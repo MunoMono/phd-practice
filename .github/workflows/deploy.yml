@@ -37,6 +37,9 @@ jobs:
         working-directory: ./frontend
         run: npm run build
       
+      - name: Add .nojekyll file
+        run: touch ./frontend/dist/.nojekyll
+      
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
