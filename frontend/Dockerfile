@@ -21,9 +21,13 @@ FROM nginx:alpine
 # Copy built assets from builder
 COPY --from=builder /app/dist /usr/share/nginx/html
 
-# Copy nginx configuration
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# Copy nginx configurations (both dev and prod)
+COPY nginx.conf /etc/nginx/conf.d/nginx.conf
+COPY nginx.prod.conf /etc/nginx/conf.d/nginx.prod.conf
 
-EXPOSE 80
+# By default, use the standard config (can be overridden)
+RUN ln -sf /etc/nginx/conf.d/nginx.conf /etc/nginx/conf.d/default.conf
+
+EXPOSE 80 443
 
 CMD ["nginx", "-g", "daemon off;"]
