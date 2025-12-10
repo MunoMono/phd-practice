@@ -22,7 +22,6 @@ const Header = ({ currentTheme, onThemeToggle }) => {
   const location = useLocation()
   const { loginWithRedirect, logout, isAuthenticated, user } = useAuth0()
   const isDark = currentTheme === 'g100'
-  const [isSwitcherOpen, setIsSwitcherOpen] = useState(false)
   const [isArchiveSwitcherOpen, setIsArchiveSwitcherOpen] = useState(false)
   const [archiveView, setArchiveView] = useState(0)
 
@@ -67,10 +66,15 @@ const Header = ({ currentTheme, onThemeToggle }) => {
           {isDark ? <Light size={20} /> : <Asleep size={20} />}
         </HeaderGlobalAction>
         <HeaderGlobalAction
-          aria-label="User menu"
+          aria-label={isAuthenticated ? 'Logout' : 'Login'}
           tooltipAlignment="end"
-          isActive={isSwitcherOpen}
-          onClick={() => setIsSwitcherOpen(!isSwitcherOpen)}
+          onClick={() => {
+            if (isAuthenticated) {
+              logout({ returnTo: window.location.origin })
+            } else {
+              loginWithRedirect()
+            }
+          }}
         >
           <UserAvatar size={20} />
         </HeaderGlobalAction>
@@ -83,37 +87,6 @@ const Header = ({ currentTheme, onThemeToggle }) => {
           <SwitcherIcon size={20} />
         </HeaderGlobalAction>
       </HeaderGlobalBar>
-      <HeaderPanel aria-label="User menu" expanded={isSwitcherOpen}>
-        <Switcher aria-label="User menu">
-          {isAuthenticated ? (
-            <>
-              <SwitcherItem aria-label="User email" isSelected>
-                {user?.email}
-              </SwitcherItem>
-              <SwitcherDivider />
-              <SwitcherItem 
-                aria-label="Logout"
-                onClick={() => {
-                  setIsSwitcherOpen(false)
-                  logout({ returnTo: window.location.origin })
-                }}
-              >
-                Logout
-              </SwitcherItem>
-            </>
-          ) : (
-            <SwitcherItem 
-              aria-label="Login"
-              onClick={() => {
-                setIsSwitcherOpen(false)
-                loginWithRedirect()
-              }}
-            >
-              Login
-            </SwitcherItem>
-          )}
-        </Switcher>
-      </HeaderPanel>
       <HeaderPanel aria-label="DDR Archive" expanded={isArchiveSwitcherOpen}>
         <Switcher aria-label="DDR Archive">
           <SwitcherItem 
