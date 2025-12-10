@@ -9,11 +9,9 @@ import {
   Switcher,
   SwitcherItem,
   SwitcherDivider,
-  SkipToContent,
-  ContentSwitcher,
-  Switch
+  SkipToContent
 } from '@carbon/react'
-import { Asleep, Light, UserAvatar } from '@carbon/icons-react'
+import { Asleep, Light, UserAvatar, Switcher as SwitcherIcon } from '@carbon/icons-react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth0 } from '@auth0/auth0-react'
 import { useState } from 'react'
@@ -25,6 +23,7 @@ const Header = ({ currentTheme, onThemeToggle }) => {
   const { loginWithRedirect, logout, isAuthenticated, user } = useAuth0()
   const isDark = currentTheme === 'g100'
   const [isSwitcherOpen, setIsSwitcherOpen] = useState(false)
+  const [isArchiveSwitcherOpen, setIsArchiveSwitcherOpen] = useState(false)
   const [archiveView, setArchiveView] = useState(0)
 
   return (
@@ -59,15 +58,15 @@ const Header = ({ currentTheme, onThemeToggle }) => {
           Experimental Log
         </HeaderMenuItem>
       </HeaderNavigation>
-      <ContentSwitcher 
-        selectedIndex={archiveView} 
-        onChange={(e) => setArchiveView(e.index)}
-        style={{ marginLeft: 'auto', marginRight: '1rem' }}
-      >
-        <Switch name="public" text="DDR Public Archive" />
-        <Switch name="admin" text="DDR Archive Admin" />
-      </ContentSwitcher>
       <HeaderGlobalBar>
+        <HeaderGlobalAction
+          aria-label="DDR Archive"
+          tooltipAlignment="end"
+          isActive={isArchiveSwitcherOpen}
+          onClick={() => setIsArchiveSwitcherOpen(!isArchiveSwitcherOpen)}
+        >
+          <SwitcherIcon size={20} />
+        </HeaderGlobalAction>
         <HeaderGlobalAction
           aria-label="User menu"
           tooltipAlignment="end"
@@ -113,6 +112,31 @@ const Header = ({ currentTheme, onThemeToggle }) => {
               Login
             </SwitcherItem>
           )}
+        </Switcher>
+      </HeaderPanel>
+      <HeaderPanel aria-label="DDR Archive" expanded={isArchiveSwitcherOpen}>
+        <Switcher aria-label="DDR Archive">
+          <SwitcherItem 
+            aria-label="DDR Public Archive"
+            isSelected={archiveView === 0}
+            onClick={() => {
+              setArchiveView(0)
+              setIsArchiveSwitcherOpen(false)
+            }}
+          >
+            DDR Public Archive
+          </SwitcherItem>
+          <SwitcherDivider />
+          <SwitcherItem 
+            aria-label="DDR Archive Admin"
+            isSelected={archiveView === 1}
+            onClick={() => {
+              setArchiveView(1)
+              setIsArchiveSwitcherOpen(false)
+            }}
+          >
+            DDR Archive Admin
+          </SwitcherItem>
         </Switcher>
       </HeaderPanel>
     </CarbonHeader>
