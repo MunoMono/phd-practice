@@ -60,12 +60,11 @@ const Header = ({ currentTheme, onThemeToggle }) => {
       </HeaderNavigation>
       <HeaderGlobalBar>
         <HeaderGlobalAction
-          aria-label="DDR Archive"
+          aria-label={isDark ? 'Switch to light theme' : 'Switch to dark theme'}
           tooltipAlignment="end"
-          isActive={isArchiveSwitcherOpen}
-          onClick={() => setIsArchiveSwitcherOpen(!isArchiveSwitcherOpen)}
+          onClick={onThemeToggle}
         >
-          <SwitcherIcon size={20} />
+          {isDark ? <Light size={20} /> : <Asleep size={20} />}
         </HeaderGlobalAction>
         <HeaderGlobalAction
           aria-label="User menu"
@@ -76,11 +75,12 @@ const Header = ({ currentTheme, onThemeToggle }) => {
           <UserAvatar size={20} />
         </HeaderGlobalAction>
         <HeaderGlobalAction
-          aria-label={isDark ? 'Switch to light theme' : 'Switch to dark theme'}
+          aria-label="DDR Archive"
           tooltipAlignment="end"
-          onClick={onThemeToggle}
+          isActive={isArchiveSwitcherOpen}
+          onClick={() => setIsArchiveSwitcherOpen(!isArchiveSwitcherOpen)}
         >
-          {isDark ? <Light size={20} /> : <Asleep size={20} />}
+          <SwitcherIcon size={20} />
         </HeaderGlobalAction>
       </HeaderGlobalBar>
       <HeaderPanel aria-label="User menu" expanded={isSwitcherOpen}>
