@@ -32,5 +32,22 @@ export default defineConfig({
         `
       }
     }
+  },
+  assetsInclude: ['**/*.woff', '**/*.woff2', '**/*.ttf', '**/*.eot'],
+  build: {
+    rollupOptions: {
+      output: {
+        assetFileNames: (assetInfo) => {
+          // Keep font files in their original structure
+          if (assetInfo.name.endsWith('.woff') || 
+              assetInfo.name.endsWith('.woff2') || 
+              assetInfo.name.endsWith('.ttf') || 
+              assetInfo.name.endsWith('.eot')) {
+            return 'assets/fonts/[name][extname]';
+          }
+          return 'assets/[name]-[hash][extname]';
+        }
+      }
+    }
   }
 })
