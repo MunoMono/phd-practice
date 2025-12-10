@@ -57,8 +57,20 @@ VITE_AUTH0_REDIRECT_URI=https://innovationdesign.io
 # Environment
 VITE_DDR_ENV=production
 
-# GraphQL API Endpoint
-VITE_GRAPHQL_ENDPOINT=https://ddrarchive.org/graphql
+# PostgreSQL Configuration
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=secure_password_change_me
+POSTGRES_DB=epistemic_drift
+
+# Backend Configuration
+GRANITE_MODEL_PATH=ibm-granite/granite-4.0-h-small-instruct
+GRANITE_DEVICE=cpu
+
+# S3/Storage Configuration (optional)
+S3_BUCKET=
+S3_ENDPOINT=
+S3_ACCESS_KEY=
+S3_SECRET_KEY=
 EOF
 
 echo "🛑 Stopping existing containers..."
