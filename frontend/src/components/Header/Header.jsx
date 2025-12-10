@@ -5,9 +5,12 @@ import {
   HeaderMenuItem,
   HeaderGlobalBar,
   HeaderGlobalAction,
+  Switcher,
+  SwitcherItem,
+  SwitcherDivider,
   SkipToContent
 } from '@carbon/react'
-import { Asleep, Light, Login, Logout } from '@carbon/icons-react'
+import { Asleep, Light, UserAvatar } from '@carbon/icons-react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth0 } from '@auth0/auth0-react'
 import '../../styles/components/Header.scss'
@@ -58,23 +61,35 @@ const Header = ({ currentTheme, onThemeToggle }) => {
         >
           {isDark ? <Light size={20} /> : <Asleep size={20} />}
         </HeaderGlobalAction>
-        {isAuthenticated ? (
-          <HeaderGlobalAction
-            aria-label="Logout"
-            tooltipAlignment="end"
-            onClick={() => logout({ logoutParams: { returnTo: window.location.origin } })}
-          >
-            <Logout size={20} />
-          </HeaderGlobalAction>
-        ) : (
-          <HeaderGlobalAction
-            aria-label="Login"
-            tooltipAlignment="end"
-            onClick={() => loginWithRedirect()}
-          >
-            <Login size={20} />
-          </HeaderGlobalAction>
-        )}
+        <HeaderGlobalAction
+          aria-label={isAuthenticated ? user?.name || 'User' : 'Login'}
+          tooltipAlignment="end"
+        >
+          <UserAvatar size={20} />
+          <Switcher aria-label="User Menu">
+            {isAuthenticated ? (
+              <>
+                <SwitcherItem aria-label="Profile">
+                  {user?.email}
+                </SwitcherItem>
+                <SwitcherDivider />
+                <SwitcherItem 
+                  aria-label="Logout"
+                  onClick={() => logout({ returnTo: window.location.origin })}
+                >
+                  Logout
+                </SwitcherItem>
+              </>
+            ) : (
+              <SwitcherItem 
+                aria-label="Login"
+                onClick={() => loginWithRedirect()}
+              >
+                Login
+              </SwitcherItem>
+            )}
+          </Switcher>
+        </HeaderGlobalAction>
       </HeaderGlobalBar>
     </CarbonHeader>
   )
