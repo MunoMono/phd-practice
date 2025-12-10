@@ -27,7 +27,7 @@ const Dashboard = () => {
         <Column lg={16} md={8} sm={4}>
           <div className="dashboard__diagram-section">
             <img 
-              src="/ai-methods/diagrams/home/phd-model.svg" 
+              src="/diagrams/home/phd-model.svg" 
               alt="PhD research framework diagram showing the three strands of research"
               className="dashboard__diagram"
             />
