@@ -1,10 +1,21 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import { viteStaticCopy } from 'vite-plugin-static-copy'
 
 // https://vite.dev/config/
 export default defineConfig({
   base: '/',
-  plugins: [react()],
+  plugins: [
+    react(),
+    viteStaticCopy({
+      targets: [
+        {
+          src: 'node_modules/@ibm/plex/IBM-Plex-*/fonts/split/woff2/*.woff2',
+          dest: 'fonts'
+        }
+      ]
+    })
+  ],
   server: {
     port: 3000,
     proxy: {
@@ -30,23 +41,6 @@ export default defineConfig({
           @use '@carbon/react/scss/utilities/convert' as *;
           @use '@carbon/react/scss/utilities/focus-outline' as *;
         `
-      }
-    }
-  },
-  assetsInclude: ['**/*.woff', '**/*.woff2', '**/*.ttf', '**/*.eot'],
-  build: {
-    rollupOptions: {
-      output: {
-        assetFileNames: (assetInfo) => {
-          // Keep font files in their original structure
-          if (assetInfo.name.endsWith('.woff') || 
-              assetInfo.name.endsWith('.woff2') || 
-              assetInfo.name.endsWith('.ttf') || 
-              assetInfo.name.endsWith('.eot')) {
-            return 'assets/fonts/[name][extname]';
-          }
-          return 'assets/[name]-[hash][extname]';
-        }
       }
     }
   }
