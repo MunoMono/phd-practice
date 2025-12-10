@@ -5,6 +5,7 @@ import {
   HeaderMenuItem,
   HeaderGlobalBar,
   HeaderGlobalAction,
+  HeaderPanel,
   Switcher,
   SwitcherItem,
   SwitcherDivider,
@@ -13,6 +14,7 @@ import {
 import { Asleep, Light, UserAvatar } from '@carbon/icons-react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth0 } from '@auth0/auth0-react'
+import { useState } from 'react'
 import '../../styles/components/Header.scss'
 
 const Header = ({ currentTheme, onThemeToggle }) => {
@@ -20,6 +22,7 @@ const Header = ({ currentTheme, onThemeToggle }) => {
   const location = useLocation()
   const { loginWithRedirect, logout, isAuthenticated, user } = useAuth0()
   const isDark = currentTheme === 'g100'
+  const [isSwitcherOpen, setIsSwitcherOpen] = useState(false)
 
   return (
     <CarbonHeader aria-label="Epistemic Drift Research">
@@ -61,33 +64,46 @@ const Header = ({ currentTheme, onThemeToggle }) => {
         >
           {isDark ? <Light size={20} /> : <Asleep size={20} />}
         </HeaderGlobalAction>
-        <HeaderGlobalAction aria-label="User menu" tooltipAlignment="end">
+        <HeaderGlobalAction
+          aria-label="User menu"
+          tooltipAlignment="end"
+          isActive={isSwitcherOpen}
+          onClick={() => setIsSwitcherOpen(!isSwitcherOpen)}
+        >
           <UserAvatar size={20} />
-          <Switcher aria-label="User menu">
-            {isAuthenticated ? (
-              <>
-                <SwitcherItem aria-label="User email">
-                  {user?.email}
-                </SwitcherItem>
-                <SwitcherDivider />
-                <SwitcherItem 
-                  aria-label="Logout"
-                  onClick={() => logout({ returnTo: window.location.origin })}
-                >
-                  Logout
-                </SwitcherItem>
-              </>
-            ) : (
-              <SwitcherItem 
-                aria-label="Login"
-                onClick={() => loginWithRedirect()}
-              >
-                Login
-              </SwitcherItem>
-            )}
-          </Switcher>
         </HeaderGlobalAction>
       </HeaderGlobalBar>
+      <HeaderPanel aria-label="User menu" expanded={isSwitcherOpen}>
+        <Switcher aria-label="User menu">
+          {isAuthenticated ? (
+            <>
+              <SwitcherItem aria-label="User email" isSelected>
+                {user?.email}
+              </SwitcherItem>
+              <SwitcherDivider />
+              <SwitcherItem 
+                aria-label="Logout"
+                onClick={() => {
+                  setIsSwitcherOpen(false)
+                  logout({ returnTo: window.location.origin })
+                }}
+              >
+                Logout
+              </SwitcherItem>
+            </>
+          ) : (
+            <SwitcherItem 
+              aria-label="Login"
+              onClick={() => {
+                setIsSwitcherOpen(false)
+                loginWithRedirect()
+              }}
+            >
+              Login
+            </SwitcherItem>
+          )}
+        </Switcher>
+      </HeaderPanel>
     </CarbonHeader>
   )
 }
