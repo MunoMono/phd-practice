@@ -42,6 +42,24 @@ export default defineConfig({
           @use '@carbon/react/scss/utilities/focus-outline' as *;
         `
       }
+    },
+    postcss: {
+      plugins: [
+        {
+          postcssPlugin: 'rewrite-ibm-plex-urls',
+          Once(root) {
+            root.walkDecls(decl => {
+              if (decl.value.includes('~@ibm/plex')) {
+                // Rewrite ~@ibm/plex paths to /fonts/
+                decl.value = decl.value.replace(
+                  /url\(~@ibm\/plex\/IBM-Plex-[^/]+\/fonts\/split\/woff2\/([^)]+)\)/g,
+                  'url(/fonts/$1)'
+                );
+              }
+            });
+          }
+        }
+      ]
     }
   }
 })
