@@ -9,7 +9,9 @@ import {
   Switcher,
   SwitcherItem,
   SwitcherDivider,
-  SkipToContent
+  SkipToContent,
+  ContentSwitcher,
+  Switch
 } from '@carbon/react'
 import { Asleep, Light, UserAvatar } from '@carbon/icons-react'
 import { useNavigate, useLocation } from 'react-router-dom'
@@ -23,6 +25,7 @@ const Header = ({ currentTheme, onThemeToggle }) => {
   const { loginWithRedirect, logout, isAuthenticated, user } = useAuth0()
   const isDark = currentTheme === 'g100'
   const [isSwitcherOpen, setIsSwitcherOpen] = useState(false)
+  const [archiveView, setArchiveView] = useState(0)
 
   return (
     <CarbonHeader aria-label="Epistemic Drift Research">
@@ -56,14 +59,15 @@ const Header = ({ currentTheme, onThemeToggle }) => {
           Experimental Log
         </HeaderMenuItem>
       </HeaderNavigation>
+      <ContentSwitcher 
+        selectedIndex={archiveView} 
+        onChange={(e) => setArchiveView(e.index)}
+        style={{ marginLeft: 'auto', marginRight: '1rem' }}
+      >
+        <Switch name="public" text="DDR Public Archive" />
+        <Switch name="admin" text="DDR Archive Admin" />
+      </ContentSwitcher>
       <HeaderGlobalBar>
-        <HeaderGlobalAction
-          aria-label={isDark ? 'Switch to light theme' : 'Switch to dark theme'}
-          tooltipAlignment="end"
-          onClick={onThemeToggle}
-        >
-          {isDark ? <Light size={20} /> : <Asleep size={20} />}
-        </HeaderGlobalAction>
         <HeaderGlobalAction
           aria-label="User menu"
           tooltipAlignment="end"
@@ -71,6 +75,13 @@ const Header = ({ currentTheme, onThemeToggle }) => {
           onClick={() => setIsSwitcherOpen(!isSwitcherOpen)}
         >
           <UserAvatar size={20} />
+        </HeaderGlobalAction>
+        <HeaderGlobalAction
+          aria-label={isDark ? 'Switch to light theme' : 'Switch to dark theme'}
+          tooltipAlignment="end"
+          onClick={onThemeToggle}
+        >
+          {isDark ? <Light size={20} /> : <Asleep size={20} />}
         </HeaderGlobalAction>
       </HeaderGlobalBar>
       <HeaderPanel aria-label="User menu" expanded={isSwitcherOpen}>
