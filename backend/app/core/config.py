@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     API_V1_PREFIX: str = "/api/v1"
     ALLOWED_ORIGINS: List[str] = ["http://localhost:3000", "http://localhost:5173"]
     
-    # Database
+    # Local Database (research data & vectors)
     POSTGRES_USER: str = "postgres"
     POSTGRES_PASSWORD: str = "postgres"
     POSTGRES_HOST: str = "localhost"
@@ -22,6 +22,19 @@ class Settings(BaseSettings):
     @property
     def DATABASE_URL(self) -> str:
         return f"postgresql://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
+    
+    # DDR Archive Database (read-only queries)
+    DDR_POSTGRES_USER: str = ""
+    DDR_POSTGRES_PASSWORD: str = ""
+    DDR_POSTGRES_HOST: str = ""
+    DDR_POSTGRES_PORT: int = 5432
+    DDR_POSTGRES_DB: str = "ddr_archive"
+    
+    @property
+    def DDR_DATABASE_URL(self) -> str:
+        if not self.DDR_POSTGRES_HOST:
+            return ""
+        return f"postgresql://{self.DDR_POSTGRES_USER}:{self.DDR_POSTGRES_PASSWORD}@{self.DDR_POSTGRES_HOST}:{self.DDR_POSTGRES_PORT}/{self.DDR_POSTGRES_DB}"
     
     # Granite Model
     GRANITE_MODEL_PATH: str = "ibm-granite/granite-4.0-h-small-instruct"
