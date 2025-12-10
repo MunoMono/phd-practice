@@ -70,7 +70,11 @@ const Header = ({ currentTheme, onThemeToggle }) => {
           tooltipAlignment="end"
           onClick={() => {
             if (isAuthenticated) {
-              logout({ returnTo: 'https://innovationdesign.io' })
+              logout({ 
+                logoutParams: {
+                  returnTo: 'https://innovationdesign.io'
+                }
+              })
             } else {
               loginWithRedirect()
             }
