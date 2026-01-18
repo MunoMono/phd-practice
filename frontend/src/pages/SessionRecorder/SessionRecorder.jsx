@@ -1,4 +1,5 @@
-import { Grid, Column, Tile, DataTable, TableContainer, Table, TableHead, TableRow, TableHeader, TableBody, TableCell } from '@carbon/react'
+import { Grid, Column, Tile, DataTable, TableContainer, Table, TableHead, TableRow, TableHeader, TableBody, TableCell, Tag } from '@carbon/react'
+import { Recording } from '@carbon/icons-react'
 import '../../styles/pages/SessionRecorder.scss'
 
 const SessionRecorder = () => {
@@ -22,10 +23,18 @@ const SessionRecorder = () => {
   return (
     <Grid className="session-recorder" fullWidth>
       <Column lg={16} md={8} sm={4}>
-        <h1>Session Recorder</h1>
-        <p className="recorder__description">
-          Complete audit trail of human-AI collaboration sessions
-        </p>
+        <div className="recorder__header">
+          <div>
+            <h1>Session Recorder</h1>
+            <p className="recorder__description">
+              Inference logging for explainable AI. 
+              Every prediction links to source chunks for manual validation by supervisors.
+            </p>
+          </div>
+          <Tag type="green" size="md">
+            <Recording size={16} /> XAI Enabled
+          </Tag>
+        </div>
       </Column>
 
       <Column lg={16} md={8} sm={4}>

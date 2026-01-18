@@ -1,7 +1,34 @@
 @use '@carbon/react/scss/spacing' as *;
 @use '@carbon/react/scss/theme' as *;
+@use '@carbon/react/scss/breakpoint' as *;
 
 .experimental-log {
+  padding: $spacing-07 $spacing-05;
+
+  h1 {
+    font-size: 2.5rem;
+    font-weight: 400;
+    margin: 0 0 $spacing-03;
+    background: linear-gradient(135deg, #8a3ffc, #a56eff);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .log__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: $spacing-07;
+    padding-bottom: $spacing-06;
+    border-bottom: 2px solid rgba(138, 63, 252, 0.2);
+
+    @include breakpoint-down(md) {
+      flex-direction: column;
+      gap: $spacing-05;
+    }
+  }
+
   .log__description {
     margin-bottom: $spacing-06;
     color: $text-secondary;

@@ -1,6 +1,6 @@
-import { Grid, Column, Tile, ClickableTile } from '@carbon/react'
+import { Grid, Column, Tile, ClickableTile, Tag } from '@carbon/react'
 import { useNavigate } from 'react-router-dom'
-import { ChartNetwork, DataVis_1, Recording, Chemistry } from '@carbon/icons-react'
+import { ChartNetwork, DataVis_1, Recording, Chemistry, Checkmark, InProgress } from '@carbon/icons-react'
 import TemporalDriftChart from '../../components/visualizations/TemporalDriftChart'
 import StatsCards from '../../components/StatsCards/StatsCards'
 import '../../styles/pages/Dashboard.scss'
@@ -17,8 +17,8 @@ const Dashboard = () => {
               Epistemic drift detection
             </h1>
             <p className="dashboard__hero-subtitle">
-              Second-order cybernetic analysis for AI research transparency.
-              Track reasoning paths, analyze collaboration patterns, and monitor temporal drift in real-time.
+              PID-gated NLP for design methods research (1965-1985). 
+              BERT embeddings + provenance tracking + IBM Granite fine-tuning with full academic attribution.
             </p>
           </Column>
         </Grid>
@@ -35,6 +35,9 @@ const Dashboard = () => {
 
         <Column lg={16} md={8} sm={4}>
           <div className="dashboard__diagram-section">
+            <Tag type="blue" size="md" className="dashboard__diagram-badge">
+              <Checkmark size={16} /> PID-Gated Architecture
+            </Tag>
             <img 
               src="/diagrams/home/phd-model.svg" 
               alt="PhD research framework diagram showing the three strands of research"
@@ -53,7 +56,7 @@ const Dashboard = () => {
               <ChartNetwork size={32} />
             </div>
             <h3>Evidence Tracer</h3>
-            <p>Visualize reasoning paths from queries to source documents with interactive network graphs</p>
+            <p>Trace predictions to archival sources with formal citations. Full provenance: Embeddings → Chunks → PIDs → DDR Archive</p>
           </ClickableTile>
         </Column>
 
@@ -63,7 +66,7 @@ const Dashboard = () => {
               <Recording size={32} />
             </div>
             <h3>Session Recorder</h3>
-            <p>Log and analyze human-AI collaboration sessions for interaction patterns</p>
+            <p>Inference logging for XAI. Every prediction attributed to source chunks for supervisor validation</p>
           </ClickableTile>
         </Column>
 
@@ -73,7 +76,7 @@ const Dashboard = () => {
               <Chemistry size={32} />
             </div>
             <h3>Experimental Log</h3>
-            <p>Document experiments and track training metrics over time</p>
+            <p>IBM Granite training runs with provenance. Track which PIDs trained which model for reproducibility</p>
           </ClickableTile>
         </Column>
 
@@ -100,20 +103,20 @@ const Dashboard = () => {
             <Grid condensed>
               <Column lg={5} md={8} sm={4}>
                 <Tile className="dashboard__info-tile">
-                  <h4>Presentation Layer</h4>
-                  <p>React + Carbon Design System + D3.js for interactive visualizations</p>
+                  <h4>Ingestion Layer</h4>
+                  <p>PID-gated allowlist: GraphQL sync + S3 validation + Docling OCR (PDF/TIFF)</p>
                 </Tile>
               </Column>
               <Column lg={5} md={8} sm={4}>
                 <Tile className="dashboard__info-tile">
-                  <h4>Logic Layer</h4>
-                  <p>FastAPI + Granite 4.0 H-Small-Instruct (32B/9B parameters)</p>
+                  <h4>NLP Layer</h4>
+                  <p>BERT embeddings (384-dim) + IBM Granite fine-tuning + pgvector similarity search</p>
                 </Tile>
               </Column>
               <Column lg={6} md={8} sm={4}>
                 <Tile className="dashboard__info-tile">
-                  <h4>Data Layer</h4>
-                  <p>PostgreSQL with pgvector extension + S3 object storage</p>
+                  <h4>Provenance Layer</h4>
+                  <p>Training runs + inference logs + corpus snapshots + formal citations</p>
                 </Tile>
               </Column>
             </Grid>

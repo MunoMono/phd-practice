@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from strawberry.fastapi import GraphQLRouter
 import logging
 
-from app.api.routes import agent, sessions, experiments, metrics, documents, sync
+from app.api.routes import agent, sessions, experiments, metrics, documents, sync, graphql_sync, provenance
 from app.api.graphql.schema import schema
 from app.core.config import settings
 
@@ -54,6 +54,8 @@ app.include_router(experiments.router, prefix="/api/experiments", tags=["experim
 app.include_router(metrics.router, prefix="/api/metrics", tags=["metrics"])
 app.include_router(documents.router, prefix="/api/documents", tags=["documents"])
 app.include_router(sync.router, prefix="/api/sync", tags=["sync"])
+app.include_router(graphql_sync.router, prefix="/api/v1", tags=["graphql-sync"])
+app.include_router(provenance.router, prefix="/api/provenance", tags=["provenance"])
 
 # GraphQL endpoint
 graphql_app = GraphQLRouter(schema)

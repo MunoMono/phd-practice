@@ -17,6 +17,7 @@ from app.core.database import LocalSessionLocal
 from app.models.document import Document, DocumentChunk
 from app.services.docling_processor import DoclingProcessor
 from app.services.embedding_service import EmbeddingService
+from app.services.authority_service import AuthorityService
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +29,9 @@ class S3SyncService:
         self.s3_client = None
         self.docling = DoclingProcessor()
         self.embeddings = EmbeddingService()
+        self.authorities = AuthorityService()  # For PID validation and metadata enrichment
         self._init_s3_client()
+        self._valid_pids_cache = None  # Cache of PIDs from Postgres authorities
     
     def _init_s3_client(self):
         """Initialize S3 client for DigitalOcean Spaces"""
@@ -63,13 +66,96 @@ class S3SyncService:
         
         return None
     
-    def list_pdfs_in_bucket(self) -> List[Dict]:
-        """List all PDF files in the S3 bucket"""
+    def extract_pid_from_s3_key(self, s3_key: str, metadata: Optional[Dict] = None) -> Optional[str]:
+        """
+        Extract PID from S3 object key or metadata
+        
+        Strategy:
+        1. Check S3 object metadata for 'pid' tag
+        2. Parse PID from filename pattern (e.g., pid_12345_document.pdf)
+        3. Return None if no PID found (will be filtered out)
+        
+        Args:
+            s3_key: S3 object key
+            metadata: S3 object metadata dict
+        
+        Returns:
+            PID string or None
+        """
+        # Check metadata first (most reliable)
+        if metadata and 'pid' in metadata:
+            return metadata['pid']
+        
+        # Parse from filename pattern: pid_XXXXX or PID-XXXXX
+        filename = os.path.basename(s3_key)
+        pid_patterns = [
+            r'pid[_-]([a-zA-Z0-9]+)',  # pid_12345 or pid-12345
+            r'PID[_-]([a-zA-Z0-9]+)',  # PID_12345 or PID-12345
+            r'^([a-zA-Z0-9]+)_',       # 12345_document.pdf
+        ]
+        
+        for pattern in pid_patterns:
+            match = re.search(pattern, filename)
+            if match:
+                return match.group(1)
+        
+        return None
+    
+    def get_valid_pids_from_postgres(self) -> set:
+        """
+        Query Postgres for all valid authority PIDs
+        
+        This creates the allowlist - only assets with these PIDs will be synced
+        
+        Returns:
+            Set of valid PID strings
+        """
+        if self._valid_pids_cache is not None:
+            return self._valid_pids_cache
+        
+        db = LocalSessionLocal()
+        try:
+            # Get all PIDs from documents table (already ingested)
+            from sqlalchemy import text
+            result = db.execute(text(
+                "SELECT DISTINCT pid FROM documents WHERE pid IS NOT NULL"
+            ))
+            valid_pids = {row[0] for row in result}
+            
+            # TODO: Optionally query DDR Archive GraphQL for authority PIDs
+            # For now, we trust what's already in our database
+            
+            self._valid_pids_cache = valid_pids
+            logger.info(f"Loaded {len(valid_pids)} valid PIDs from Postgres")
+            return valid_pids
+            
+        except Exception as e:
+            logger.error(f"Error loading valid PIDs: {e}")
+            return set()
+        finally:
+            db.close()
+    
+    def list_training_assets_in_bucket(self, enforce_pid_filter: bool = True) -> List[Dict]:
+        """
+        List all PID-linked PDF/TIFF files in S3 bucket (training corpus only)
+        
+        CRITICAL: Only returns assets with valid PIDs from Postgres authorities
+        
+        Args:
+            enforce_pid_filter: If True, only return assets with valid PIDs (default)
+        
+        Returns:
+            List of asset metadata dicts with PID linkage
+        """
         if not self.s3_client:
             return []
         
+        # Get allowlist of valid PIDs
+        valid_pids = self.get_valid_pids_from_postgres() if enforce_pid_filter else set()
+        
         try:
-            pdfs = []
+            assets = []
+            filtered_count = 0
             paginator = self.s3_client.get_paginator('list_objects_v2')
             pages = paginator.paginate(Bucket=settings.S3_BUCKET)
             
@@ -80,20 +166,43 @@ class S3SyncService:
                 for obj in page['Contents']:
                     key = obj['Key']
                     
-                    # Filter for PDFs only
-                    if key.lower().endswith('.pdf'):
-                        year = self.extract_year_from_filename(key)
+                    # Filter for PDFs and TIFFs only (training-eligible formats)
+                    allowed_extensions = ('.pdf', '.tiff', '.tif')
+                    if not key.lower().endswith(allowed_extensions):
+                        continue
+                    
+                    # Extract PID from S3 key/metadata
+                    # TODO: Fetch metadata for more reliable PID extraction
+                    pid = self.extract_pid_from_s3_key(key)
+                    
+                    # ALLOWLIST FILTER: Skip if no PID or PID not in Postgres
+                    if enforce_pid_filter:
+                        if not pid:
+                            filtered_count += 1
+                            logger.debug(f"Skipping {key} - no PID found")
+                            continue
                         
-                        pdfs.append({
-                            'key': key,
-                            'filename': os.path.basename(key),
-                            'size': obj['Size'],
-                            'last_modified': obj['LastModified'],
-                            'publication_year': year
-                        })
+                        if pid not in valid_pids:
+                            filtered_count += 1
+                            logger.debug(f"Skipping {key} - PID {pid} not in authorities")
+                            continue
+                    
+                    year = self.extract_year_from_filename(key)
+                    
+                    assets.append({
+                        'key': key,
+                        'filename': os.path.basename(key),
+                        'pid': pid,  # CRITICAL: PID linkage
+                        'size': obj['Size'],
+                        'last_modified': obj['LastModified'],
+                        'publication_year': year
+                    })
             
-            logger.info(f"Found {len(pdfs)} PDFs in S3 bucket")
-            return pdfs
+            logger.info(
+                f"Found {len(assets)} PID-linked training assets in S3 bucket "
+                f"({filtered_count} filtered out - no valid PID)"
+            )
+            return assets
             
         except ClientError as e:
             logger.error(f"Error listing S3 bucket: {e}")
@@ -133,7 +242,9 @@ class S3SyncService:
         temp_path: str
     ) -> Optional[str]:
         """
-        Process a PDF: extract text, generate embeddings, store in DB
+        Process a PDF/TIFF: extract text, generate embeddings, store in DB
+        
+        CRITICAL: Requires PID in pdf_info - only authority-linked assets are processed
         
         Returns:
             document_id if successful, None otherwise
@@ -142,25 +253,39 @@ class S3SyncService:
         document_id = None
         
         try:
+            # CRITICAL: Validate PID presence
+            if 'pid' not in pdf_info or not pdf_info['pid']:
+                logger.error(f"Cannot process {pdf_info['key']} - no PID (not in training corpus)")
+                return None
+            
             # Check if already processed
             existing = db.query(Document).filter(
                 Document.s3_key == pdf_info['key']
             ).first()
             
             if existing:
-                logger.info(f"Document {pdf_info['key']} already processed")
+                logger.info(f"Document {pdf_info['key']} already processed (PID: {existing.pid})")
                 return existing.document_id
             
             # Generate document ID
             document_id = f"doc_{uuid.uuid4().hex[:12]}"
             
-            # Create document record
+            # Determine file type
+            if pdf_info['key'].lower().endswith('.pdf'):
+                file_type = 'application/pdf'
+            elif pdf_info['key'].lower().endswith(('.tiff', '.tif')):
+                file_type = 'image/tiff'
+            else:
+                file_type = 'application/octet-stream'
+            
+            # Create document record with PID
             doc = Document(
                 document_id=document_id,
+                pid=pdf_info['pid'],  # CRITICAL: Authority linkage
                 title=pdf_info['filename'],
                 publication_year=pdf_info.get('publication_year') or 1970,  # Default mid-period
                 filename=pdf_info['filename'],
-                file_type='application/pdf',
+                file_type=file_type,
                 s3_key=pdf_info['key'],
                 file_size_bytes=pdf_info['size'],
                 processing_status='processing'

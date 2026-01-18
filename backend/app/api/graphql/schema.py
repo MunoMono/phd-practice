@@ -183,9 +183,17 @@ class Query:
     def temporal_documents(
         self,
         start_year: Optional[int] = None,
-        end_year: Optional[int] = None
+        end_year: Optional[int] = None,
+        only_with_pid: bool = False  # Filter for training corpus only
     ) -> List['TemporalDocument']:
-        """Query documents by publication year"""
+        """
+        Query documents by publication year
+        
+        Args:
+            start_year: Filter by minimum publication year
+            end_year: Filter by maximum publication year
+            only_with_pid: If True, only return PID-linked documents (training corpus)
+        """
         db = LocalSessionLocal()
         try:
             query = db.query(Document)
@@ -195,6 +203,10 @@ class Query:
             if end_year:
                 query = query.filter(Document.publication_year <= end_year)
             
+            # CRITICAL: Filter for training corpus (PID-linked only)
+            if only_with_pid:
+                query = query.filter(Document.pid.isnot(None))
+            
             docs = query.order_by(Document.publication_year).all()
             
             return [
@@ -203,12 +215,79 @@ class Query:
                     title=doc.title or "",
                     publication_year=doc.publication_year,
                     status=doc.processing_status or "pending",
-                    has_diagrams=doc.has_diagrams or 0
+                    has_diagrams=doc.has_diagrams or 0,
+                    pid=doc.pid,  # Expose PID for verification
+                    authority_id=doc.authority_id
                 )
                 for doc in docs
             ]
         except:
             return []
+        finally:
+            db.close()
+    
+    @strawberry.field
+    def training_corpus_stats(self) -> 'TrainingCorpusStats':
+        """
+        Get statistics on PID-linked training corpus
+        
+        Shows data quality: how many documents have PIDs (eligible for training)
+        vs orphaned assets (no PID linkage)
+        """
+        db = LocalSessionLocal()
+        try:
+            from sqlalchemy import text, func
+            
+            # Total documents
+            total = db.query(func.count(Document.id)).scalar() or 0
+            
+            # Documents with PID (training eligible)
+            with_pid = db.query(func.count(Document.id)).filter(
+                Document.pid.isnot(None)
+            ).scalar() or 0
+            
+            # Documents without PID (orphaned)
+            without_pid = total - with_pid
+            
+            # Coverage percentage
+            pid_coverage = (with_pid / total * 100) if total > 0 else 0.0
+            
+            # Breakdown by year
+            yearly_stats = db.execute(text("""
+                SELECT 
+                    publication_year,
+                    COUNT(*) as total,
+                    COUNT(pid) as with_pid
+                FROM documents
+                GROUP BY publication_year
+                ORDER BY publication_year
+            """))
+            
+            documents_by_year = [
+                YearlyDocumentCount(
+                    year=row[0],
+                    count=row[1],
+                    with_pid_count=row[2]
+                )
+                for row in yearly_stats
+            ]
+            
+            return TrainingCorpusStats(
+                total_documents=total,
+                total_with_pid=with_pid,
+                total_without_pid=without_pid,
+                pid_coverage_percent=round(pid_coverage, 2),
+                documents_by_year=documents_by_year
+            )
+        except Exception as e:
+            logger.error(f"Error getting training corpus stats: {e}")
+            return TrainingCorpusStats(
+                total_documents=0,
+                total_with_pid=0,
+                total_without_pid=0,
+                pid_coverage_percent=0.0,
+                documents_by_year=[]
+            )
         finally:
             db.close()
     
@@ -251,6 +330,25 @@ class TemporalDocument:
     publication_year: int
     status: str
     has_diagrams: int
+    pid: Optional[str] = None  # Authority linkage
+    authority_id: Optional[str] = None
+
+
+@strawberry.type
+class TrainingCorpusStats:
+    """Statistics for PID-linked training corpus"""
+    total_documents: int
+    total_with_pid: int
+    total_without_pid: int  # Orphaned assets (not eligible for training)
+    pid_coverage_percent: float
+    documents_by_year: List['YearlyDocumentCount']
+
+
+@strawberry.type
+class YearlyDocumentCount:
+    year: int
+    count: int
+    with_pid_count: int
 
 
 @strawberry.type

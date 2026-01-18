@@ -24,22 +24,35 @@ embedding_service = EmbeddingService()
 @router.post("/upload")
 async def upload_document(
     file: UploadFile = File(...),
+    pid: str = Form(...),  # REQUIRED: Postgres authority PID
     title: Optional[str] = Form(None),
     publication_year: int = Form(...),
     publication_date: Optional[str] = Form(None),
+    authority_id: Optional[str] = Form(None),  # DDR Archive authority ID
     metadata: Optional[str] = Form("{}")
 ):
     """
-    Upload PDF document for epistemic drift analysis
+    Upload PDF/TIFF document for epistemic drift analysis
+    
+    CRITICAL: Only PID-linked assets are eligible for training corpus
     
     Args:
-        file: PDF file upload
+        file: PDF or TIFF file upload
+        pid: Postgres authority PID (REQUIRED - links to source of truth)
         title: Document title
         publication_year: Year published (1965-1985)
         publication_date: Full publication date (optional)
+        authority_id: DDR Archive authority ID (optional)
         metadata: JSON string with author, journal, etc.
     """
     try:
+        # Validate PID is provided
+        if not pid or not pid.strip():
+            raise HTTPException(
+                status_code=400,
+                detail="PID is required - only authority-linked assets can be ingested"
+            )
+        
         # Validate publication year
         if not (1965 <= publication_year <= 1985):
             raise HTTPException(
@@ -47,11 +60,12 @@ async def upload_document(
                 detail="Publication year must be between 1965 and 1985"
             )
         
-        # Validate file type
-        if not file.filename.endswith('.pdf'):
+        # Validate file type (PDF or TIFF only)
+        allowed_extensions = ['.pdf', '.tiff', '.tif']
+        if not any(file.filename.lower().endswith(ext) for ext in allowed_extensions):
             raise HTTPException(
                 status_code=400,
-                detail="Only PDF files are supported"
+                detail="Only PDF and TIFF files are supported for training corpus"
             )
         
         # Generate document ID
@@ -69,12 +83,22 @@ async def upload_document(
         # Create database record
         db = LocalSessionLocal()
         try:
+            # Determine file type
+            if file.filename.lower().endswith('.pdf'):
+                file_type = 'application/pdf'
+            elif file.filename.lower().endswith(('.tiff', '.tif')):
+                file_type = 'image/tiff'
+            else:
+                file_type = 'application/octet-stream'
+            
             doc = Document(
                 document_id=document_id,
+                pid=pid.strip(),  # CRITICAL: Authority linkage
+                authority_id=authority_id,
                 title=title or file.filename,
                 publication_year=publication_year,
                 filename=file.filename,
-                file_type='application/pdf',
+                file_type=file_type,
                 file_size_bytes=len(content),
                 processing_status='pending'
             )

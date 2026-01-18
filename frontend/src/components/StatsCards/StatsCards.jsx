@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
-import { Grid, Column, Tile, SkeletonText } from '@carbon/react'
-import { DataBase, CloudApp, Cube } from '@carbon/icons-react'
+import { Grid, Column, Tile, SkeletonText, ProgressBar, Tag } from '@carbon/react'
+import { DataBase, CloudApp, Cube, Chemistry } from '@carbon/icons-react'
 import '../../styles/components/StatsCards.scss'
 
 const StatsCards = () => {
@@ -17,7 +17,7 @@ const StatsCards = () => {
 
   const fetchStats = async () => {
     try {
-      // GraphQL query
+      // GraphQL query for PID-gated corpus metrics
       const query = `
         query {
           systemMetrics {
@@ -28,6 +28,9 @@ const StatsCards = () => {
                 researchSessions
                 experiments
                 digitalAssets
+                documents
+                trainingRuns
+                corpusSnapshots
               }
             }
             s3Storage {
@@ -36,8 +39,10 @@ const StatsCards = () => {
               configured
               images
               pdfs
+              tiffs
             }
             totalItems
+            pidCount
           }
         }
       `
@@ -71,14 +76,19 @@ const StatsCards = () => {
         local_table_counts: {
           document_embeddings: metrics.localDb.tableCounts.documentEmbeddings,
           research_sessions: metrics.localDb.tableCounts.researchSessions,
-          experiments: metrics.localDb.tableCounts.experiments
+          experiments: metrics.localDb.tableCounts.experiments,
+          documents: metrics.localDb.tableCounts.documents || 0,
+          training_runs: metrics.localDb.tableCounts.trainingRuns || 0,
+          corpus_snapshots: metrics.localDb.tableCounts.corpusSnapshots || 0
         },
         total_s3_assets: metrics.localDb.tableCounts.digitalAssets,
         total_s3_size_mb: 0,
         s3_configured: true,
         s3_images: metrics.s3Storage.images,
         s3_pdfs: metrics.s3Storage.pdfs,
-        total_items: metrics.totalItems
+        s3_tiffs: metrics.s3Storage.tiffs || 0,
+        total_items: metrics.totalItems,
+        pid_count: metrics.pidCount || 3
       })
       setError(null)
     } catch (err) {
@@ -130,57 +140,89 @@ const StatsCards = () => {
 
   return (
     <Grid condensed className="stats-cards">
-      <Column lg={5} md={4} sm={4}>
+      <Column lg={4} md={2} sm={4}>
         <Tile className="stats-card stats-card--database">
           <div className="stats-card__icon">
             <DataBase size={32} />
           </div>
           <div className="stats-card__content">
             <div className="stats-card__number">
-              {formatNumber(stats?.total_db_records)}
+              {formatNumber(stats?.pid_count)}
             </div>
-            <div className="stats-card__label">Database Records</div>
-            {stats?.local_table_counts && (
-              <div className="stats-card__breakdown">
-                <div>{formatNumber(stats.local_table_counts.document_embeddings)} embeddings</div>
-                <div>{formatNumber(stats.local_table_counts.research_sessions)} sessions</div>
-                <div>{formatNumber(stats.local_table_counts.experiments)} experiments</div>
+            <div className="stats-card__label">PID-Validated Authorities</div>
+            <div className="stats-card__progress">
+              <ProgressBar 
+                label="Year 1 Target" 
+                value={stats?.pid_count || 0} 
+                max={50} 
+                size="sm"
+              />
+              <div className="stats-card__progress-label">
+                {stats?.pid_count || 0}/50 authorities curated
               </div>
-            )}
+            </div>
+            <div className="stats-card__breakdown">
+              <Tag type="blue" size="sm">{formatNumber(stats?.local_table_counts?.documents || 0)} docs ingested</Tag>
+            </div>
           </div>
         </Tile>
       </Column>
 
-      <Column lg={5} md={4} sm={4}>
+      <Column lg={4} md={2} sm={4}>
         <Tile className="stats-card stats-card--storage">
           <div className="stats-card__icon">
             <CloudApp size={32} />
           </div>
           <div className="stats-card__content">
             <div className="stats-card__number">
-              {formatNumber(stats?.total_s3_assets)}
+              {formatNumber(stats?.local_table_counts?.document_embeddings || 0)}
             </div>
-            <div className="stats-card__label">Digital Assets</div>
+            <div className="stats-card__label">Document Chunks</div>
             <div className="stats-card__breakdown">
-              <div>{formatNumber(stats?.s3_images || 0)} images</div>
-              <div>{formatNumber(stats?.s3_pdfs || 0)} PDFs</div>
+              <Tag type="green" size="sm">384-dim BERT</Tag>
+              <div className="stats-card__meta">
+                {formatNumber(stats?.s3_pdfs || 0)} PDFs · {formatNumber(stats?.s3_tiffs || 0)} TIFFs
+              </div>
             </div>
           </div>
         </Tile>
       </Column>
 
-      <Column lg={6} md={4} sm={4}>
+      <Column lg={4} md={2} sm={4}>
         <Tile className="stats-card stats-card--total">
           <div className="stats-card__icon">
             <Cube size={32} />
           </div>
           <div className="stats-card__content">
             <div className="stats-card__number">
-              {formatNumber(stats?.total_items)}
+              {formatNumber(stats?.local_table_counts?.corpus_snapshots || 0)}
             </div>
-            <div className="stats-card__label">Total Items</div>
+            <div className="stats-card__label">Corpus Snapshots</div>
             <div className="stats-card__breakdown">
-              Combined records & assets
+              <Tag type="purple" size="sm">SHA-256 versioned</Tag>
+              <div className="stats-card__meta">
+                {formatNumber(stats?.local_table_counts?.training_runs || 0)} training runs logged
+              </div>
+            </div>
+          </div>
+        </Tile>
+      </Column>
+
+      <Column lg={4} md={2} sm={4}>
+        <Tile className="stats-card stats-card--experiments">
+          <div className="stats-card__icon">
+            <Chemistry size={32} />
+          </div>
+          <div className="stats-card__content">
+            <div className="stats-card__number">
+              {formatNumber(stats?.local_table_counts?.experiments || 0)}
+            </div>
+            <div className="stats-card__label">Experiments</div>
+            <div className="stats-card__breakdown">
+              <Tag type="warm-gray" size="sm">Granite fine-tuning</Tag>
+              <div className="stats-card__meta">
+                {formatNumber(stats?.local_table_counts?.research_sessions || 0)} inference sessions
+              </div>
             </div>
           </div>
         </Tile>

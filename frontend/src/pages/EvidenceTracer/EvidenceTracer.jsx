@@ -1,5 +1,5 @@
-import { Grid, Column, Tile, TextInput, Button } from '@carbon/react'
-import { Search } from '@carbon/icons-react'
+import { Grid, Column, Tile, TextInput, Button, Tag } from '@carbon/react'
+import { Search, Checkmark } from '@carbon/icons-react'
 import { useState } from 'react'
 import EvidenceGraph from '../../components/visualizations/EvidenceGraph'
 import '../../styles/pages/EvidenceTracer.scss'
@@ -16,10 +16,18 @@ const EvidenceTracer = () => {
   return (
     <Grid className="evidence-tracer" fullWidth>
       <Column lg={16} md={8} sm={4}>
-        <h1>Evidence Tracer</h1>
-        <p className="tracer__description">
-          Visualize how the Granite agent constructs reasoning from retrieved document chunks
-        </p>
+        <div className="tracer__header">
+          <div>
+            <h1>Evidence Tracer</h1>
+            <p className="tracer__description">
+              Trace AI predictions back to archival sources with formal citations. 
+              Full provenance chain: Query → Embeddings → Chunks → PIDs → DDR Archive
+            </p>
+          </div>
+          <Tag type="blue" size="md">
+            <Checkmark size={16} /> Provenance Enabled
+          </Tag>
+        </div>
       </Column>
 
       <Column lg={12} md={6} sm={4}>
