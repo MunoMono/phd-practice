@@ -81,6 +81,9 @@ class TableCounts:
     research_sessions: int
     experiments: int
     digital_assets: int
+    documents: int
+    training_runs: int
+    corpus_snapshots: int
 
 
 @strawberry.type
@@ -97,6 +100,7 @@ class S3Stats:
     configured: bool
     images: int
     pdfs: int
+    tiffs: int
     error: Optional[str] = None
 
 
@@ -105,6 +109,7 @@ class SystemMetrics:
     local_db: DatabaseStats
     s3_storage: S3Stats
     total_items: int
+    pid_count: int
 
 
 @strawberry.type
@@ -141,16 +146,49 @@ class Query:
                 
                 result = db.execute(text("SELECT COUNT(*) FROM digital_assets WHERE file_type = 'application/pdf'"))
                 pdfs_count = result.scalar()
+                
+                result = db.execute(text("SELECT COUNT(*) FROM digital_assets WHERE file_type LIKE 'image/tiff'"))
+                tiffs_count = result.scalar()
             except:
                 digital_assets_count = 0
                 images_count = 0
                 pdfs_count = 0
+                tiffs_count = 0
+            
+            # Get new table counts
+            try:
+                result = db.execute(text("SELECT COUNT(*) FROM documents"))
+                documents_count = result.scalar()
+            except:
+                documents_count = 0
+            
+            try:
+                result = db.execute(text("SELECT COUNT(*) FROM training_runs"))
+                training_runs_count = result.scalar()
+            except:
+                training_runs_count = 0
+            
+            try:
+                result = db.execute(text("SELECT COUNT(*) FROM corpus_snapshots"))
+                corpus_snapshots_count = result.scalar()
+            except:
+                corpus_snapshots_count = 0
+            
+            # Get PID count (unique PIDs)
+            try:
+                result = db.execute(text("SELECT COUNT(DISTINCT pid) FROM documents WHERE pid IS NOT NULL"))
+                pid_count = result.scalar()
+            except:
+                pid_count = 0
             
             table_counts = TableCounts(
                 document_embeddings=counts['document_embeddings'],
                 research_sessions=counts['research_sessions'],
                 experiments=counts['experiments'],
-                digital_assets=digital_assets_count
+                digital_assets=digital_assets_count,
+                documents=documents_count,
+                training_runs=training_runs_count,
+                corpus_snapshots=corpus_snapshots_count
             )
             
             db_stats = DatabaseStats(
@@ -167,7 +205,8 @@ class Query:
             total_size_mb=0.0,
             configured=False,
             images=images_count,
-            pdfs=pdfs_count
+            pdfs=pdfs_count,
+            tiffs=tiffs_count
         )
         
         # Calculate total (database records + digital assets)
@@ -176,7 +215,8 @@ class Query:
         return SystemMetrics(
             local_db=db_stats,
             s3_storage=s3_stats,
-            total_items=total_items
+            total_items=total_items,
+            pid_count=pid_count
         )
     
     @strawberry.field
