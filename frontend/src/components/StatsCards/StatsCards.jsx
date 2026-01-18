@@ -42,7 +42,12 @@ const StatsCards = () => {
         }
       `
       
-      const response = await fetch('http://localhost:8000/graphql', {
+      // Use environment-aware URL - in production, use /api/graphql, in dev use localhost
+      const graphqlUrl = import.meta.env.PROD 
+        ? '/api/graphql' 
+        : 'http://localhost:8000/graphql'
+      
+      const response = await fetch(graphqlUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
