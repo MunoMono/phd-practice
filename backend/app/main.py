@@ -1,9 +1,11 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
+from strawberry.fastapi import GraphQLRouter
 import logging
 
-from app.api.routes import agent, sessions, experiments
+from app.api.routes import agent, sessions, experiments, metrics
+from app.api.graphql.schema import schema
 from app.core.config import settings
 
 # Configure logging
@@ -49,6 +51,11 @@ app.add_middleware(
 app.include_router(agent.router, prefix="/api/agent", tags=["agent"])
 app.include_router(sessions.router, prefix="/api/sessions", tags=["sessions"])
 app.include_router(experiments.router, prefix="/api/experiments", tags=["experiments"])
+app.include_router(metrics.router, prefix="/api/metrics", tags=["metrics"])
+
+# GraphQL endpoint
+graphql_app = GraphQLRouter(schema)
+app.include_router(graphql_app, prefix="/graphql")
 
 
 @app.get("/")

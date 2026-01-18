@@ -1,0 +1,138 @@
+.stats-cards {
+  margin: 2rem 0;
+}
+
+.stats-card {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  padding: 1.5rem;
+  min-height: 140px;
+  transition: all 0.2s ease;
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  }
+
+  &__icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  &__content {
+    flex: 1;
+  }
+
+  &__number {
+    font-size: 2.5rem;
+    font-weight: 700;
+    line-height: 1;
+    margin-bottom: 0.5rem;
+    background: linear-gradient(135deg, #0f62fe, #4589ff);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  &__label {
+    font-size: 0.875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--cds-text-secondary);
+    margin-bottom: 0.5rem;
+  }
+
+  &__breakdown {
+    font-size: 0.75rem;
+    color: var(--cds-text-secondary);
+    line-height: 1.4;
+    margin-top: 0.5rem;
+
+    div {
+      margin: 0.25rem 0;
+    }
+  }
+
+  &__note {
+    font-size: 0.75rem;
+    color: var(--cds-text-secondary);
+    font-style: italic;
+    margin-top: 0.5rem;
+  }
+
+  // Color variants
+  &--database {
+    .stats-card__icon {
+      background: linear-gradient(135deg, #0f62fe, #4589ff);
+      color: white;
+    }
+  }
+
+  &--storage {
+    .stats-card__icon {
+      background: linear-gradient(135deg, #24a148, #42be65);
+      color: white;
+    }
+
+    .stats-card__number {
+      background: linear-gradient(135deg, #24a148, #42be65);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+  }
+
+  &--total {
+    .stats-card__icon {
+      background: linear-gradient(135deg, #8a3ffc, #a56eff);
+      color: white;
+    }
+
+    .stats-card__number {
+      background: linear-gradient(135deg, #8a3ffc, #a56eff);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+  }
+
+  &--loading {
+    min-height: 140px;
+  }
+
+  &--error {
+    border-left: 4px solid #da1e28;
+    background: #fff1f1;
+
+    p {
+      color: #da1e28;
+      font-weight: 500;
+    }
+  }
+}
+
+// Responsive adjustments
+@media (max-width: 672px) {
+  .stats-card {
+    &__number {
+      font-size: 2rem;
+    }
+
+    &__icon {
+      width: 48px;
+      height: 48px;
+
+      svg {
+        width: 24px;
+        height: 24px;
+      }
+    }
+  }
+}

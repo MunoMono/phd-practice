@@ -23,7 +23,11 @@ class Settings(BaseSettings):
     def DATABASE_URL(self) -> str:
         return f"postgresql://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
     
-    # DDR Archive Database (read-only queries)
+    # DDR Archive GraphQL API
+    DDR_GRAPHQL_ENDPOINT: str = "https://api.ddrarchive.org/graphql"
+    DDR_API_TOKEN: str = ""  # Optional authentication token
+    
+    # DDR Archive Database (read-only queries) - DEPRECATED, use GraphQL instead
     DDR_POSTGRES_USER: str = ""
     DDR_POSTGRES_PASSWORD: str = ""
     DDR_POSTGRES_HOST: str = ""

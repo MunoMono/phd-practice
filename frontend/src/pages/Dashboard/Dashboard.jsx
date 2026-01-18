@@ -2,6 +2,7 @@ import { Grid, Column, Tile, ClickableTile } from '@carbon/react'
 import { useNavigate } from 'react-router-dom'
 import { ChartNetwork, DataVis_1, Recording, Chemistry } from '@carbon/icons-react'
 import TemporalDriftChart from '../../components/visualizations/TemporalDriftChart'
+import StatsCards from '../../components/StatsCards/StatsCards'
 import '../../styles/pages/Dashboard.scss'
 
 const Dashboard = () => {
@@ -24,6 +25,14 @@ const Dashboard = () => {
       </div>
 
       <Grid className="dashboard__content" fullWidth>
+        <Column lg={16} md={8} sm={4}>
+          <h2 className="dashboard__section-title">System Metrics</h2>
+        </Column>
+        
+        <Column lg={16} md={8} sm={4}>
+          <StatsCards />
+        </Column>
+
         <Column lg={16} md={8} sm={4}>
           <div className="dashboard__diagram-section">
             <img 
