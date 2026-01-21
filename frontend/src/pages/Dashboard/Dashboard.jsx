@@ -35,58 +35,62 @@ const Dashboard = () => {
 
       <Grid className="dashboard__content" fullWidth>
         {/* Granite Hero Section */}
-        <Column lg={16} md={8} sm={4}>
-          <div className="dashboard__granite-hero">
-            <div className="dashboard__granite-hero-logo">
-              <img src="/granite-logo.png" alt="IBM Granite" />
-            </div>
-            <div className="dashboard__granite-hero-content">
-              <div className="dashboard__granite-hero-badge">
-                <Tag type="blue" size="md">
-                  <Chip size={20} /> Powered by IBM Granite
-                </Tag>
-                {graniteInfo && (
-                  <Tag type={graniteInfo.is_loaded ? 'green' : 'gray'} size="md">
-                    {graniteInfo.is_loaded ? <Checkmark size={16} /> : <InProgress size={16} />}
-                    {graniteInfo.is_loaded ? ' Active' : ' Standby'}
-                  </Tag>
-                )}
+        <Column lg={16} md={8} sm={4} className="dashboard__granite-hero-wrapper">
+          <Grid condensed>
+            <Column lg={6} md={4} sm={4}>
+              <div className="dashboard__granite-hero-logo">
+                <img src="/granite-logo.png" alt="IBM Granite" />
               </div>
-              <h2 className="dashboard__granite-hero-title">
-                Enterprise AI for Academic Research
-              </h2>
-              <p className="dashboard__granite-hero-description">
-                IBM Granite is a family of open, performant, and trusted AI models purpose-built for business and optimized for 
-                scientific tasks. This research platform leverages <strong>Granite 3.1 8B Instruct</strong> with 8-bit quantization 
-                for efficient CPU-based inference, enabling epistemic drift detection across historical design methods literature 
-                (1965-1985) with full provenance tracking and formal academic attribution.
-              </p>
-              {graniteInfo && (
-                <div className="dashboard__granite-hero-specs">
-                  <div className="dashboard__granite-hero-spec">
-                    <span className="dashboard__granite-hero-spec-label">Model</span>
-                    <span className="dashboard__granite-hero-spec-value">{graniteInfo.model_name || 'granite-3.1-8b-instruct'}</span>
-                  </div>
-                  <div className="dashboard__granite-hero-spec">
-                    <span className="dashboard__granite-hero-spec-label">Device</span>
-                    <span className="dashboard__granite-hero-spec-value">{graniteInfo.device || 'CPU'}</span>
-                  </div>
-                  {graniteInfo.config && (
-                    <>
-                      <div className="dashboard__granite-hero-spec">
-                        <span className="dashboard__granite-hero-spec-label">Max Tokens</span>
-                        <span className="dashboard__granite-hero-spec-value">{graniteInfo.config.max_tokens}</span>
-                      </div>
-                      <div className="dashboard__granite-hero-spec">
-                        <span className="dashboard__granite-hero-spec-label">Temperature</span>
-                        <span className="dashboard__granite-hero-spec-value">{graniteInfo.config.temperature}</span>
-                      </div>
-                    </>
+            </Column>
+            <Column lg={10} md={4} sm={4}>
+              <div className="dashboard__granite-hero-content">
+                <div className="dashboard__granite-hero-badge">
+                  <Tag type="blue" size="md">
+                    <Chip size={20} /> Powered by IBM Granite
+                  </Tag>
+                  {graniteInfo && (
+                    <Tag type={graniteInfo.is_loaded ? 'green' : 'gray'} size="md">
+                      {graniteInfo.is_loaded ? <Checkmark size={16} /> : <InProgress size={16} />}
+                      {graniteInfo.is_loaded ? ' Active' : ' Standby'}
+                    </Tag>
                   )}
                 </div>
-              )}
-            </div>
-          </div>
+                <h2 className="dashboard__granite-hero-title">
+                  Enterprise AI for Academic Research
+                </h2>
+                <p className="dashboard__granite-hero-description">
+                  IBM Granite is a family of open, performant, and trusted AI models purpose-built for business and optimized for 
+                  scientific tasks. This research platform leverages <strong>Granite 3.1 8B Instruct</strong> with 8-bit quantization 
+                  for efficient CPU-based inference, enabling epistemic drift detection across historical design methods literature 
+                  (1965-1985) with full provenance tracking and formal academic attribution.
+                </p>
+                {graniteInfo && (
+                  <div className="dashboard__granite-hero-specs">
+                    <div className="dashboard__granite-hero-spec">
+                      <span className="dashboard__granite-hero-spec-label">Model</span>
+                      <span className="dashboard__granite-hero-spec-value">{graniteInfo.model_name || 'granite-3.1-8b-instruct'}</span>
+                    </div>
+                    <div className="dashboard__granite-hero-spec">
+                      <span className="dashboard__granite-hero-spec-label">Device</span>
+                      <span className="dashboard__granite-hero-spec-value">{graniteInfo.device || 'CPU'}</span>
+                    </div>
+                    {graniteInfo.config && (
+                      <>
+                        <div className="dashboard__granite-hero-spec">
+                          <span className="dashboard__granite-hero-spec-label">Max Tokens</span>
+                          <span className="dashboard__granite-hero-spec-value">{graniteInfo.config.max_tokens}</span>
+                        </div>
+                        <div className="dashboard__granite-hero-spec">
+                          <span className="dashboard__granite-hero-spec-label">Temperature</span>
+                          <span className="dashboard__granite-hero-spec-value">{graniteInfo.config.temperature}</span>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+            </Column>
+          </Grid>
         </Column>
 
         <Column lg={16} md={8} sm={4}>

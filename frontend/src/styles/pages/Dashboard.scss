@@ -201,11 +201,7 @@
   }
 
   // Granite Hero Section
-  &__granite-hero {
-    display: grid;
-    grid-template-columns: 1fr 1.5fr;
-    gap: $spacing-09;
-    align-items: center;
+  &__granite-hero-wrapper {
     padding: $spacing-09 $spacing-07;
     margin-bottom: $spacing-09;
     background: linear-gradient(135deg, 
@@ -216,12 +212,6 @@
     border: 1px solid rgba(15, 98, 254, 0.15);
     position: relative;
     overflow: hidden;
-
-    @include breakpoint-down(lg) {
-      grid-template-columns: 1fr;
-      gap: $spacing-07;
-      text-align: center;
-    }
 
     &::before {
       content: '';
@@ -239,23 +229,24 @@
       0% { transform: rotate(0deg); }
       100% { transform: rotate(360deg); }
     }
+  }
 
-    &-logo {
-      position: relative;
-      z-index: 1;
+  &__granite-hero-logo {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    
+    img {
       width: 100%;
-      max-width: 360px;
-      margin: 0 auto;
+      max-width: 400px;
+      height: auto;
       filter: drop-shadow(0 8px 24px rgba(0, 200, 150, 0.3));
       animation: float 6s ease-in-out infinite;
 
       @include breakpoint-down(lg) {
         max-width: 280px;
-      }
-
-      svg {
-        width: 100%;
-        height: auto;
       }
     }
 
@@ -263,84 +254,80 @@
       0%, 100% { transform: translateY(0px); }
       50% { transform: translateY(-12px); }
     }
+  }
 
-    &-content {
-      position: relative;
-      z-index: 1;
+  &__granite-hero-content {
+    position: relative;
+    z-index: 1;
+  }
+
+  &__granite-hero-badge {
+    display: flex;
+    gap: $spacing-03;
+    margin-bottom: $spacing-05;
+    flex-wrap: wrap;
+  }
+
+  &__granite-hero-title {
+    font-size: 2.5rem;
+    font-weight: 300;
+    line-height: 1.2;
+    margin: 0 0 $spacing-05;
+    background: linear-gradient(135deg, #0f62fe 0%, #00c896 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    letter-spacing: -0.02em;
+
+    @include breakpoint-down(lg) {
+      font-size: 2rem;
     }
+  }
 
-    &-badge {
-      display: flex;
-      gap: $spacing-03;
-      margin-bottom: $spacing-05;
-      flex-wrap: wrap;
+  &__granite-hero-description {
+    font-size: 1.125rem;
+    line-height: 1.7;
+    color: $text-secondary;
+    margin: 0 0 $spacing-07;
 
-      @include breakpoint-down(lg) {
-        justify-content: center;
-      }
+    strong {
+      color: $text-primary;
+      font-weight: 600;
     }
+  }
 
-    &-title {
-      font-size: 2.5rem;
-      font-weight: 300;
-      line-height: 1.2;
-      margin: 0 0 $spacing-05;
-      background: linear-gradient(135deg, #0f62fe 0%, #00c896 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-      letter-spacing: -0.02em;
+  &__granite-hero-specs {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: $spacing-05;
+    padding: $spacing-06;
+    background: rgba(255, 255, 255, 0.5);
+    border-radius: 8px;
+    border: 1px solid rgba(15, 98, 254, 0.1);
 
-      @include breakpoint-down(lg) {
-        font-size: 2rem;
-      }
+    @include breakpoint-down(lg) {
+      grid-template-columns: repeat(2, 1fr);
     }
+  }
 
-    &-description {
-      font-size: 1.125rem;
-      line-height: 1.7;
+  &__granite-hero-spec {
+    display: flex;
+    flex-direction: column;
+    gap: $spacing-02;
+
+    &-label {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
       color: $text-secondary;
-      margin: 0 0 $spacing-07;
-
-      strong {
-        color: $text-primary;
-        font-weight: 600;
-      }
+      font-weight: 600;
     }
 
-    &-specs {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-      gap: $spacing-05;
-      padding: $spacing-06;
-      background: rgba(255, 255, 255, 0.5);
-      border-radius: 8px;
-      border: 1px solid rgba(15, 98, 254, 0.1);
-
-      @include breakpoint-down(lg) {
-        grid-template-columns: repeat(2, 1fr);
-      }
-    }
-
-    &-spec {
-      display: flex;
-      flex-direction: column;
-      gap: $spacing-02;
-
-      &-label {
-        font-size: 0.75rem;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-        color: $text-secondary;
-        font-weight: 600;
-      }
-
-      &-value {
-        font-size: 1rem;
-        color: $text-primary;
-        font-weight: 500;
-        word-break: break-word;
-      }
+    &-value {
+      font-size: 1rem;
+      color: $text-primary;
+      font-weight: 500;
+      word-break: break-word;
     }
   }
 
