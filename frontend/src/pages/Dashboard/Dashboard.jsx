@@ -38,35 +38,30 @@ const Dashboard = () => {
         <Column lg={16} md={8} sm={4}>
           <div className="dashboard__granite-hero">
             <div className="dashboard__granite-hero-logo">
-              <svg viewBox="0 0 720 720" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <defs>
-                  <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" style={{stopColor: '#00c896', stopOpacity: 1}} />
-                    <stop offset="100%" style={{stopColor: '#00d084', stopOpacity: 1}} />
-                  </linearGradient>
-                  <linearGradient id="grad2" x1="0%" y1="0%" x2="100%" y2="0%">
-                    <stop offset="0%" style={{stopColor: '#0f62fe', stopOpacity: 1}} />
-                    <stop offset="100%" style={{stopColor: '#4589ff', stopOpacity: 1}} />
-                  </linearGradient>
-                  <linearGradient id="grad3" x1="0%" y1="100%" x2="0%" y2="0%">
-                    <stop offset="0%" style={{stopColor: '#00c896', stopOpacity: 1}} />
-                    <stop offset="100%" style={{stopColor: '#42be65', stopOpacity: 1}} />
-                  </linearGradient>
-                </defs>
-                {/* Front face - light mint */}
-                <path d="M220 280 L500 140 L500 440 L220 580 Z" fill="#d0f0e0" />
-                {/* Top face - green gradient */}
-                <path d="M220 280 L500 140 L500 160 L360 240 L360 460 L220 540 Z" fill="url(#grad1)" />
-                {/* Left face - dark green */}
-                <path d="M53 160 L220 75 L220 580 L53 495 Z" fill="#006d32" />
-                {/* Right face - cyan gradient */}
-                <path d="M500 140 L667 225 L667 525 L500 440 Z" fill="#52d1c9" />
-                {/* Top plane - light green gradient */}
-                <path d="M220 75 L500 160 L667 225 L387 140 Z" fill="url(#grad3)" opacity="0.9" />
-                {/* Inner cube - blue gradient */}
-                <path d="M230 320 L360 240 L445 290 L315 370 Z" fill="url(#grad2)" />
-                <path d="M360 240 L360 460 L445 510 L445 290 Z" fill="#0043ce" />
-                <path d="M315 370 L445 290 L445 510 L315 590 Z" fill="#4589ff" opacity="0.9" />
+              <svg viewBox="0 0 400 400" fill="none" xmlns="http://www.w3.org/2000/svg">
+                {/* Outer green cube frame */}
+                {/* Top face */}
+                <path d="M80 120 L200 60 L320 120 L200 180 Z" fill="#42be65" />
+                {/* Left face */}
+                <path d="M80 120 L80 280 L200 340 L200 180 Z" fill="#24a148" />
+                {/* Right face */}
+                <path d="M200 180 L200 340 L320 280 L320 120 Z" fill="#3dbb61" />
+                
+                {/* Middle cyan layer */}
+                {/* Top face */}
+                <path d="M120 140 L200 100 L280 140 L200 180 Z" fill="#82cfff" />
+                {/* Left face */}
+                <path d="M120 140 L120 260 L200 300 L200 180 Z" fill="#33b1ff" />
+                {/* Right face */}
+                <path d="M200 180 L200 300 L280 260 L280 140 Z" fill="#52d1c9" />
+                
+                {/* Inner blue cube */}
+                {/* Top face */}
+                <path d="M160 160 L200 140 L240 160 L200 180 Z" fill="#78a9ff" />
+                {/* Left face */}
+                <path d="M160 160 L160 240 L200 260 L200 180 Z" fill="#0f62fe" />
+                {/* Right face */}
+                <path d="M200 180 L200 260 L240 240 L240 160 Z" fill="#4589ff" />
               </svg>
             </div>
             <div className="dashboard__granite-hero-content">
