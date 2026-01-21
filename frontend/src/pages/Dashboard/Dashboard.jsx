@@ -39,29 +39,32 @@ const Dashboard = () => {
           <div className="dashboard__granite-hero">
             <div className="dashboard__granite-hero-logo">
               <svg viewBox="0 0 400 400" fill="none" xmlns="http://www.w3.org/2000/svg">
-                {/* Outer green cube frame */}
-                {/* Top face */}
-                <path d="M80 120 L200 60 L320 120 L200 180 Z" fill="#42be65" />
-                {/* Left face */}
-                <path d="M80 120 L80 280 L200 340 L200 180 Z" fill="#24a148" />
-                {/* Right face */}
-                <path d="M200 180 L200 340 L320 280 L320 120 Z" fill="#3dbb61" />
+                {/* Outer green frame - Bottom face */}
+                <path d="M100 280 L200 340 L300 280 L200 220 Z" fill="#24a148" />
+                {/* Outer green frame - Left face */}
+                <path d="M100 120 L100 280 L200 220 L200 60 Z" fill="#198038" />
+                {/* Outer green frame - Right face */}
+                <path d="M200 60 L200 220 L300 280 L300 120 Z" fill="#42be65" />
+                {/* Outer green frame - Top light face */}
+                <path d="M100 120 L200 60 L300 120 L200 180 Z" fill="#6fdc8c" />
                 
-                {/* Middle cyan layer */}
-                {/* Top face */}
-                <path d="M120 140 L200 100 L280 140 L200 180 Z" fill="#82cfff" />
-                {/* Left face */}
-                <path d="M120 140 L120 260 L200 300 L200 180 Z" fill="#33b1ff" />
-                {/* Right face */}
-                <path d="M200 180 L200 300 L280 260 L280 140 Z" fill="#52d1c9" />
+                {/* Middle cyan frame - Bottom face */}
+                <path d="M130 250 L200 290 L270 250 L200 210 Z" fill="#1192e8" />
+                {/* Middle cyan frame - Left face */}
+                <path d="M130 130 L130 250 L200 210 L200 90 Z" fill="#0072c3" />
+                {/* Middle cyan frame - Right face */}
+                <path d="M200 90 L200 210 L270 250 L270 130 Z" fill="#33b1ff" />
+                {/* Middle cyan frame - Top face */}
+                <path d="M130 130 L200 90 L270 130 L200 170 Z" fill="#82cfff" />
                 
-                {/* Inner blue cube */}
-                {/* Top face */}
-                <path d="M160 160 L200 140 L240 160 L200 180 Z" fill="#78a9ff" />
-                {/* Left face */}
-                <path d="M160 160 L160 240 L200 260 L200 180 Z" fill="#0f62fe" />
-                {/* Right face */}
-                <path d="M200 180 L200 260 L240 240 L240 160 Z" fill="#4589ff" />
+                {/* Inner blue solid cube - Bottom face */}
+                <path d="M160 230 L200 250 L240 230 L200 210 Z" fill="#0043ce" />
+                {/* Inner blue solid cube - Left face */}
+                <path d="M160 150 L160 230 L200 210 L200 130 Z" fill="#0f62fe" />
+                {/* Inner blue solid cube - Right face */}
+                <path d="M200 130 L200 210 L240 230 L240 150 Z" fill="#4589ff" />
+                {/* Inner blue solid cube - Top face */}
+                <path d="M160 150 L200 130 L240 150 L200 170 Z" fill="#78a9ff" />
               </svg>
             </div>
             <div className="dashboard__granite-hero-content">
