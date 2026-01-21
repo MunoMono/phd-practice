@@ -28,9 +28,10 @@ async def lifespan(app: FastAPI):
     logger.info("Starting Epistemic Drift Research API")
     logger.info(f"Environment: {settings.ENVIRONMENT}")
     
-    # Initialize Granite service
-    logger.info("Initializing Granite LLM service...")
-    await initialize_granite()
+    # Initialize Granite service in background (non-blocking)
+    logger.info("Starting Granite LLM service initialization in background...")
+    import asyncio
+    asyncio.create_task(initialize_granite())
     
     yield
     logger.info("Shutting down Epistemic Drift Research API")
