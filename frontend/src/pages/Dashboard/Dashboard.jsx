@@ -34,45 +34,89 @@ const Dashboard = () => {
       </div>
 
       <Grid className="dashboard__content" fullWidth>
-        {graniteInfo && (
-          <Column lg={16} md={8} sm={4}>
-            <Tile className="dashboard__granite-tile">
-              <div className="dashboard__granite-header">
-                <div className="dashboard__granite-logo">
-                  <svg width="40" height="40" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <rect width="32" height="32" rx="4" fill="#0F62FE"/>
-                    <path d="M8 12L16 8L24 12V20L16 24L8 20V12Z" fill="white" fillOpacity="0.9"/>
-                    <path d="M16 8V16M16 16L8 12M16 16L24 12M16 16V24M8 20L16 24M24 20L16 24" stroke="#0F62FE" strokeWidth="1.5" strokeLinecap="round"/>
-                  </svg>
-                </div>
-                <div className="dashboard__granite-info">
-                  <h3>IBM Granite Language Model</h3>
-                  <div className="dashboard__granite-meta">
-                    <Tag type="blue" size="sm">
-                      <Chip size={16} /> {graniteInfo.model_name || 'granite-3.1-8b-instruct'}
-                    </Tag>
-                    <Tag type={graniteInfo.is_loaded ? 'green' : 'gray'} size="sm">
-                      {graniteInfo.is_loaded ? '✓ Loaded' : 'Loading...'}
-                    </Tag>
-                    <Tag type="purple" size="sm">
-                      Device: {graniteInfo.device || 'CPU'}
-                    </Tag>
-                  </div>
-                </div>
+        {/* Granite Hero Section */}
+        <Column lg={16} md={8} sm={4}>
+          <div className="dashboard__granite-hero">
+            <div className="dashboard__granite-hero-logo">
+              <svg viewBox="0 0 720 720" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                  <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" style={{stopColor: '#00c896', stopOpacity: 1}} />
+                    <stop offset="100%" style={{stopColor: '#00d084', stopOpacity: 1}} />
+                  </linearGradient>
+                  <linearGradient id="grad2" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" style={{stopColor: '#0f62fe', stopOpacity: 1}} />
+                    <stop offset="100%" style={{stopColor: '#4589ff', stopOpacity: 1}} />
+                  </linearGradient>
+                  <linearGradient id="grad3" x1="0%" y1="100%" x2="0%" y2="0%">
+                    <stop offset="0%" style={{stopColor: '#00c896', stopOpacity: 1}} />
+                    <stop offset="100%" style={{stopColor: '#42be65', stopOpacity: 1}} />
+                  </linearGradient>
+                </defs>
+                {/* Front face - light mint */}
+                <path d="M220 280 L500 140 L500 440 L220 580 Z" fill="#d0f0e0" />
+                {/* Top face - green gradient */}
+                <path d="M220 280 L500 140 L500 160 L360 240 L360 460 L220 540 Z" fill="url(#grad1)" />
+                {/* Left face - dark green */}
+                <path d="M53 160 L220 75 L220 580 L53 495 Z" fill="#006d32" />
+                {/* Right face - cyan gradient */}
+                <path d="M500 140 L667 225 L667 525 L500 440 Z" fill="#52d1c9" />
+                {/* Top plane - light green gradient */}
+                <path d="M220 75 L500 160 L667 225 L387 140 Z" fill="url(#grad3)" opacity="0.9" />
+                {/* Inner cube - blue gradient */}
+                <path d="M230 320 L360 240 L445 290 L315 370 Z" fill="url(#grad2)" />
+                <path d="M360 240 L360 460 L445 510 L445 290 Z" fill="#0043ce" />
+                <path d="M315 370 L445 290 L445 510 L315 590 Z" fill="#4589ff" opacity="0.9" />
+              </svg>
+            </div>
+            <div className="dashboard__granite-hero-content">
+              <div className="dashboard__granite-hero-badge">
+                <Tag type="blue" size="md">
+                  <Chip size={20} /> Powered by IBM Granite
+                </Tag>
+                {graniteInfo && (
+                  <Tag type={graniteInfo.is_loaded ? 'green' : 'gray'} size="md">
+                    {graniteInfo.is_loaded ? <Checkmark size={16} /> : <InProgress size={16} />}
+                    {graniteInfo.is_loaded ? ' Active' : ' Standby'}
+                  </Tag>
+                )}
               </div>
-              <p className="dashboard__granite-description">
-                Enterprise-grade LLM optimized for epistemic drift analysis. 8-bit quantization for efficient CPU inference with full provenance tracking.
+              <h2 className="dashboard__granite-hero-title">
+                Enterprise AI for Academic Research
+              </h2>
+              <p className="dashboard__granite-hero-description">
+                IBM Granite is a family of open, performant, and trusted AI models purpose-built for business and optimized for 
+                scientific tasks. This research platform leverages <strong>Granite 3.1 8B Instruct</strong> with 8-bit quantization 
+                for efficient CPU-based inference, enabling epistemic drift detection across historical design methods literature 
+                (1965-1985) with full provenance tracking and formal academic attribution.
               </p>
-              {graniteInfo.config && (
-                <div className="dashboard__granite-config">
-                  <span>Max Tokens: {graniteInfo.config.max_tokens}</span>
-                  <span>Temperature: {graniteInfo.config.temperature}</span>
-                  <span>Top-p: {graniteInfo.config.top_p}</span>
+              {graniteInfo && (
+                <div className="dashboard__granite-hero-specs">
+                  <div className="dashboard__granite-hero-spec">
+                    <span className="dashboard__granite-hero-spec-label">Model</span>
+                    <span className="dashboard__granite-hero-spec-value">{graniteInfo.model_name || 'granite-3.1-8b-instruct'}</span>
+                  </div>
+                  <div className="dashboard__granite-hero-spec">
+                    <span className="dashboard__granite-hero-spec-label">Device</span>
+                    <span className="dashboard__granite-hero-spec-value">{graniteInfo.device || 'CPU'}</span>
+                  </div>
+                  {graniteInfo.config && (
+                    <>
+                      <div className="dashboard__granite-hero-spec">
+                        <span className="dashboard__granite-hero-spec-label">Max Tokens</span>
+                        <span className="dashboard__granite-hero-spec-value">{graniteInfo.config.max_tokens}</span>
+                      </div>
+                      <div className="dashboard__granite-hero-spec">
+                        <span className="dashboard__granite-hero-spec-label">Temperature</span>
+                        <span className="dashboard__granite-hero-spec-value">{graniteInfo.config.temperature}</span>
+                      </div>
+                    </>
+                  )}
                 </div>
               )}
-            </Tile>
-          </Column>
-        )}
+            </div>
+          </div>
+        </Column>
 
         <Column lg={16} md={8} sm={4}>
           <h2 className="dashboard__section-title">System Metrics</h2>
