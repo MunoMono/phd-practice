@@ -65,7 +65,7 @@ app.include_router(analysis.router, prefix="/api/granite", tags=["granite-analys
 
 # GraphQL endpoint
 graphql_app = GraphQLRouter(schema)
-app.include_router(graphql_app, prefix="/graphql")
+app.include_router(graphql_app, prefix="/api/graphql")
 
 
 @app.get("/")
