@@ -9,7 +9,7 @@ from datetime import datetime
 import logging
 
 from app.services.granite_service import get_granite_service
-from app.services.embedding_service import search_similar_chunks
+# from app.services.embedding_service import search_similar_chunks  # TODO: implement when embedding service ready
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
