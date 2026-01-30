@@ -104,7 +104,12 @@ function App() {
   return (
     <Router>
       <Theme theme={theme}>
-        <Header currentTheme={theme} onThemeToggle={toggleTheme} />
+        <Header 
+          currentTheme={theme} 
+          onThemeToggle={toggleTheme}
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+        />
         <div className="app-content">
           {/* Portfolio Summary Header */}
           <div className="portfolio-header">
@@ -138,39 +143,8 @@ function App() {
             </div>
           </div>
 
-          {/* Simple Tab Navigation */}
-          <div className="tab-navigation" style={{ 
-            display: 'flex', 
-            gap: '0.5rem', 
-            padding: '1rem',
-            background: '#262626',
-            borderBottom: '1px solid #393939'
-          }}>
-            <Button
-              kind={activeTab === 'dashboard' ? 'primary' : 'tertiary'}
-              onClick={() => setActiveTab('dashboard')}
-              size="md"
-            >
-              Dashboard
-            </Button>
-            <Button
-              kind={activeTab === 'holdings' ? 'primary' : 'tertiary'}
-              onClick={() => setActiveTab('holdings')}
-              size="md"
-            >
-              Holdings
-            </Button>
-            <Button
-              kind={activeTab === 'import' ? 'primary' : 'tertiary'}
-              onClick={() => setActiveTab('import')}
-              size="md"
-            >
-              Import/Export
-            </Button>
-          </div>
-
-          {/* Tab Content */}
-          <div className="tab-content">
+          {/* Page Content */}
+          <div className="tab-content" style={{ minHeight: 'calc(100vh - 3rem)' }}>
             {activeTab === 'dashboard' && (
               <Dashboard
                 portfolio={portfolio}

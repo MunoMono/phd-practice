@@ -12,7 +12,7 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth0 } from '@auth0/auth0-react'
 import '../../styles/components/Header.scss'
 
-const Header = ({ currentTheme, onThemeToggle }) => {
+const Header = ({ currentTheme, onThemeToggle, activeTab, onTabChange }) => {
   const navigate = useNavigate()
   const location = useLocation()
   const { logout, isAuthenticated } = useAuth0()
@@ -21,15 +21,27 @@ const Header = ({ currentTheme, onThemeToggle }) => {
   return (
     <CarbonHeader aria-label="Wealth Management">
       <SkipToContent />
-      <HeaderName href="#" prefix="" onClick={(e) => { e.preventDefault(); navigate('/') }}>
+      <HeaderName href="#" prefix="" onClick={(e) => { e.preventDefault(); onTabChange('dashboard'); }}>
         Wealth Management
       </HeaderName>
       <HeaderNavigation aria-label="Navigation">
         <HeaderMenuItem
-          onClick={() => navigate('/')}
-          isCurrentPage={location.pathname === '/'}
+          onClick={() => onTabChange('dashboard')}
+          isCurrentPage={activeTab === 'dashboard'}
         >
           Dashboard
+        </HeaderMenuItem>
+        <HeaderMenuItem
+          onClick={() => onTabChange('holdings')}
+          isCurrentPage={activeTab === 'holdings'}
+        >
+          Holdings
+        </HeaderMenuItem>
+        <HeaderMenuItem
+          onClick={() => onTabChange('import')}
+          isCurrentPage={activeTab === 'import'}
+        >
+          Import/Export
         </HeaderMenuItem>
       </HeaderNavigation>
       <HeaderGlobalBar>

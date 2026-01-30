@@ -217,15 +217,6 @@ const Dashboard = ({ portfolio, onUpdateTolerancePct }) => {
 
   return (
     <div className="dashboard-page" style={{ padding: '1rem', background: '#262626', minHeight: '100vh' }}>
-      {/* Debug info */}
-      <Grid narrow>
-        <Column lg={14} md={8} sm={4}>
-          <Tile style={{ marginBottom: '1rem', background: '#393939', color: '#f4f4f4', padding: '1rem' }}>
-            <p style={{ margin: 0, fontSize: '14px' }}><strong>✅ Debug:</strong> Portfolio loaded - {portfolio.portfolioName} | {portfolio.holdings.length} holdings | {portfolio.sleeves.length} sleeves | Total: £{totalCurrent.toLocaleString()}</p>
-          </Tile>
-        </Column>
-      </Grid>
-
       {/* Metrics Header */}
       <Grid narrow className="metrics-grid">\n        <Column lg={3} md={2} sm={2}>
           <Tile className="metric-tile">
