@@ -86,14 +86,19 @@ class PIDMediaCountService:
                 return {'pdf_count': 0, 'tiff_count': 0, 'total_count': 0}
             
             # Count PDF files and JPG derivatives (which may include TIFFs as source)
-            # ONLY include media items marked as used_for_ml: true
+            # PERMANENT FILTER: ONLY include media items marked as used_for_ml: true
+            # This ensures we exclude hi-res TIFFs of photographs and other non-relevant
+            # assets that have been manually flagged in DDR Archive admin.
+            # This filter is critical for Docling ingestion quality control.
             pdf_count = 0
             tiff_count = 0
+            ml_filtered_count = 0
             
             for media_item in attached_media:
-                # Skip items not marked for ML use
+                # Skip items not marked for ML use (permanent gate)
                 if not media_item.get('used_for_ml', False):
-                    logger.debug(f"Skipping media item {media_item.get('id')} - not marked for ML")
+                    ml_filtered_count += 1
+                    logger.debug(f"Skipping media item {media_item.get('id')} '{media_item.get('title')}' - not marked for ML (used_for_ml=false)")
                     continue
                 
                 pdf_files = media_item.get('pdf_files') or []
@@ -112,7 +117,10 @@ class PIDMediaCountService:
                 'total_count': pdf_count + tiff_count
             }
             
-            logger.info(f"PID {pid}: {result['pdf_count']} PDFs, {result['tiff_count']} TIFF-source derivatives from {len(attached_media)} attached media items")
+            ml_included = len(attached_media) - ml_filtered_count
+            logger.info(f"PID {pid}: {result['pdf_count']} PDFs, {result['tiff_count']} TIFF-source derivatives from {ml_included}/{len(attached_media)} attached media items (used_for_ml filter applied)")
+            if ml_filtered_count > 0:
+                logger.info(f"PID {pid}: Filtered out {ml_filtered_count} media items not marked for ML use")
             return result
             
         except requests.exceptions.RequestException as e:
