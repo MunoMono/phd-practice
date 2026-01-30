@@ -10,7 +10,11 @@ class Settings(BaseSettings):
     
     # API
     API_V1_PREFIX: str = "/api/v1"
-    ALLOWED_ORIGINS: List[str] = ["http://localhost:3000", "http://localhost:5173"]
+    ALLOWED_ORIGINS: List[str] = ["http://localhost:3000", "http://localhost:5173", "https://innovationdesign.io"]
+    
+    # Auth0
+    AUTH0_DOMAIN: str = "dev-i4m880asz7y6j5sk.us.auth0.com"
+    AUTH0_AUDIENCE: str = ""  # API identifier from Auth0 dashboard
     
     # Local Database (research data & vectors)
     POSTGRES_USER: str = "postgres"

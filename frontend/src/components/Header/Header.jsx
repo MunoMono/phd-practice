@@ -65,6 +65,18 @@ const Header = ({ currentTheme, onThemeToggle }) => {
         >
           {isDark ? <Light size={20} /> : <Asleep size={20} />}
         </HeaderGlobalAction>
+        {isAuthenticated && (
+          <div style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            padding: '0 1rem',
+            color: 'var(--cds-text-secondary)',
+            fontSize: '0.875rem',
+            whiteSpace: 'nowrap'
+          }}>
+            {user?.email}
+          </div>
+        )}
         <HeaderGlobalAction
           aria-label={isAuthenticated ? 'Logout' : 'Login'}
           tooltipAlignment="end"

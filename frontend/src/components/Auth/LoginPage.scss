@@ -1,0 +1,39 @@
+.login-page {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  background: var(--cds-background);
+}
+
+.login-container {
+  text-align: center;
+  max-width: 500px;
+  padding: var(--cds-spacing-09);
+}
+
+.login-content {
+  background: var(--cds-layer-01);
+  padding: var(--cds-spacing-09);
+  border: 1px solid var(--cds-border-subtle);
+}
+
+.login-title {
+  font-size: var(--cds-heading-05-font-size);
+  font-weight: var(--cds-heading-05-font-weight);
+  line-height: var(--cds-heading-05-line-height);
+  letter-spacing: var(--cds-heading-05-letter-spacing);
+  margin-bottom: var(--cds-spacing-05);
+  color: var(--cds-text-primary);
+}
+
+.login-subtitle {
+  font-size: var(--cds-body-01-font-size);
+  line-height: var(--cds-body-01-line-height);
+  color: var(--cds-text-secondary);
+  margin-bottom: var(--cds-spacing-07);
+}
+
+.login-button {
+  margin-top: var(--cds-spacing-05);
+}
