@@ -4,3 +4,47 @@
   min-height: calc(100vh - 3rem);
   background-color: var(--cds-background);
 }
+
+.portfolio-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--cds-spacing-05) var(--cds-spacing-07);
+  background: var(--cds-layer-01);
+  border-bottom: 1px solid var(--cds-border-subtle);
+
+  h2 {
+    margin: 0 0 var(--cds-spacing-02) 0;
+    font-weight: 400;
+    font-size: 1.75rem;
+  }
+}
+
+.portfolio-info {
+  flex: 1;
+}
+
+.portfolio-stats {
+  display: flex;
+  align-items: center;
+  gap: var(--cds-spacing-03);
+  font-size: 0.875rem;
+  color: var(--cds-text-secondary);
+
+  .stat-label {
+    font-weight: 600;
+  }
+
+  .stat-value {
+    color: var(--cds-text-primary);
+  }
+
+  .stat-separator {
+    color: var(--cds-border-subtle);
+  }
+}
+
+.portfolio-actions {
+  display: flex;
+  gap: var(--cds-spacing-03);
+}

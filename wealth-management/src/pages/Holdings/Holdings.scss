@@ -1,0 +1,28 @@
+.holdings-page {
+  padding: var(--cds-spacing-05);
+}
+
+.holdings-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--cds-spacing-05);
+
+  h3 {
+    margin: 0;
+    font-weight: 600;
+  }
+}
+
+.holdings-table {
+  overflow-x: auto;
+  
+  thead th {
+    white-space: nowrap;
+  }
+  
+  tbody td {
+    vertical-align: top;
+    padding: var(--cds-spacing-03);
+  }
+}

@@ -1,19 +1,81 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAuth0 } from '@auth0/auth0-react'
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
-import { Theme, Loading } from '@carbon/react'
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
+import { Theme, Loading, Tabs, TabList, Tab, TabPanels, TabPanel, Button } from '@carbon/react'
+import { Download, Reset } from '@carbon/icons-react'
 import Header from './components/Header/Header'
 import Dashboard from './pages/Dashboard/Dashboard'
+import Holdings from './pages/Holdings/Holdings'
+import Import from './pages/Import/Import'
 import LoginPage from './components/Auth/LoginPage'
+import { DEFAULT_PORTFOLIO } from './utils/defaultPortfolio'
+import { loadPortfolio, savePortfolio, resetPortfolio } from './utils/localStorage'
+import { calculateTotalCurrent, formatCurrency } from './utils/portfolioCalculations'
+import { exportToCSV, downloadCSV } from './utils/csvHelpers'
 import './styles/App.scss'
 
 function App() {
   const [theme, setTheme] = useState('g100')
+  const [portfolio, setPortfolio] = useState(DEFAULT_PORTFOLIO)
   const { isAuthenticated, isLoading } = useAuth0()
+
+  // Load portfolio from localStorage on mount
+  useEffect(() => {
+    const loaded = loadPortfolio(DEFAULT_PORTFOLIO);
+    setPortfolio(loaded);
+  }, []);
+
+  // Save portfolio to localStorage whenever it changes
+  useEffect(() => {
+    savePortfolio(portfolio);
+  }, [portfolio]);
 
   const toggleTheme = () => {
     setTheme(prevTheme => prevTheme === 'white' ? 'g100' : 'white')
   }
+
+  const handleUpdateTolerancePct = (newTolerance) => {
+    setPortfolio({ ...portfolio, tolerancePct: newTolerance });
+  };
+
+  const handleUpdateHolding = (holdingId, updatedHolding) => {
+    setPortfolio({
+      ...portfolio,
+      holdings: portfolio.holdings.map(h => 
+        h.id === holdingId ? updatedHolding : h
+      )
+    });
+  };
+
+  const handleDeleteHolding = (holdingId) => {
+    setPortfolio({
+      ...portfolio,
+      holdings: portfolio.holdings.filter(h => h.id !== holdingId)
+    });
+  };
+
+  const handleAddHolding = (newHolding) => {
+    setPortfolio({
+      ...portfolio,
+      holdings: [...portfolio.holdings, newHolding]
+    });
+  };
+
+  const handleImportPortfolio = (importedPortfolio) => {
+    setPortfolio(importedPortfolio);
+  };
+
+  const handleReset = () => {
+    if (window.confirm('Reset to default portfolio? This will erase all current data.')) {
+      const defaultData = resetPortfolio(DEFAULT_PORTFOLIO);
+      setPortfolio(defaultData);
+    }
+  };
+
+  const handleExport = () => {
+    const { csv, filename } = exportToCSV(portfolio);
+    downloadCSV(csv, filename);
+  };
 
   if (isLoading) {
     return (
@@ -33,14 +95,75 @@ function App() {
     )
   }
 
+  const totalCurrent = calculateTotalCurrent(portfolio.holdings);
+
   return (
     <Router>
       <Theme theme={theme}>
         <Header currentTheme={theme} onThemeToggle={toggleTheme} />
         <div className="app-content">
-          <Routes>
-            <Route path="/" element={<Dashboard />} />
-          </Routes>
+          {/* Portfolio Summary Header */}
+          <div className="portfolio-header">
+            <div className="portfolio-info">
+              <h2>{portfolio.portfolioName}</h2>
+              <div className="portfolio-stats">
+                <span className="stat-label">Base Currency:</span>
+                <span className="stat-value">{portfolio.baseCurrency}</span>
+                <span className="stat-separator">|</span>
+                <span className="stat-label">Total Value:</span>
+                <span className="stat-value">{formatCurrency(totalCurrent, portfolio.baseCurrency)}</span>
+              </div>
+            </div>
+            <div className="portfolio-actions">
+              <Button
+                kind="tertiary"
+                renderIcon={Download}
+                onClick={handleExport}
+                size="sm"
+              >
+                Export CSV
+              </Button>
+              <Button
+                kind="tertiary"
+                renderIcon={Reset}
+                onClick={handleReset}
+                size="sm"
+              >
+                Reset
+              </Button>
+            </div>
+          </div>
+
+          {/* Tabs */}
+          <Tabs>
+            <TabList aria-label="Portfolio tabs" contained>
+              <Tab>Dashboard</Tab>
+              <Tab>Holdings</Tab>
+              <Tab>Import</Tab>
+            </TabList>
+            <TabPanels>
+              <TabPanel>
+                <Dashboard
+                  portfolio={portfolio}
+                  onUpdateTolerancePct={handleUpdateTolerancePct}
+                />
+              </TabPanel>
+              <TabPanel>
+                <Holdings
+                  portfolio={portfolio}
+                  onUpdateHolding={handleUpdateHolding}
+                  onDeleteHolding={handleDeleteHolding}
+                  onAddHolding={handleAddHolding}
+                />
+              </TabPanel>
+              <TabPanel>
+                <Import
+                  portfolio={portfolio}
+                  onImportPortfolio={handleImportPortfolio}
+                />
+              </TabPanel>
+            </TabPanels>
+          </Tabs>
         </div>
       </Theme>
     </Router>
