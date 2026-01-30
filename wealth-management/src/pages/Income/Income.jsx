@@ -35,7 +35,7 @@ const Income = ({ portfolio }) => {
   };
 
   // Calculate projected income
-  const incomeBySleeveconst incomeByProjeSleeve = portfolio.sleeves.map(sleeve => {
+  const incomeBySleeve = portfolio.sleeves.map(sleeve => {
     const sleeveHoldings = portfolio.holdings.filter(h => h.sleeveId === sleeve.id);
     const sleeveValue = sleeveHoldings.reduce((sum, h) => sum + (h.currentValue || 0), 0);
     const expectedYield = sleeveYields[sleeve.id] || 0;
