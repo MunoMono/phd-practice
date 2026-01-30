@@ -31,6 +31,20 @@ const COLORS = ['#0f62fe', '#24a148', '#da1e28', '#f1c21b', '#8a3ffc', '#ff832b'
 
 const Dashboard = ({ portfolio, onUpdateTolerancePct }) => {
   const [showOnlyActions, setShowOnlyActions] = useState(false);
+  const [chartError, setChartError] = useState(null);
+
+  // Add data validation
+  if (!portfolio || !portfolio.holdings || !portfolio.sleeves) {
+    return (
+      <div className="dashboard-page">
+        <InlineNotification
+          kind="error"
+          title="Portfolio data missing"
+          subtitle="Portfolio data is not available. Please try refreshing or resetting."
+        />
+      </div>
+    );
+  }
 
   const totalCurrent = calculateTotalCurrent(portfolio.holdings);
   const holdingsWithMetrics = calculateAllHoldings(portfolio.holdings, totalCurrent);
@@ -200,13 +214,31 @@ const Dashboard = ({ portfolio, onUpdateTolerancePct }) => {
         {/* Carbon Charts */}
         <Column lg={8} md={4} sm={4}>
           <Tile className="dashboard-tile chart-tile">
-            <DonutChart data={donutData} options={donutOptions} />
+            {chartError ? (
+              <InlineNotification
+                kind="warning"
+                title="Chart rendering issue"
+                subtitle={chartError}
+                lowContrast
+              />
+            ) : (
+              <DonutChart data={donutData} options={donutOptions} />
+            )}
           </Tile>
         </Column>
 
         <Column lg={8} md={4} sm={4}>
           <Tile className="dashboard-tile chart-tile">
-            <StackedBarChart data={driftData} options={driftOptions} />
+            {chartError ? (
+              <InlineNotification
+                kind="warning"
+                title="Chart rendering issue"
+                subtitle={chartError}
+                lowContrast
+              />
+            ) : (
+              <StackedBarChart data={driftData} options={driftOptions} />
+            )}
           </Tile>
         </Column>
 
