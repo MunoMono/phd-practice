@@ -8,6 +8,9 @@ what will be ingested by Docling.
 import logging
 import requests
 from typing import Dict, List, Optional
+from sqlalchemy import text
+
+from app.core.database import LocalSessionLocal
 
 logger = logging.getLogger(__name__)
 
@@ -127,9 +130,6 @@ class PIDMediaCountService:
             tiff_count: Number of TIFF files
             db: Optional database session (if None, creates new one)
         """
-        from app.core.database import LocalSessionLocal
-        from sqlalchemy import text
-        
         close_session = False
         if db is None:
             db = LocalSessionLocal()
@@ -173,9 +173,6 @@ class PIDMediaCountService:
         Returns:
             Summary statistics
         """
-        from app.core.database import LocalSessionLocal
-        from sqlalchemy import text
-        
         close_session = False
         if db is None:
             db = LocalSessionLocal()
