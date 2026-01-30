@@ -32,20 +32,13 @@ class PIDMediaCountService:
             Dict with pdf_count, tiff_count, total_count
         """
         query = """
-        query GetMediaForPID($pid: String!) {
-            mediaItemsByPID(pid: $pid) {
-                id
+        query GetMediaForPID($pid: ID!) {
+            record_v1(id: $pid) {
                 pid
                 title
-                pdf_files {
-                    id
+                digital_assets {
                     filename
-                    url
-                }
-                tiff_files {
-                    id
-                    filename
-                    url
+                    mime
                 }
             }
         }
@@ -71,26 +64,26 @@ class PIDMediaCountService:
                 return {'pdf_count': 0, 'tiff_count': 0, 'total_count': 0}
             
             # Parse response
-            media_items = data.get('data', {}).get('mediaItemsByPID', [])
+            record = data.get('data', {}).get('record_v1')
             
-            if not media_items:
-                logger.warning(f"No media items found for PID {pid}")
+            if not record:
+                logger.warning(f"No record found for PID {pid}")
                 return {'pdf_count': 0, 'tiff_count': 0, 'total_count': 0}
             
-            # Count media assets across all items with this PID
-            total_pdfs = 0
-            total_tiffs = 0
+            digital_assets = record.get('digital_assets')
             
-            for item in media_items:
-                pdf_files = item.get('pdf_files', [])
-                tiff_files = item.get('tiff_files', [])
-                total_pdfs += len(pdf_files)
-                total_tiffs += len(tiff_files)
+            if not digital_assets:
+                logger.info(f"No digital assets found for PID {pid}")
+                return {'pdf_count': 0, 'tiff_count': 0, 'total_count': 0}
+            
+            # Count PDFs and TIFFs by mime type
+            pdf_count = sum(1 for asset in digital_assets if asset.get('mime') == 'application/pdf')
+            tiff_count = sum(1 for asset in digital_assets if asset.get('mime') in ['image/tiff', 'image/tif'])
             
             result = {
-                'pdf_count': total_pdfs,
-                'tiff_count': total_tiffs,
-                'total_count': total_pdfs + total_tiffs
+                'pdf_count': pdf_count,
+                'tiff_count': tiff_count,
+                'total_count': pdf_count + tiff_count
             }
             
             logger.info(f"PID {pid}: {result['pdf_count']} PDFs, {result['tiff_count']} TIFFs")
