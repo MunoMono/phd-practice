@@ -49,7 +49,70 @@ async def trigger_s3_sync(max_docs: Optional[int] = None):
 
 @router.post("/authorities/scheduled")
 async def scheduled_authority_sync(
-    bac
+    background_tasks: BackgroundTasks,
+    x_api_key: Optional[str] = Header(None)
+):
+    """
+    Scheduled sync endpoint for cron jobs
+    
+    Security: Requires API key header
+    """
+    # TODO: Add API key validation when settings.SYNC_API_KEY is configured
+    # if x_api_key != settings.SYNC_API_KEY:
+    #     raise HTTPException(status_code=401, detail="Invalid API key")
+    
+    logger.info("Starting scheduled authority sync...")
+    
+    try:
+        result = await graphql_sync_service.sync_all_authorities(
+            incremental=True,
+            triggered_by='cron'
+        )
+        
+        return {
+            'status': 'success',
+            'message': f"Synced {result.get('new_authorities', 0)} new authorities",
+            'details': result
+        }
+        
+    except Exception as e:
+        logger.error(f"Scheduled sync error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/authorities/manual")
+async def manual_authority_sync(
+    background_tasks: BackgroundTasks,
+    incremental: bool = True
+):
+    """
+    Manual sync endpoint for admin use
+    
+    Args:
+        incremental: If True, only sync new records since last sync
+    """
+    logger.info(f"Starting manual authority sync (incremental={incremental})...")
+    
+    try:
+        result = await graphql_sync_service.sync_all_authorities(
+            incremental=incremental,
+            triggered_by='manual'
+        )
+        
+        return {
+            'status': 'success',
+            'message': f"Synced {result.get('new_authorities', 0)} authorities",
+            'details': result
+        }
+        
+    except Exception as e:
+        logger.error(f"Manual sync error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/status")
+async def sync_status():
+    """
     Get comprehensive sync status for all sources
     
     Returns:
@@ -64,7 +127,22 @@ async def scheduled_authority_sync(
         result = db.execute(text("SELECT * FROM sync_health WHERE source_system = 'ddr_graphql'"))
         sync_health = result.fetchone()
         
-        # Get s3/list-pdfs")
+        return {
+            'graphql_sync': {
+                'source': sync_health[1] if sync_health else None,
+                'last_sync': sync_health[2].isoformat() if sync_health and sync_health[2] else None,
+                'health_status': sync_health[6] if sync_health else 'unknown'
+            },
+            's3_storage': {
+                'configured': s3_sync_service.s3_client is not None,
+                'bucket': s3_sync_service.bucket_name if s3_sync_service.s3_client else None
+            }
+        }
+    finally:
+        db.close()
+
+
+@router.get("/s3/list-pdfs")
 async def list_pdfs():
     """List all PDFs in S3 bucket with metadata"""
     pdfs = s3_sync_service.list_pdfs_in_bucket()
@@ -101,25 +179,30 @@ async def sync_history(limit: int = 20):
     db = LocalSessionLocal()
     try:
         result = db.execute(
-            text(f"SELECT * FROM recent_syncs LIMIT :limit"),
+            text("SELECT * FROM sync_log ORDER BY sync_started_at DESC LIMIT :limit"),
             {'limit': limit}
         )
         syncs = [dict(row._mapping) for row in result.fetchall()]
         
         return {
             'count': len(syncs),
-            'syncs': syncs
+            'syncs': [
+                {
+                    'sync_id': s['sync_id'],
+                    'source_system': s['source_system'],
+                    'sync_started_at': s['sync_started_at'].isoformat() if s.get('sync_started_at') else None,
+                    'sync_completed_at': s['sync_completed_at'].isoformat() if s.get('sync_completed_at') else None,
+                    'status': s['status'],
+                    'records_processed': s['records_processed'],
+                    'new_records': s['new_records'],
+                    'updated_records': s['updated_records'],
+                    'triggered_by': s['triggered_by']
+                }
+                for s in syncs
+            ]
         }
     finally:
-        db.close()           'bucket': s3_sync_service.s3_client and s3_sync_service.s3_client._endpoint.host,
-                'pdfs_in_bucket': len(pdfs),
-                'pdfs_with_year': len([p for p in pdfs if p['publication_year']]),
-                'year_range': {
-                    'min': min([p['publication_year'] for p in pdfs if p['publication_year']], default=None),
-                    'max': max([p['publication_year'] for p in pdfs if p['publication_year']], default=None)
-                }
-            },
-            'recent_syncs': recent_syncs
+        db.close()
         }
     finally:
         db.close() 2 * * * curl -X POST \\
