@@ -80,13 +80,13 @@ const StatsCards = () => {
       }
       
       const metrics = result.data.systemMetrics
-      conSet PID authorities
-      setPidAuthorities(metrics.pidAuthorities || [])
-      
-      // st recent = result.data.recentDocuments || []
+      const recent = result.data.recentDocuments || []
       
       // Set recent documents
       setRecentDocs(recent)
+      
+      // Set PID authorities
+      setPidAuthorities(metrics.pidAuthorities || [])
       
       // Transform to match existing component structure
       setStats({
