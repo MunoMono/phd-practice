@@ -39,6 +39,29 @@ html {
   color: inherit;
 }
 
+// IBM Carbon list styling - use dashes for bullets
+ul {
+  list-style-type: none;
+  padding-left: 0;
+  
+  li {
+    position: relative;
+    padding-left: 1.25rem;
+    
+    &::before {
+      content: '–';
+      position: absolute;
+      left: 0;
+      color: var(--cds-text-primary);
+      font-weight: 600;
+    }
+  }
+}
+
+ol {
+  padding-left: 1.25rem;
+}
+
 // Custom scrollbar (webkit browsers)
 ::-webkit-scrollbar {
   width: 8px;
