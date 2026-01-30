@@ -22,6 +22,9 @@ function App() {
   // Load portfolio from localStorage on mount
   useEffect(() => {
     const loaded = loadPortfolio(DEFAULT_PORTFOLIO);
+    console.log('App.jsx loaded portfolio:', loaded);
+    console.log('Holdings count:', loaded?.holdings?.length);
+    console.log('Sleeves count:', loaded?.sleeves?.length);
     setPortfolio(loaded);
   }, []);
 

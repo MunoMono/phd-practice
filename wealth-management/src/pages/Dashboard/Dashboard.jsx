@@ -33,45 +33,112 @@ const Dashboard = ({ portfolio, onUpdateTolerancePct }) => {
   const [showOnlyActions, setShowOnlyActions] = useState(false);
   const [chartError, setChartError] = useState(null);
 
+  console.log('Dashboard rendering with portfolio:', portfolio);
+
   // Add data validation
-  if (!portfolio || !portfolio.holdings || !portfolio.sleeves) {
+  if (!portfolio) {
+    console.error('Portfolio is null or undefined');
     return (
       <div className="dashboard-page">
-        <InlineNotification
-          kind="error"
-          title="Portfolio data missing"
-          subtitle="Portfolio data is not available. Please try refreshing or resetting."
-        />
+        <Grid narrow>
+          <Column lg={14} md={8} sm={4}>
+            <InlineNotification
+              kind="error"
+              title="Portfolio data is NULL"
+              subtitle="Portfolio object is null or undefined. Check App.jsx state initialization."
+            />
+          </Column>
+        </Grid>
       </div>
     );
   }
 
-  const totalCurrent = calculateTotalCurrent(portfolio.holdings);
-  const holdingsWithMetrics = calculateAllHoldings(portfolio.holdings, totalCurrent);
-  const sleevesWithMetrics = calculateAllSleeves(
-    portfolio.sleeves,
-    portfolio.holdings,
-    totalCurrent,
-    portfolio.tolerancePct
-  );
+  if (!portfolio.holdings) {
+    console.error('Holdings array is missing:', portfolio);
+    return (
+      <div className="dashboard-page">
+        <Grid narrow>
+          <Column lg={14} md={8} sm={4}>
+            <InlineNotification
+              kind="error"
+              title="Holdings missing"
+              subtitle={`Portfolio name: ${portfolio.portfolioName || 'N/A'} but holdings array is missing`}
+            />
+          </Column>
+        </Grid>
+      </div>
+    );
+  }
+
+  if (!portfolio.sleeves) {
+    console.error('Sleeves array is missing:', portfolio);
+    return (
+      <div className="dashboard-page">
+        <Grid narrow>
+          <Column lg={14} md={8} sm={4}>
+            <InlineNotification
+              kind="error"
+              title="Sleeves missing"
+              subtitle={`Portfolio has ${portfolio.holdings.length} holdings but no sleeves array`}
+            />
+          </Column>
+        </Grid>
+      </div>
+    );
+  }
+
+  console.log('Portfolio data valid - calculating metrics');
+  let totalCurrent, holdingsWithMetrics, sleevesWithMetrics;
+  
+  try {
+    totalCurrent = calculateTotalCurrent(portfolio.holdings);
+    console.log('Total current:', totalCurrent);
+    holdingsWithMetrics = calculateAllHoldings(portfolio.holdings, totalCurrent);
+    console.log('Holdings with metrics:', holdingsWithMetrics.length);
+    sleevesWithMetrics = calculateAllSleeves(
+      portfolio.sleeves,
+      portfolio.holdings,
+      totalCurrent,
+      portfolio.tolerancePct
+    );
+    console.log('Sleeves with metrics:', sleevesWithMetrics.length);
+  } catch (error) {
+    console.error('Error calculating metrics:', error);
+    return (
+      <div className="dashboard-page">
+        <Grid narrow>
+          <Column lg={14} md={8} sm={4}>
+            <InlineNotification
+              kind="error"
+              title="Calculation error"
+              subtitle={`Error: ${error.message}`}
+            />
+          </Column>
+        </Grid>
+      </div>
+    );
+  }
 
   // Prepare Carbon Charts data
-  const donutData = sleevesWithMetrics.map(sleeve => ({
-    group: sleeve.name,
-    value: sleeve.sleeveValue
-  }));
+  let donutData, donutOptions, driftData, driftOptions;
+  try {
+    donutData = sleevesWithMetrics.map(sleeve => ({
+      group: sleeve.name,
+      value: sleeve.sleeveValue
+    }));
+    console.log('Donut data prepared:', donutData);
 
-  const donutOptions = {
-    title: 'Sleeve Allocation',
-    resizable: true,
-    donut: {
-      center: {
-        label: 'Total',
-        numberFormatter: (value) => `£${Math.round(value).toLocaleString()}`
+    donutOptions = {
+      title: 'Sleeve Allocation',
+      resizable: true,
+      donut: {
+        center: {
+          label: 'Total',
+          numberFormatter: (value) => `£${Math.round(value).toLocaleString()}`
+        },
+        alignment: 'center'
       },
-      alignment: 'center'
-    },
-    height: '400px',
+      height: '400px',
     theme: 'g100',
     legend: {
       alignment: 'center'
@@ -84,16 +151,17 @@ const Dashboard = ({ portfolio, onUpdateTolerancePct }) => {
         'Cash/Income Buffer': '#da1e28'
       }
     }
-  };
+    };
 
-  // Drift bar chart data
-  const driftData = sleevesWithMetrics.map(sleeve => ({
-    group: sleeve.name,
-    key: sleeve.withinBand ? 'Within tolerance' : 'Requires action',
-    value: Math.abs(sleeve.driftPct)
-  }));
+    // Drift chart data
+    driftData = sleevesWithMetrics.map(sleeve => ({
+      group: sleeve.name,
+      key: sleeve.withinBand ? 'Within tolerance' : 'Requires action',
+      value: Math.abs(sleeve.sleeveDrift)
+    }));
+    console.log('Drift data prepared:', driftData);
 
-  const driftOptions = {
+    driftOptions = {
     title: 'Sleeve Drift from Target',
     axes: {
       left: {
@@ -111,13 +179,17 @@ const Dashboard = ({ portfolio, onUpdateTolerancePct }) => {
     },
     height: '400px',
     theme: 'g100',
-    color: {
       scale: {
         'Within tolerance': '#24a148',
         'Requires action': '#da1e28'
       }
     }
-  };
+    };
+    console.log('Chart options prepared successfully');
+  } catch (error) {
+    console.error('Error preparing chart data:', error);
+    setChartError(error.message);
+  }
 
   // Metrics cards data
   const totalTarget = portfolio.totalTarget || 750000;
@@ -142,9 +214,17 @@ const Dashboard = ({ portfolio, onUpdateTolerancePct }) => {
 
   return (
     <div className="dashboard-page">
+      {/* Debug info */}
+      <Grid narrow>
+        <Column lg={14} md={8} sm={4}>
+          <Tile style={{ marginBottom: '1rem', background: '#393939', color: '#f4f4f4' }}>
+            <p style={{ margin: 0 }}><strong>Debug:</strong> Portfolio loaded - {portfolio.portfolioName} | {portfolio.holdings.length} holdings | {portfolio.sleeves.length} sleeves</p>
+          </Tile>
+        </Column>
+      </Grid>
+
       {/* Metrics Header */}
-      <Grid narrow className="metrics-grid">
-        <Column lg={3} md={2} sm={2}>
+      <Grid narrow className="metrics-grid">\n        <Column lg={3} md={2} sm={2}>
           <Tile className="metric-tile">
             <DashboardIcon size={24} className="metric-icon" />
             <div className="metric-content">
