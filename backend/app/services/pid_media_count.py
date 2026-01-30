@@ -40,6 +40,7 @@ class PIDMediaCountService:
                     id
                     pid
                     title
+                    used_for_ml
                     pdf_files {
                         filename
                     }
@@ -85,10 +86,16 @@ class PIDMediaCountService:
                 return {'pdf_count': 0, 'tiff_count': 0, 'total_count': 0}
             
             # Count PDF files and JPG derivatives (which may include TIFFs as source)
+            # ONLY include media items marked as used_for_ml: true
             pdf_count = 0
             tiff_count = 0
             
             for media_item in attached_media:
+                # Skip items not marked for ML use
+                if not media_item.get('used_for_ml', False):
+                    logger.debug(f"Skipping media item {media_item.get('id')} - not marked for ML")
+                    continue
+                
                 pdf_files = media_item.get('pdf_files') or []
                 jpg_derivatives = media_item.get('jpg_derivatives') or []
                 
