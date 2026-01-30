@@ -179,6 +179,7 @@ const Dashboard = ({ portfolio, onUpdateTolerancePct }) => {
     },
     height: '400px',
     theme: 'g100',
+    color: {
       scale: {
         'Within tolerance': '#24a148',
         'Requires action': '#da1e28'
