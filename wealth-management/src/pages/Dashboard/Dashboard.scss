@@ -1,48 +1,117 @@
+@use '@carbon/react/scss/spacing' as *;
+@use '@carbon/react/scss/theme' as *;
+@use '@carbon/react/scss/colors' as *;
+@use '@carbon/react/scss/type' as *;
+
 .dashboard-page {
-  padding: var(--cds-spacing-05);
+  padding: $spacing-05;
+
+  .metrics-grid {
+    margin-bottom: $spacing-06;
+  }
+
+  .metric-tile {
+    display: flex;
+    align-items: center;
+    gap: $spacing-04;
+    padding: $spacing-05;
+    background: $layer-01;
+    border-left: 3px solid $border-interactive;
+    transition: all 0.2s $duration-fast-02 motion(standard, productive);
+
+    &:hover {
+      background: $layer-hover-01;
+      border-left-color: $focus;
+    }
+
+    .metric-icon {
+      color: $icon-secondary;
+    }
+
+    .metric-content {
+      display: flex;
+      flex-direction: column;
+      gap: $spacing-02;
+
+      .metric-label {
+        @include type-style('label-01');
+        color: $text-secondary;
+        margin: 0;
+      }
+
+      .metric-value {
+        @include type-style('productive-heading-03');
+        color: $text-primary;
+        margin: 0;
+        font-weight: 600;
+
+        &.positive {
+          color: $support-success;
+        }
+
+        &.negative {
+          color: $support-error;
+        }
+      }
+    }
+  }
 }
 
 .dashboard-tile {
-  margin-bottom: var(--cds-spacing-05);
+  margin-bottom: $spacing-05;
   min-height: 200px;
+  background: $layer-01;
+
+  &.chart-tile {
+    min-height: 450px;
+    
+    // Carbon Charts styling
+    :global(.cds--cc--chart-wrapper) {
+      background: transparent;
+    }
+  }
 }
 
 .tile-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: var(--cds-spacing-05);
+  margin-bottom: $spacing-05;
+  padding-bottom: $spacing-03;
+  border-bottom: 1px solid $border-subtle-01;
   
   h4 {
+    @include type-style('productive-heading-02');
     margin: 0;
     font-weight: 600;
   }
 }
 
 .chart-container {
-  margin-top: var(--cds-spacing-05);
+  margin-top: $spacing-05;
 }
 
 .sleeve-value {
-  font-size: 0.75rem;
-  color: var(--cds-text-secondary);
-  margin-top: var(--cds-spacing-02);
+  @include type-style('label-01');
+  color: $text-secondary;
+  margin-top: $spacing-02;
 }
 
 .drift-positive {
-  color: var(--cds-support-error);
+  color: $support-error;
 }
 
 .drift-negative {
-  color: var(--cds-support-success);
+  color: $support-success;
 }
 
 .trade-buy {
-  color: var(--cds-support-success);
+  color: $support-success;
   font-weight: 600;
 }
 
 .trade-sell {
-  color: var(--cds-support-error);
+  color: $support-error;
   font-weight: 600;
 }
+

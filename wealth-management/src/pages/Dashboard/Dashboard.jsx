@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import {
   Grid,
   Column,
@@ -10,8 +10,11 @@ import {
   StructuredListHead,
   StructuredListBody,
   StructuredListRow,
-  StructuredListCell
+  StructuredListCell,
+  InlineNotification
 } from '@carbon/react';
+import { DonutChart, BarChartStacked, LineChart } from '@carbon/charts-react';
+import { ChartBullet, Analytics, Collaborate, Dashboard as DashboardIcon } from '@carbon/icons-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 import {
   calculateTotalCurrent,
@@ -21,6 +24,7 @@ import {
   formatCurrency,
   formatPercent
 } from '../../utils/portfolioCalculations';
+import '@carbon/charts-react/styles.css';
 import './Dashboard.scss';
 
 const COLORS = ['#0f62fe', '#24a148', '#da1e28', '#f1c21b', '#8a3ffc', '#ff832b'];
@@ -37,7 +41,76 @@ const Dashboard = ({ portfolio, onUpdateTolerancePct }) => {
     portfolio.tolerancePct
   );
 
-  // Prepare pie chart data
+  // Prepare Carbon Charts data
+  const donutData = sleevesWithMetrics.map(sleeve => ({
+    group: sleeve.name,
+    value: sleeve.sleeveValue
+  }));
+
+  const donutOptions = {
+    title: 'Sleeve Allocation',
+    resizable: true,
+    donut: {
+      center: {
+        label: 'Total',
+        numberFormatter: (value) => `£${Math.round(value).toLocaleString()}`
+      },
+      alignment: 'center'
+    },
+    height: '400px',
+    theme: 'g100',
+    legend: {
+      alignment: 'center'
+    },
+    color: {
+      scale: {
+        'Defensive Income': '#0f62fe',
+        'Equity Income & Growth': '#24a148', 
+        'Real Assets & Alternatives': '#8a3ffc',
+        'Cash/Income Buffer': '#da1e28'
+      }
+    }
+  };
+
+  // Drift bar chart data
+  const driftData = sleevesWithMetrics.map(sleeve => ({
+    group: sleeve.name,
+    key: sleeve.withinBand ? 'Within tolerance' : 'Requires action',
+    value: Math.abs(sleeve.driftPct)
+  }));
+
+  const driftOptions = {
+    title: 'Sleeve Drift from Target',
+    axes: {
+      left: {
+        mapsTo: 'value',
+        title: 'Drift (%)',
+        scaleType: 'linear'
+      },
+      bottom: {
+        mapsTo: 'group',
+        scaleType: 'labels'
+      }
+    },
+    bars: {
+      maxWidth: 50
+    },
+    height: '400px',
+    theme: 'g100',
+    color: {
+      scale: {
+        'Within tolerance': '#24a148',
+        'Requires action': '#da1e28'
+      }
+    }
+  };
+
+  // Metrics cards data
+  const totalTarget = portfolio.totalTarget || 750000;
+  const totalDrift = ((totalCurrent - totalTarget) / totalTarget) * 100;
+  const actionsRequired = sleevesWithMetrics.filter(s => !s.withinBand).length;
+
+  // Prepare pie chart data (fallback for recharts)
   const pieData = sleevesWithMetrics.map(sleeve => ({
     name: sleeve.name,
     value: sleeve.sleeveValue
@@ -55,6 +128,51 @@ const Dashboard = ({ portfolio, onUpdateTolerancePct }) => {
 
   return (
     <div className="dashboard-page">
+      {/* Metrics Header */}
+      <Grid narrow className="metrics-grid">
+        <Column lg={4} md={2} sm={4}>
+          <Tile className="metric-tile">
+            <DashboardIcon size={24} className="metric-icon" />
+            <div className="metric-content">
+              <p className="metric-label">Total Value</p>
+              <p className="metric-value">{formatCurrency(totalCurrent)}</p>
+            </div>
+          </Tile>
+        </Column>
+        
+        <Column lg={4} md={2} sm={4}>
+          <Tile className="metric-tile">
+            <ChartBullet size={24} className="metric-icon" />
+            <div className="metric-content">
+              <p className="metric-label">vs Target</p>
+              <p className={`metric-value ${totalDrift >= 0 ? 'positive' : 'negative'}`}>
+                {totalDrift >= 0 ? '+' : ''}{totalDrift.toFixed(2)}%
+              </p>
+            </div>
+          </Tile>
+        </Column>
+
+        <Column lg={4} md={2} sm={4}>
+          <Tile className="metric-tile">
+            <Analytics size={24} className="metric-icon" />
+            <div className="metric-content">
+              <p className="metric-label">Actions Required</p>
+              <p className="metric-value">{actionsRequired}</p>
+            </div>
+          </Tile>
+        </Column>
+
+        <Column lg={4} md={2} sm={4}>
+          <Tile className="metric-tile">
+            <Collaborate size={24} className="metric-icon" />
+            <div className="metric-content">
+              <p className="metric-label">Tolerance</p>
+              <p className="metric-value">±{portfolio.tolerancePct}%</p>
+            </div>
+          </Tile>
+        </Column>
+      </Grid>
+
       <Grid>
         {/* Tolerance Setting */}
         <Column lg={16} md={8} sm={4}>
@@ -65,6 +183,7 @@ const Dashboard = ({ portfolio, onUpdateTolerancePct }) => {
             <NumberInput
               id="tolerance-input"
               label="Sleeve tolerance (%)"
+              helperText="Trigger rebalancing when sleeve drifts beyond ±X%"
               value={portfolio.tolerancePct}
               onChange={(e, { value }) => {
                 if (!isNaN(value)) {
@@ -78,34 +197,16 @@ const Dashboard = ({ portfolio, onUpdateTolerancePct }) => {
           </Tile>
         </Column>
 
-        {/* Sleeve Allocation Chart */}
+        {/* Carbon Charts */}
         <Column lg={8} md={4} sm={4}>
-          <Tile className="dashboard-tile">
-            <div className="tile-header">
-              <h4>Sleeve Allocation</h4>
-            </div>
-            <div className="chart-container">
-              <ResponsiveContainer width="100%" height={300}>
-                <PieChart>
-                  <Pie
-                    data={pieData}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(1)}%`}
-                    outerRadius={80}
-                    fill="#8884d8"
-                    dataKey="value"
-                  >
-                    {pieData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip formatter={(value) => formatCurrency(value, portfolio.baseCurrency)} />
-                  <Legend />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
+          <Tile className="dashboard-tile chart-tile">
+            <DonutChart data={donutData} options={donutOptions} />
+          </Tile>
+        </Column>
+
+        <Column lg={8} md={4} sm={4}>
+          <Tile className="dashboard-tile chart-tile">
+            <BarChartStacked data={driftData} options={driftOptions} />
           </Tile>
         </Column>
 
