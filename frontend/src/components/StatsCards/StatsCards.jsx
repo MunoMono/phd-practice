@@ -168,13 +168,21 @@ const StatsCards = () => {
             <div className="stats-card__number">
               {formatNumber(stats?.pid_count)}
             </div>
-            <div className="stats-card__label">PID-Validated Authorities</div>
+            <div className="stats-card__label">PID-validated authorities</div>
             <div className="stats-card__progress">
               <ProgressBar 
-                label="Year 1 Target" 
+                label="Year 1 target" 
                 value={stats?.pid_count || 0} 
                 max={50} 
-               pidAuthorities.length > 0 && (
+                size="sm"
+              />
+              <div className="stats-card__progress-label">
+                {stats?.pid_count || 0}/50 authorities curated
+              </div>
+            </div>
+            <div className="stats-card__breakdown">
+              <Tag type="blue" size="sm">{formatNumber(stats?.local_table_counts?.documents || 0)} docs ingested</Tag>
+              {pidAuthorities.length > 0 && (
                 <div className="stats-card__recent" style={{ marginTop: '8px', fontSize: '0.75rem', color: 'var(--cds-text-secondary)' }}>
                   <div style={{ fontWeight: '600', marginBottom: '4px' }}>PID authorities:</div>
                   {pidAuthorities.map((auth, idx) => (
@@ -184,15 +192,7 @@ const StatsCards = () => {
                   ))}
                 </div>
               )}
-              {recentDocs.length > 0 && pidAuthorities.length ===
-              />
-              <div className="stats-card__progress-label">
-                {stats?.pid_count || 0}/50 authorities curated
-              </div>
-            </div>
-            <div className="stats-card__breakdown">
-              <Tag type="blue" size="sm">{formatNumber(stats?.local_table_counts?.documents || 0)} docs ingested</Tag>
-              {recentDocs.length > 0 && (
+              {recentDocs.length > 0 && pidAuthorities.length === 0 && (
                 <div className="stats-card__recent" style={{ marginTop: '8px', fontSize: '0.75rem', color: 'var(--cds-text-secondary)' }}>
                   <div style={{ fontWeight: '600', marginBottom: '4px' }}>Recent items (past week):</div>
                   {recentDocs.map((doc, idx) => (
