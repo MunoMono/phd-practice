@@ -220,7 +220,7 @@ async def sync_history(limit: int = 20):
 
 
 @router.post("/media-counts")
-async def sync_media_counts(db: Session = Depends(get_local_db)):
+async def sync_media_counts():
     """
     Query DDR Archive GraphQL API for media asset counts (PDFs + TIFFs)
     attached to each PID authority. This provides provenance tracking for
@@ -232,7 +232,8 @@ async def sync_media_counts(db: Session = Depends(get_local_db)):
     try:
         logger.info("Syncing media counts for all PIDs...")
         
-        stats = pid_media_service.sync_all_pid_media_counts(db=db)
+        # Use standalone session - let the service create its own
+        stats = pid_media_service.sync_all_pid_media_counts(db=None)
         
         if 'error' in stats:
             raise HTTPException(status_code=500, detail=stats['error'])
