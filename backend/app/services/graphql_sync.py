@@ -4,8 +4,10 @@ This is the PRIMARY ingestion method for the training corpus
 """
 import logging
 import requests
+import uuid
 from typing import List, Dict, Optional
 from datetime import datetime
+from sqlalchemy import text
 
 from app.core.config import settings
 from app.core.database import LocalSessionLocal
@@ -28,6 +30,106 @@ class GraphQLSyncService:
     def __init__(self):
         self.graphql_endpoint = settings.DDR_GRAPHQL_ENDPOINT
         self.api_token = settings.DDR_API_TOKEN
+    
+    def get_last_sync_timestamp(self) -> Optional[datetime]:
+        """Get timestamp of last successful sync from database"""
+        db = LocalSessionLocal()
+        try:
+            result = db.execute(text(
+                "SELECT get_last_sync_time('ddr_graphql')"
+            ))
+            timestamp = result.scalar()
+            return timestamp
+        except Exception as e:
+            logger.warning(f"Could not retrieve last sync time: {e}")
+            return None
+        finally:
+            db.close()
+    
+    def start_sync_log(
+        self, 
+        sync_type: str = 'manual',
+        triggered_by: str = 'api'
+    ) -> str:
+        """
+        Create sync log entry and return sync_id
+        
+        Args:
+            sync_type: 'scheduled', 'manual', 'incremental', 'full'
+            triggered_by: Who/what triggered the sync
+        
+        Returns:
+            sync_id for tracking this sync operation
+        """
+        db = LocalSessionLocal()
+        try:
+            sync_id = f"sync_{uuid.uuid4().hex[:12]}"
+            
+            db.execute(text("""
+                INSERT INTO sync_log (
+                    sync_id, sync_type, sync_source, status, triggered_by
+                ) VALUES (
+                    :sync_id, :sync_type, 'graphql_ddr_archive', 'running', :triggered_by
+                )
+            """), {
+                'sync_id': sync_id,
+                'sync_type': sync_type,
+                'triggered_by': triggered_by
+            })
+            db.commit()
+            
+            logger.info(f"Started sync: {sync_id} (type={sync_type})")
+            return sync_id
+            
+        except Exception as e:
+            db.rollback()
+            logger.error(f"Failed to create sync log: {e}")
+            return f"sync_error_{uuid.uuid4().hex[:8]}"
+        finally:
+            db.close()
+    
+    def complete_sync_log(
+        self,
+        sync_id: str,
+        records_new: int = 0,
+        records_updated: int = 0,
+        records_failed: int = 0,
+        status: str = 'completed',
+        error_log: Optional[str] = None
+    ):
+        """Mark sync as complete and update statistics"""
+        db = LocalSessionLocal()
+        try:
+            db.execute(text("""
+                SELECT complete_sync(
+                    :sync_id, :records_new, :records_updated, :records_failed, :status
+                )
+            """), {
+                'sync_id': sync_id,
+                'records_new': records_new,
+                'records_updated': records_updated,
+                'records_failed': records_failed,
+                'status': status
+            })
+            
+            if error_log:
+                db.execute(text("""
+                    UPDATE sync_log 
+                    SET error_log = :error_log
+                    WHERE sync_id = :sync_id
+                """), {
+                    'sync_id': sync_id,
+                    'error_log': error_log
+                })
+            
+            db.commit()
+            logger.info(f"Completed sync {sync_id}: new={records_new}, updated={records_updated}, failed={records_failed}")
+            
+        except Exception as e:
+            db.rollback()
+            logger.error(f"Failed to complete sync log: {e}")
+        finally:
+            db.close()
     
     def parse_graphql_media_response(self, json_data: Dict) -> Dict:
         """

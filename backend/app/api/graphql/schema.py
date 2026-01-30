@@ -105,11 +105,26 @@ class S3Stats:
 
 
 @strawberry.type
+class RecentDocument:
+    pid: str
+    title: str
+    created_at: Optional[str]
+
+
+@strawberry.type
+class PidAuthority:
+    pid: str
+    title: str
+    document_count: int
+
+
+@strawberry.type
 class SystemMetrics:
     local_db: DatabaseStats
     s3_storage: S3Stats
     total_items: int
     pid_count: int
+    pid_authorities: List['PidAuthority']
 
 
 @strawberry.type
@@ -181,6 +196,30 @@ class Query:
             except:
                 pid_count = 0
             
+            # Get PID authorities with titles
+            try:
+                result = db.execute(text("""
+                    SELECT 
+                        pid,
+                        MAX(title) as title,
+                        COUNT(*) as document_count
+                    FROM documents 
+                    WHERE pid IS NOT NULL
+                    GROUP BY pid
+                    ORDER BY pid
+                """))
+                pid_authorities = [
+                    PidAuthority(
+                        pid=row[0],
+                        title=row[1] or 'Untitled',
+                        document_count=row[2]
+                    )
+                    for row in result.fetchall()
+                ]
+            except Exception as e:
+                logger.error(f"Error fetching PID authorities: {e}")
+                pid_authorities = []
+            
             table_counts = TableCounts(
                 document_embeddings=counts['document_embeddings'],
                 research_sessions=counts['research_sessions'],
@@ -216,8 +255,41 @@ class Query:
             local_db=db_stats,
             s3_storage=s3_stats,
             total_items=total_items,
-            pid_count=pid_count
+            pid_count=pid_count,
+            pid_authorities=pid_authorities
         )
+    
+    @strawberry.field
+    def recent_documents(
+        self,
+        days: int = 7
+    ) -> List['RecentDocument']:
+        """
+        Get recently ingested documents with PIDs
+        
+        Args:
+            days: Number of days to look back (default: 7)
+        """
+        db = LocalSessionLocal()
+        try:
+            from datetime import datetime, timedelta
+            cutoff_date = datetime.now() - timedelta(days=days)
+            
+            docs = db.query(Document).filter(
+                Document.pid.isnot(None),
+                Document.created_at >= cutoff_date
+            ).order_by(Document.created_at.desc()).all()
+            
+            return [
+                RecentDocument(
+                    pid=doc.pid,
+                    title=doc.title,
+                    created_at=doc.created_at.isoformat() if doc.created_at else None
+                )
+                for doc in docs
+            ]
+        finally:
+            db.close()
     
     @strawberry.field
     def temporal_documents(

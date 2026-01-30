@@ -7,6 +7,8 @@ const StatsCards = () => {
   const [stats, setStats] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [recentDocs, setRecentDocs] = useState([])
+  const [pidAuthorities, setPidAuthorities] = useState([])
 
   useEffect(() => {
     fetchStats()
@@ -17,7 +19,7 @@ const StatsCards = () => {
 
   const fetchStats = async () => {
     try {
-      // GraphQL query for PID-gated corpus metrics
+      // GraphQL query for PID-gated corpus metrics and recent documents
       const query = `
         query {
           systemMetrics {
@@ -43,6 +45,16 @@ const StatsCards = () => {
             }
             totalItems
             pidCount
+            pidAuthorities {
+              pid
+              title
+              documentCount
+            }
+          }
+          recentDocuments(days: 7) {
+            pid
+            title
+            createdAt
           }
         }
       `
@@ -68,6 +80,13 @@ const StatsCards = () => {
       }
       
       const metrics = result.data.systemMetrics
+      conSet PID authorities
+      setPidAuthorities(metrics.pidAuthorities || [])
+      
+      // st recent = result.data.recentDocuments || []
+      
+      // Set recent documents
+      setRecentDocs(recent)
       
       // Transform to match existing component structure
       setStats({
@@ -155,7 +174,17 @@ const StatsCards = () => {
                 label="Year 1 Target" 
                 value={stats?.pid_count || 0} 
                 max={50} 
-                size="sm"
+               pidAuthorities.length > 0 && (
+                <div className="stats-card__recent" style={{ marginTop: '8px', fontSize: '0.75rem', color: 'var(--cds-text-secondary)' }}>
+                  <div style={{ fontWeight: '600', marginBottom: '4px' }}>PID authorities:</div>
+                  {pidAuthorities.map((auth, idx) => (
+                    <div key={idx} style={{ marginLeft: '8px', marginBottom: '2px', fontFamily: 'monospace' }}>
+                      • {auth.title} | {auth.pid}
+                    </div>
+                  ))}
+                </div>
+              )}
+              {recentDocs.length > 0 && pidAuthorities.length ===
               />
               <div className="stats-card__progress-label">
                 {stats?.pid_count || 0}/50 authorities curated
@@ -163,6 +192,16 @@ const StatsCards = () => {
             </div>
             <div className="stats-card__breakdown">
               <Tag type="blue" size="sm">{formatNumber(stats?.local_table_counts?.documents || 0)} docs ingested</Tag>
+              {recentDocs.length > 0 && (
+                <div className="stats-card__recent" style={{ marginTop: '8px', fontSize: '0.75rem', color: 'var(--cds-text-secondary)' }}>
+                  <div style={{ fontWeight: '600', marginBottom: '4px' }}>Recent items (past week):</div>
+                  {recentDocs.map((doc, idx) => (
+                    <div key={idx} style={{ marginLeft: '8px', marginBottom: '2px' }}>
+                      • {doc.title} <span style={{ opacity: 0.6 }}>({doc.pid})</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </Tile>

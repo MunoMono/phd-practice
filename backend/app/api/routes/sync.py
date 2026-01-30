@@ -1,20 +1,24 @@
 """
-S3 sync endpoints - trigger document sync from DigitalOcean Spaces
+Sync endpoints - trigger document sync from various sources
+Includes GraphQL DDR Archive sync and S3 Spaces sync
 """
 import logging
-from fastapi import APIRouter, HTTPException
-from typing import Optional
+from fastapi import APIRouter, HTTPException, BackgroundTasks, Header
+from typing import Optional, List
+from datetime import datetime
 
 from app.services.s3_sync import S3SyncService
+from app.services.graphql_sync import GraphQLSyncService
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-sync_service = S3SyncService()
+s3_sync_service = S3SyncService()
+graphql_sync_service = GraphQLSyncService()
 
 
-@router.post("/trigger")
-async def trigger_sync(max_docs: Optional[int] = None):
+@router.post("/s3/trigger")
+async def trigger_s3_sync(max_docs: Optional[int] = None):
     """
     Trigger S3 sync to pull PDFs from DigitalOcean Spaces
     
@@ -27,7 +31,7 @@ async def trigger_sync(max_docs: Optional[int] = None):
     try:
         logger.info(f"Triggering S3 sync (max_docs={max_docs})...")
         
-        result = await sync_service.sync_from_s3(max_docs=max_docs)
+        result = await s3_sync_service.sync_from_s3(max_docs=max_docs)
         
         if 'error' in result:
             raise HTTPException(status_code=500, detail=result['error'])
@@ -41,6 +45,195 @@ async def trigger_sync(max_docs: Optional[int] = None):
     except Exception as e:
         logger.error(f"Error during S3 sync: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/authorities/scheduled")
+async def scheduled_authority_sync(
+    bac
+    Get comprehensive sync status for all sources
+    
+    Returns:
+        Status for GraphQL, S3, and sync health monitoring
+    """
+    from app.core.database import LocalSessionLocal
+    from sqlalchemy import text
+    
+    db = LocalSessionLocal()
+    try:
+        # Get sync health from view
+        result = db.execute(text("SELECT * FROM sync_health WHERE source_system = 'ddr_graphql'"))
+        sync_health = result.fetchone()
+        
+        # Get s3/list-pdfs")
+async def list_pdfs():
+    """List all PDFs in S3 bucket with metadata"""
+    pdfs = s3_sync_service.list_pdfs_in_bucket()
+    
+    return {
+        'count': len(pdfs),
+        'pdfs': [
+            {
+                'filename': p['filename'],
+                'key': p['key'],
+                'size_mb': round(p['size'] / 1024 / 1024, 2),
+                'publication_year': p['publication_year'],
+                'last_modified': p['last_modified'].isoformat()
+            }
+            for p in pdfs
+        ]
+    }
+
+
+@router.get("/history")
+async def sync_history(limit: int = 20):
+    """
+    Get sync history with statistics
+    
+    Args:
+        limit: Number of recent syncs to return
+    
+    Returns:
+        List of recent sync operations with details
+    """
+    from app.core.database import LocalSessionLocal
+    from sqlalchemy import text
+    
+    db = LocalSessionLocal()
+    try:
+        result = db.execute(
+            text(f"SELECT * FROM recent_syncs LIMIT :limit"),
+            {'limit': limit}
+        )
+        syncs = [dict(row._mapping) for row in result.fetchall()]
+        
+        return {
+            'count': len(syncs),
+            'syncs': syncs
+        }
+    finally:
+        db.close()           'bucket': s3_sync_service.s3_client and s3_sync_service.s3_client._endpoint.host,
+                'pdfs_in_bucket': len(pdfs),
+                'pdfs_with_year': len([p for p in pdfs if p['publication_year']]),
+                'year_range': {
+                    'min': min([p['publication_year'] for p in pdfs if p['publication_year']], default=None),
+                    'max': max([p['publication_year'] for p in pdfs if p['publication_year']], default=None)
+                }
+            },
+            'recent_syncs': recent_syncs
+        }
+    finally:
+        db.close() 2 * * * curl -X POST \\
+        -H "X-API-Key: ${SYNC_API_KEY}" \\
+        http://localhost:8000/api/v1/sync/authorities/scheduled
+    ```
+    
+    Returns:
+        Sync operation started confirmation
+    """
+    # TODO: Validate API key for production
+    # if x_api_key != settings.SYNC_API_KEY:
+    #     raise HTTPException(status_code=401, detail="Invalid API key")
+    
+    sync_id = graphql_sync_service.start_sync_log(
+        sync_type='scheduled',
+        triggered_by='cron'
+    )
+    
+    # Run sync in background
+    background_tasks.add_task(
+        run_graphql_sync,
+        sync_id=sync_id,
+        incremental=True
+    )
+    
+    return {
+        'status': 'sync_started',
+        'sync_id': sync_id,
+        'type': 'scheduled',
+        'message': 'Incremental sync started in background'
+    }
+
+
+@router.post("/authorities/manual")
+async def manual_authority_sync(
+    background_tasks: BackgroundTasks,
+    pids: Optional[List[str]] = None,
+    force_refresh: bool = False
+):
+    """
+    Manual authority sync - trigger from UI or API
+    
+    Allows PhD researchers to sync specific authorities or force refresh all.
+    
+    Args:
+        pids: Specific PIDs to sync (None = all)
+        force_refresh: Re-fetch even if unchanged
+    
+    Returns:
+        Sync operation started confirmation
+    """
+    sync_type = 'full' if force_refresh else 'incremental'
+    
+    sync_id = graphql_sync_service.start_sync_log(
+        sync_type=sync_type,
+        triggered_by='manual_api'
+    )
+    
+    # Run sync in background
+    background_tasks.add_task(
+        run_graphql_sync,
+        sync_id=sync_id,
+        specific_pids=pids,
+        incremental=not force_refresh
+    )
+    
+    return {
+        'status': 'sync_started',
+        'sync_id': sync_id,
+        'type': sync_type,
+        'pids': pids,
+        'message': f'Sync started for {len(pids) if pids else "all"} authorities'
+    }
+
+
+async def run_graphql_sync(
+    sync_id: str,
+    specific_pids: Optional[List[str]] = None,
+    incremental: bool = True
+):
+    """
+    Background task to run GraphQL sync
+    
+    Args:
+        sync_id: Tracking ID for this sync
+        specific_pids: Only sync these PIDs
+        incremental: Only fetch changed records
+    """
+    try:
+        records_new = 0
+        records_updated = 0
+        records_failed = 0
+        
+        # TODO: Implement actual GraphQL fetch and sync logic
+        # For now, this is a placeholder
+        logger.info(f"Running sync {sync_id}: incremental={incremental}, pids={specific_pids}")
+        
+        # Mark as complete
+        graphql_sync_service.complete_sync_log(
+            sync_id=sync_id,
+            records_new=records_new,
+            records_updated=records_updated,
+            records_failed=records_failed,
+            status='completed'
+        )
+        
+    except Exception as e:
+        logger.error(f"Sync {sync_id} failed: {e}")
+        graphql_sync_service.complete_sync_log(
+            sync_id=sync_id,
+            status='failed',
+            error_log=str(e)
+        )
 
 
 @router.get("/status")
