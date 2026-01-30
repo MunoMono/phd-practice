@@ -13,7 +13,7 @@ import {
   StructuredListCell,
   InlineNotification
 } from '@carbon/react';
-import { DonutChart, BarChartStacked, LineChart } from '@carbon/charts-react';
+import { DonutChart, StackedBarChart, LineChart } from '@carbon/charts-react';
 import { ChartBullet, Analytics, Collaborate, Dashboard as DashboardIcon } from '@carbon/icons-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 import {
@@ -206,7 +206,7 @@ const Dashboard = ({ portfolio, onUpdateTolerancePct }) => {
 
         <Column lg={8} md={4} sm={4}>
           <Tile className="dashboard-tile chart-tile">
-            <BarChartStacked data={driftData} options={driftOptions} />
+            <StackedBarChart data={driftData} options={driftOptions} />
           </Tile>
         </Column>
 
