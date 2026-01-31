@@ -407,8 +407,6 @@ async def get_dashboard_stats():
                 "completionRate": round(
                     (stats.documents_with_embeddings / stats.total_documents * 100) 
                     if stats.total_documents > 0 else 0, 2
-                ) 
-                    if stats.total_documents > 0 else 0, 2
                 )
             },
             "themes": {
