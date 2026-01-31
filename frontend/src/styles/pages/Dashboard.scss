@@ -7,8 +7,26 @@
     background: linear-gradient(135deg, #0f62fe 0%, #001d6c 100%);
     padding: $spacing-10 0 $spacing-13;
     margin-bottom: $spacing-09;
+    margin-left: calc(-1 * $spacing-06);
+    margin-right: calc(-1 * $spacing-06);
+    padding-left: $spacing-06;
+    padding-right: $spacing-06;
     position: relative;
     overflow: hidden;
+    
+    @include breakpoint-down(md) {
+      margin-left: calc(-1 * $spacing-05);
+      margin-right: calc(-1 * $spacing-05);
+      padding-left: $spacing-05;
+      padding-right: $spacing-05;
+    }
+    
+    @media (max-width: 671px) {
+      margin-left: calc(-1 * $spacing-04);
+      margin-right: calc(-1 * $spacing-04);
+      padding-left: $spacing-04;
+      padding-right: $spacing-04;
+    }
 
     &::before {
       content: '';

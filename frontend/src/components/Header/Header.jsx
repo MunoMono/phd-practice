@@ -79,7 +79,7 @@ const Header = ({ currentTheme, onThemeToggle }) => {
           onClick={() => navigate('/ml-dashboard')}
           isCurrentPage={location.pathname === '/ml-dashboard'}
         >
-          ML Dashboard
+          ML dashboard
         </HeaderMenuItem>
       </HeaderNavigation>
       <HeaderGlobalBar>

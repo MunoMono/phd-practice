@@ -27,8 +27,10 @@
   }
   
   .mobile-nav,
-  .cds--side-nav {
+  .cds--side-nav,
+  .cds--side-nav__overlay {
     display: none !important;
+    visibility: hidden !important;
   }
 }
 
@@ -52,6 +54,12 @@
   .cds--header-panel {
     width: 20rem;
   }
+}
+
+// Remove white spacers between menu items
+.cds--header__menu-item {
+  border-left: none !important;
+  border-right: none !important;
 }
 
 // Ensure proper z-index for overlays

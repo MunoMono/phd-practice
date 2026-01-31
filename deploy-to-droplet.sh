@@ -56,7 +56,7 @@ else
     cd ai-methods
 fi
 
-# Create .env file with Auth0 credentials
+# Create .env file with Auth0 credentials and database configuration
 echo "🔐 Creating environment configuration..."
 cat > .env << 'EOF'
 # Auth0 Configuration for innovationdesign.io
@@ -70,6 +70,21 @@ VITE_DDR_ENV=production
 
 # GraphQL API Endpoint
 VITE_GRAPHQL_ENDPOINT=https://ddrarchive.org/graphql
+
+# PostgreSQL Configuration
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=postgres
+POSTGRES_DB=epistemic_drift
+
+# Backend Configuration
+GRANITE_MODEL_PATH=ibm-granite/granite-4.0-h-small-instruct
+GRANITE_DEVICE=cpu
+
+# S3/Storage Configuration (optional)
+S3_BUCKET=
+S3_ENDPOINT=
+S3_ACCESS_KEY=
+S3_SECRET_KEY=
 EOF
 
 echo "🛑 Stopping existing containers..."
