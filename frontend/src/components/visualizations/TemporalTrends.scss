@@ -1,0 +1,39 @@
+@use '@carbon/react/scss/spacing' as *;
+@use '@carbon/react/scss/type' as *;
+@use '@carbon/react/scss/theme' as *;
+
+.temporal-trends {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 400px;
+
+  svg {
+    width: 100%;
+    height: 100%;
+  }
+}
+
+.trends-loading,
+.trends-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+  color: $text-secondary;
+  @include type-style('body-01');
+}
+
+// D3 element styling
+.line-docs,
+.line-pdfs {
+  transition: stroke-width 200ms ease;
+
+  &:hover {
+    stroke-width: 4;
+  }
+}
+
+.point-doc {
+  transition: r 200ms ease;
+}

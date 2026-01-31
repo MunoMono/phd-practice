@@ -1,0 +1,198 @@
+@use '@carbon/react/scss/spacing' as *;
+@use '@carbon/react/scss/type' as *;
+@use '@carbon/react/scss/theme' as *;
+@use '@carbon/react/scss/breakpoint' as *;
+
+.ml-dashboard {
+  padding: $spacing-06;
+  background-color: $layer-01;
+  min-height: 100vh;
+
+  @include breakpoint-down(md) {
+    padding: $spacing-05 $spacing-04;
+  }
+}
+
+.ml-dashboard-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+}
+
+.dashboard-header {
+  margin-bottom: $spacing-06;
+
+  .header-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: $spacing-05 0;
+    border-bottom: 1px solid $border-subtle-01;
+
+    @include breakpoint-down(md) {
+      flex-direction: column;
+      gap: $spacing-05;
+    }
+  }
+
+  h1 {
+    @include type-style('heading-05');
+    color: $text-primary;
+    margin-bottom: $spacing-02;
+  }
+
+  .header-subtitle {
+    @include type-style('body-01');
+    color: $text-secondary;
+  }
+}
+
+.stats-tile {
+  height: 100%;
+  padding: $spacing-05;
+  display: flex;
+  gap: $spacing-05;
+  transition: all 0.2s ease;
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  }
+
+  .stats-icon {
+    color: $icon-primary;
+    flex-shrink: 0;
+  }
+
+  .stats-content {
+    flex: 1;
+  }
+
+  .stats-number {
+    @include type-style('heading-04');
+    color: $text-primary;
+    margin: 0 0 $spacing-02 0;
+  }
+
+  .stats-label {
+    @include type-style('label-01');
+    color: $text-secondary;
+    margin: 0 0 $spacing-03 0;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .stats-meta {
+    @include type-style('helper-text-01');
+    color: $text-secondary;
+    margin-top: $spacing-03;
+  }
+
+  .cds--progress-bar {
+    margin-top: $spacing-03;
+  }
+}
+
+.visualization-section {
+  margin: $spacing-07 0;
+
+  .cds--tabs {
+    background-color: $layer-01;
+  }
+
+  .cds--tab-content {
+    padding: 0;
+  }
+}
+
+.visualization-tile {
+  padding: $spacing-06;
+  min-height: 600px;
+  background-color: $layer-01;
+
+  h4 {
+    @include type-style('heading-03');
+    color: $text-primary;
+    margin-bottom: $spacing-03;
+  }
+
+  .tile-description {
+    @include type-style('body-01');
+    color: $text-secondary;
+    margin-bottom: $spacing-06;
+    padding-bottom: $spacing-05;
+    border-bottom: 1px solid $border-subtle-01;
+  }
+}
+
+.activity-tile {
+  padding: $spacing-06;
+
+  h4 {
+    @include type-style('heading-03');
+    color: $text-primary;
+    margin-bottom: $spacing-05;
+  }
+
+  .activity-table {
+    margin-bottom: $spacing-05;
+  }
+
+  .no-activity {
+    @include type-style('body-01');
+    color: $text-secondary;
+    padding: $spacing-07 0;
+    text-align: center;
+  }
+
+  .activity-footer {
+    @include type-style('helper-text-01');
+    color: $text-secondary;
+    padding-top: $spacing-05;
+    border-top: 1px solid $border-subtle-01;
+  }
+}
+
+// Carbon DataTable overrides
+.activity-tile {
+  .cds--data-table {
+    background-color: transparent;
+  }
+
+  .cds--data-table thead {
+    background-color: $layer-accent-01;
+  }
+
+  .cds--data-table tbody tr:hover {
+    background-color: $layer-hover-01;
+  }
+
+  .cds--tag {
+    min-width: 80px;
+    justify-content: center;
+  }
+}
+
+// Responsive adjustments
+@include breakpoint-down(lg) {
+  .stats-tile {
+    flex-direction: column;
+    text-align: center;
+
+    .stats-icon {
+      align-self: center;
+    }
+  }
+}
+
+@include breakpoint-down(md) {
+  .visualization-tile {
+    padding: $spacing-05;
+    min-height: 400px;
+  }
+
+  .activity-tile {
+    padding: $spacing-05;
+  }
+}

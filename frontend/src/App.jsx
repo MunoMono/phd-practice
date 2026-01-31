@@ -7,6 +7,7 @@ import Dashboard from './pages/Dashboard/Dashboard'
 import EvidenceTracer from './pages/EvidenceTracer/EvidenceTracer'
 import SessionRecorder from './pages/SessionRecorder/SessionRecorder'
 import ExperimentalLog from './pages/ExperimentalLog/ExperimentalLog'
+import MLDashboard from './pages/MLDashboard/MLDashboard'
 import LoginPage from './components/Auth/LoginPage'
 import './styles/App.scss'
 
@@ -46,6 +47,7 @@ function App() {
             <Route path="/tracer" element={<EvidenceTracer />} />
             <Route path="/sessions" element={<SessionRecorder />} />
             <Route path="/experiments" element={<ExperimentalLog />} />
+            <Route path="/ml-dashboard" element={<MLDashboard />} />
           </Routes>
         </div>
       </Theme>

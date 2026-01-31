@@ -75,6 +75,12 @@ const Header = ({ currentTheme, onThemeToggle }) => {
         >
           Experimental log
         </HeaderMenuItem>
+        <HeaderMenuItem
+          onClick={() => navigate('/ml-dashboard')}
+          isCurrentPage={location.pathname === '/ml-dashboard'}
+        >
+          ML Dashboard
+        </HeaderMenuItem>
       </HeaderNavigation>
       <HeaderGlobalBar>
         <HeaderGlobalAction
@@ -180,6 +186,12 @@ const Header = ({ currentTheme, onThemeToggle }) => {
             isActive={location.pathname === '/experiments'}
           >
             Experimental log
+          </SideNavLink>
+          <SideNavLink
+            onClick={() => handleNavClick('/ml-dashboard')}
+            isActive={location.pathname === '/ml-dashboard'}
+          >
+            ML Dashboard
           </SideNavLink>
           <SideNavMenu title="DDR Archive">
             <SideNavMenuItem
