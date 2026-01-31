@@ -5,7 +5,7 @@
 .dashboard {
   &__hero {
     background: linear-gradient(135deg, #0f62fe 0%, #001d6c 100%);
-    padding: $spacing-10 $spacing-07 $spacing-13;
+    padding: $spacing-10 0 $spacing-13;
     margin-bottom: $spacing-09;
     position: relative;
     overflow: hidden;
@@ -15,14 +15,22 @@
     margin-left: calc(50% - 50vw);
     margin-right: calc(50% - 50vw);
     
-    @include breakpoint(md) {
-      padding-left: $spacing-06;
-      padding-right: $spacing-06;
-    }
-    
-    @media (max-width: 671px) {
-      padding-left: $spacing-05;
-      padding-right: $spacing-05;
+    // Inner content wrapper to align with grid
+    &-wrapper {
+      max-width: 99rem; // Carbon's max container width
+      margin: 0 auto;
+      padding-left: $spacing-07;
+      padding-right: $spacing-07;
+      
+      @include breakpoint(md) {
+        padding-left: $spacing-06;
+        padding-right: $spacing-06;
+      }
+      
+      @media (max-width: 671px) {
+        padding-left: $spacing-05;
+        padding-right: $spacing-05;
+      }
     }
 
     &::before {

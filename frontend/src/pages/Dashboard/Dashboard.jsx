@@ -23,13 +23,15 @@ const Dashboard = () => {
         {/* Hero Section */}
         <Column lg={16} md={8} sm={4}>
           <div className="dashboard__hero">
-            <h1 className="dashboard__hero-title">
-              Epistemic drift detection
-            </h1>
-            <p className="dashboard__hero-subtitle">
-              PID-gated NLP for design methods research (1965-1985). 
-              BERT embeddings + provenance tracking + IBM Granite fine-tuning with full academic attribution.
-            </p>
+            <div className="dashboard__hero-wrapper">
+              <h1 className="dashboard__hero-title">
+                Epistemic drift detection
+              </h1>
+              <p className="dashboard__hero-subtitle">
+                PID-gated NLP for design methods research (1965-1985). 
+                BERT embeddings + provenance tracking + IBM Granite fine-tuning with full academic attribution.
+              </p>
+            </div>
           </div>
         </Column>
         {/* Granite Hero Section */}
