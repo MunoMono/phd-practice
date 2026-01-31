@@ -7,25 +7,34 @@
     background: linear-gradient(135deg, #0f62fe 0%, #001d6c 100%);
     padding: $spacing-10 0 $spacing-13;
     margin-bottom: $spacing-09;
-    margin-left: calc(-1 * $spacing-06);
-    margin-right: calc(-1 * $spacing-06);
-    padding-left: $spacing-06;
-    padding-right: $spacing-06;
     position: relative;
     overflow: hidden;
     
-    @include breakpoint-down(md) {
-      margin-left: calc(-1 * $spacing-05);
-      margin-right: calc(-1 * $spacing-05);
-      padding-left: $spacing-05;
-      padding-right: $spacing-05;
+    // Break out to full viewport width
+    width: 100vw;
+    margin-left: calc(-1 * (100vw - 100%) / 2);
+    padding-left: max($spacing-07, calc((100vw - 1584px) / 2 + $spacing-07));
+    padding-right: max($spacing-07, calc((100vw - 1584px) / 2 + $spacing-07));
+    
+    @include breakpoint(lg) {
+      margin-left: calc(-1 * $spacing-07);
+      width: calc(100% + 2 * $spacing-07);
+      padding-left: $spacing-07;
+      padding-right: $spacing-07;
+    }
+    
+    @include breakpoint(md) {
+      margin-left: calc(-1 * $spacing-06);
+      width: calc(100% + 2 * $spacing-06);
+      padding-left: $spacing-06;
+      padding-right: $spacing-06;
     }
     
     @media (max-width: 671px) {
-      margin-left: calc(-1 * $spacing-04);
-      margin-right: calc(-1 * $spacing-04);
-      padding-left: $spacing-04;
-      padding-right: $spacing-04;
+      margin-left: calc(-1 * $spacing-05);
+      width: calc(100% + 2 * $spacing-05);
+      padding-left: $spacing-05;
+      padding-right: $spacing-05;
     }
 
     &::before {
