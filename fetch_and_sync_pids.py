@@ -169,20 +169,23 @@ def insert_pids_to_droplet(parent_records):
         year = record['year']
         
         # Create a document record with this PID and metadata
-        json_metadata = json.dumps({"pdf_count": pdf_count})
+        # Use double quotes in JSON, escape them for shell
+        json_str = json.dumps({"pdf_count": pdf_count})
         insert_sql = f"""
-        INSERT INTO documents (document_id, title, publication_year, filename, pid, doc_metadata)
+        INSERT INTO documents (document_id, title, publication_year, filename, pid, pdf_count, doc_metadata)
         VALUES (
             'doc_pid_{pid}',
             '{title}',
             {year},
             '{pid}.pdf',
             '{pid}',
-            '{json_metadata}'::jsonb
+            {pdf_count},
+            '{json_str}'::jsonb
         )
         ON CONFLICT (pid) DO UPDATE SET
             title = EXCLUDED.title,
             publication_year = EXCLUDED.publication_year,
+            pdf_count = EXCLUDED.pdf_count,
             doc_metadata = EXCLUDED.doc_metadata;
         """
         
