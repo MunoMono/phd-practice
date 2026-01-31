@@ -84,9 +84,9 @@ const MLDashboard = () => {
 
   return (
     <div className="ml-dashboard">
-      <Grid>
+      <Grid narrow>
         {/* Header */}
-        <Column lg={16} className="dashboard-header">
+        <Column lg={16} md={8} sm={4} className="dashboard-header">
           <div className="header-content">
             <div>
               <h1>ML Processing Dashboard</h1>

@@ -14,7 +14,7 @@ const EvidenceTracer = () => {
   }
 
   return (
-    <Grid className="evidence-tracer" fullWidth>
+    <Grid narrow className="evidence-tracer">
       <Column lg={16} md={8} sm={4}>
         <div className="tracer__header">
           <div>

@@ -19,9 +19,10 @@ const Dashboard = () => {
 
   return (
     <div className="dashboard">
-      <div className="dashboard__hero">
-        <Grid className="dashboard__hero-content">
-          <Column lg={10} md={6} sm={4}>
+      <Grid narrow>
+        {/* Hero Section */}
+        <Column lg={16} md={8} sm={4}>
+          <div className="dashboard__hero">
             <h1 className="dashboard__hero-title">
               Epistemic drift detection
             </h1>
@@ -29,21 +30,16 @@ const Dashboard = () => {
               PID-gated NLP for design methods research (1965-1985). 
               BERT embeddings + provenance tracking + IBM Granite fine-tuning with full academic attribution.
             </p>
-          </Column>
-        </Grid>
-      </div>
-
-      <Grid className="dashboard__content" fullWidth>
+          </div>
+        </Column>
         {/* Granite Hero Section */}
-        <Column lg={16} md={8} sm={4} className="dashboard__granite-hero-wrapper">
-          <Grid condensed>
-            <Column lg={6} md={4} sm={4}>
+        <Column lg={6} md={4} sm={4}>
               <div className="dashboard__granite-hero-logo">
                 <img src="/granite-logo.png" alt="IBM Granite" />
               </div>
             </Column>
-            <Column lg={10} md={4} sm={4}>
-              <div className="dashboard__granite-hero-content">
+        <Column lg={10} md={4} sm={4}>
+          <div className="dashboard__granite-hero-content">
                 <div className="dashboard__granite-hero-badge">
                   <Tag type="blue" size="md">
                     <Chip size={20} /> Powered by IBM Granite
@@ -89,8 +85,6 @@ const Dashboard = () => {
                   </div>
                 )}
               </div>
-            </Column>
-          </Grid>
         </Column>
 
         <Column lg={16} md={8} sm={4}>
@@ -166,29 +160,26 @@ const Dashboard = () => {
         </Column>
 
         <Column lg={16} md={8} sm={4}>
-          <div className="dashboard__info-section">
-            <h2 className="dashboard__section-title">System architecture</h2>
-            <Grid condensed>
-              <Column lg={5} md={8} sm={4}>
-                <Tile className="dashboard__info-tile">
-                  <h4>Ingestion layer</h4>
-                  <p>PID-gated allowlist: GraphQL sync + S3 validation + Docling OCR (PDF/TIFF)</p>
-                </Tile>
-              </Column>
-              <Column lg={5} md={8} sm={4}>
-                <Tile className="dashboard__info-tile">
-                  <h4>NLP layer</h4>
-                  <p>BERT embeddings (384-dim) + IBM Granite fine-tuning + pgvector similarity search</p>
-                </Tile>
-              </Column>
-              <Column lg={6} md={8} sm={4}>
-                <Tile className="dashboard__info-tile">
-                  <h4>Provenance layer</h4>
-                  <p>Training runs + inference logs + corpus snapshots + formal citations</p>
-                </Tile>
-              </Column>
-            </Grid>
-          </div>
+          <h2 className="dashboard__section-title">System architecture</h2>
+        </Column>
+        
+        <Column lg={5} md={8} sm={4}>
+          <Tile className="dashboard__info-tile">
+            <h4>Ingestion layer</h4>
+            <p>PID-gated allowlist: GraphQL sync + S3 validation + Docling OCR (PDF/TIFF)</p>
+          </Tile>
+        </Column>
+        <Column lg={5} md={8} sm={4}>
+          <Tile className="dashboard__info-tile">
+            <h4>NLP layer</h4>
+            <p>BERT embeddings (384-dim) + IBM Granite fine-tuning + pgvector similarity search</p>
+          </Tile>
+        </Column>
+        <Column lg={6} md={8} sm={4}>
+          <Tile className="dashboard__info-tile">
+            <h4>Provenance layer</h4>
+            <p>Training runs + inference logs + corpus snapshots + formal citations</p>
+          </Tile>
         </Column>
       </Grid>
     </div>

@@ -5,7 +5,7 @@ import '../../styles/pages/ExperimentalLog.scss'
 
 const ExperimentalLog = () => {
   return (
-    <Grid className="experimental-log" fullWidth>
+    <Grid narrow className="experimental-log">
       <Column lg={16} md={8} sm={4}>
         <div className="log__header">
           <div>

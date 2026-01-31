@@ -6,7 +6,7 @@
 // Custom responsive overrides for mobile/tablet
 
 // Mobile: Hide desktop navigation, show hamburger menu
-@media (max-width: 672px) {
+@media (max-width: 671px) {
   .cds--header__nav {
     display: none;
   }
@@ -16,18 +16,19 @@
   }
 }
 
-// Tablet and up: Show desktop navigation, hide hamburger menu
+// Tablet and up: Show desktop navigation, hide hamburger menu and side nav
 @media (min-width: 672px) {
   .cds--header__nav {
     display: flex;
   }
   
   .cds--header__menu-toggle {
-    display: none;
+    display: none !important;
   }
   
-  .mobile-nav {
-    display: none;
+  .mobile-nav,
+  .cds--side-nav {
+    display: none !important;
   }
 }
 
