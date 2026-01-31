@@ -22,8 +22,12 @@ COPY . .
 # Create logs directory
 RUN mkdir -p logs/sessions
 
+# Copy and set up entrypoint script
+COPY docker-entrypoint.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
 # Expose port
 EXPOSE 8000
 
-# Run the application
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Run the application with entrypoint script
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
