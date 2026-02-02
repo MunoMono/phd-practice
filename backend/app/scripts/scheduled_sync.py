@@ -12,7 +12,7 @@ import urllib.request
 from datetime import datetime
 
 
-GRAPHQL_ENDPOINT = "https://rca.eprints.hosting/cgi/ddr/graphql"
+GRAPHQL_ENDPOINT = "https://api.ddrarchive.org/graphql"
 SYNC_ENDPOINT = "http://localhost:8000/api/v1/sync/graphql"
 
 # GraphQL query to fetch all media items with PIDs
