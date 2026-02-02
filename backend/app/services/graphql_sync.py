@@ -155,6 +155,13 @@ class GraphQLSyncService:
             all_items = json_data['records_v1']
             logger.info(f"Parsing records_v1 (no data wrapper): {len(all_items)} records")
         else:
+            # Debug the fallback case
+            logger.info(f"Checking condition: 'data' in json_data = {'data' in json_data}")
+            if 'data' in json_data:
+                logger.info(f"json_data.get('data') = {json_data.get('data') is not None}")
+                if json_data.get('data'):
+                    logger.info(f"'records_v1' in json_data['data'] = {'records_v1' in json_data['data']}")
+                    logger.info(f"json_data['data'] keys: {list(json_data['data'].keys())}")
             all_items = json_data.get('all_media_items', [])
             logger.info(f"Parsing all_media_items format: {len(all_items)} items")
         
