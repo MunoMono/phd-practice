@@ -260,7 +260,6 @@ class GraphQLSyncService:
                 'creator_agent_label': item.get('creator_agent_label'),
                 # ML annotation metadata
                 'used_for_ml': master_file.get('used_for_ml', False),
-                'ml_pages': master_file.get('ml_pages', ''),
                 'ml_annotation': master_file.get('ml_annotation', ''),
             }
             

@@ -42,12 +42,15 @@ class PIDMediaCountService:
                     title
                     used_for_ml
                     ml_annotation
-                    ml_pages
-                    pdf_files {
+                    digital_assets {
+                        role
                         filename
                         use_for_ml
-                        ml_annotation
                         ml_pages
+                        ml_annotation
+                    }
+                    pdf_files {
+                        filename
                     }
                     jpg_derivatives {
                         filename
