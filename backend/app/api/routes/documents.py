@@ -187,3 +187,41 @@ async def list_documents(
         }
     finally:
         db.close()
+
+
+@router.get("/{document_id}/ml-annotations")
+async def get_ml_annotations(document_id: str):
+    """
+    Get ML page annotations for a document
+    
+    Returns the ml_pages specification and ml_annotation from authority_data
+    
+    Args:
+        document_id: Document identifier
+    
+    Returns:
+        ML annotation metadata including page specifications
+    """
+    db = LocalSessionLocal()
+    try:
+        doc = db.query(Document).filter(
+            Document.document_id == document_id
+        ).first()
+        
+        if not doc:
+            raise HTTPException(status_code=404, detail="Document not found")
+        
+        authority_data = doc.authority_data or {}
+        
+        return {
+            "document_id": doc.document_id,
+            "pid": doc.pid,
+            "title": doc.title,
+            "use_for_ml": authority_data.get('use_for_ml', False),
+            "ml_pages": authority_data.get('ml_pages', ''),
+            "ml_annotation": authority_data.get('ml_annotation', ''),
+            "page_count": doc.page_count,
+            "ml_processed_at": doc.ml_processed_at.isoformat() if doc.ml_processed_at else None
+        }
+    finally:
+        db.close()

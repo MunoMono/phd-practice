@@ -258,6 +258,10 @@ class GraphQLSyncService:
                 'scope_and_content': item.get('scope_and_content'),
                 'project_title': item.get('project_title'),
                 'creator_agent_label': item.get('creator_agent_label'),
+                # ML annotation metadata
+                'use_for_ml': master_file.get('use_for_ml', False),
+                'ml_pages': master_file.get('ml_pages', ''),
+                'ml_annotation': master_file.get('ml_annotation', ''),
             }
             
             if dry_run:

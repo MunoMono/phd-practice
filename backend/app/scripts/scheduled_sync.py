@@ -15,7 +15,7 @@ from datetime import datetime
 GRAPHQL_ENDPOINT = "https://api.ddrarchive.org/graphql"
 SYNC_ENDPOINT = "http://localhost:8000/api/v1/sync/graphql"
 
-# GraphQL query to fetch all media items with PIDs
+# GraphQL query to fetch all media items with PIDs and ML annotations
 GRAPHQL_QUERY = """
 query {
   all_media_items {
@@ -26,6 +26,9 @@ query {
       media {
         format_type
         full_file_type
+        use_for_ml
+        ml_pages
+        ml_annotation
       }
     }
   }
