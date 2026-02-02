@@ -59,13 +59,13 @@ def sync_to_database(graphql_data):
     """Sync GraphQL data to local database"""
     try:
         payload = {
-            "graphql_response": graphql_data,
-            "dry_run": False  # Actually perform the sync
+            "graphql_response": graphql_data
         }
         request_data = json.dumps(payload).encode()
         
+        # dry_run=false as query parameter
         req = urllib.request.Request(
-            SYNC_ENDPOINT,
+            f"{SYNC_ENDPOINT}?dry_run=false",
             data=request_data,
             headers={"Content-Type": "application/json"},
             method="POST"
