@@ -64,6 +64,10 @@ def fetch_from_graphql():
                     print(f"  - {error.get('message')}", file=sys.stderr)
                 print(f"{datetime.now()} - Continuing with partial data...", file=sys.stderr)
             
+            # Debug: log what we got
+            if 'data' in data:
+                print(f"{datetime.now()} - Data keys: {list(data['data'].keys() if data['data'] else [])}")
+            
             print(f"{datetime.now()} - GraphQL fetch successful")
             return data
             
