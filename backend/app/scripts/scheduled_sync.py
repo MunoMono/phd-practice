@@ -56,6 +56,14 @@ def fetch_from_graphql():
         print(f"{datetime.now()} - Fetching from GraphQL API...")
         with urllib.request.urlopen(req, timeout=60) as response:
             data = json.loads(response.read().decode())
+            
+            # Check for GraphQL errors
+            if 'errors' in data:
+                print(f"{datetime.now()} - GraphQL query errors:", file=sys.stderr)
+                for error in data['errors']:
+                    print(f"  - {error.get('message')}", file=sys.stderr)
+                print(f"{datetime.now()} - Continuing with partial data...", file=sys.stderr)
+            
             print(f"{datetime.now()} - GraphQL fetch successful")
             return data
             
