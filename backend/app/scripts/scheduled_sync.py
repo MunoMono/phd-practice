@@ -79,6 +79,13 @@ def fetch_from_graphql():
 def sync_to_database(graphql_data):
     """Sync GraphQL data to local database"""
     try:
+        # Debug: check what we're sending
+        print(f"{datetime.now()} - GraphQL data keys before sync: {list(graphql_data.keys())}")
+        if 'data' in graphql_data:
+            print(f"{datetime.now()} - graphql_data['data'] is None: {graphql_data['data'] is None}")
+        if 'errors' in graphql_data:
+            print(f"{datetime.now()} - graphql_data has 'errors' key: {graphql_data['errors']}")
+        
         payload = {
             "graphql_response": graphql_data
         }
