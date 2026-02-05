@@ -285,7 +285,7 @@ def sync_authority(db, authority_type: str, config: dict):
                     INSERT INTO database_authorities 
                         (authority_type, authority_id, code, label, description, category, metadata, synced_at)
                     VALUES 
-                        (:type, :id, :code, :label, :desc, :cat, :meta::jsonb, NOW())
+                        (:type, :id, :code, :label, :desc, :cat, CAST(:meta AS jsonb), NOW())
                     ON CONFLICT (authority_type, authority_id) 
                     DO UPDATE SET
                         code = EXCLUDED.code,
