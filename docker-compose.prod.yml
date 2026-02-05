@@ -72,11 +72,7 @@ services:
       dockerfile: Dockerfile
     container_name: epistemic-drift-frontend
     ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - /etc/letsencrypt:/etc/letsencrypt:ro
-      - /var/lib/letsencrypt:/var/lib/letsencrypt:ro
+      - "8080:80"
     depends_on:
       - backend
     networks:
