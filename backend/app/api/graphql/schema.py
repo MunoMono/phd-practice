@@ -202,18 +202,24 @@ class Query:
                 pid_count = 0
             
             # Get PID authorities with titles and media counts
+            # PERMANENT ML GATE POLICY (Feb 2026):
+            # - Only show parent authority records (those with actual media counts > 0)
+            # - This filters out individual media item records
+            # - Counts are from pdf_count/tiff_count columns (synced via quick_sync_pids.py)
+            # - These counts already reflect master-only PDFs with use_for_ml=True
             try:
                 result = db.execute(text("""
                     SELECT 
                         pid,
                         MAX(title) as title,
                         COUNT(*) as document_count,
-                        MAX((doc_metadata->>'pdf_count')::int) as pdf_count,
+                        MAX(pdf_count) as pdf_count,
                         MAX((doc_metadata->>'ml_pdf_count')::int) as ml_pdf_count,
-                        MAX((doc_metadata->>'tiff_count')::int) as tiff_count,
+                        MAX(tiff_count) as tiff_count,
                         MAX((doc_metadata->>'ml_tiff_count')::int) as ml_tiff_count
                     FROM documents 
                     WHERE pid IS NOT NULL
+                    AND (pdf_count > 0 OR tiff_count > 0)
                     GROUP BY pid
                     ORDER BY pid
                 """))

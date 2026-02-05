@@ -1,25 +1,43 @@
 # PID Sync Guide - Permanent Solution
 
-## The Problem (Solved)
+## The Problem (Solved - Feb 2026)
 The PID sync kept breaking due to:
 1. **Wrong logic**: Counted media items instead of PDF files
 2. **Database password**: Kept reverting after container restarts
 3. **No ML gate**: Didn't properly filter by `use_for_ml` flag
+4. **Duplicate counting**: Counted both master PDFs and browser-friendly versions
+5. **Media-level filtering**: Applied ML gate at media item level instead of individual file level
 
-## The Solution
+## The Solution - PERMANENT ML GATE POLICIES
+
+### Policy Enforcement (Feb 2026)
+The sync now enforces these **permanent policies** for training corpus curation:
+
+1. **Master PDFs Only**: Only count PDF files with `role='pdf_master'`
+   - Excludes browser-friendly versions created for web display
+   - Ensures high-quality OCR-baked master files for training
+
+2. **File-Level ML Gate**: Check `use_for_ml` flag at individual file level
+   - Match each master PDF to its digital asset by filename
+   - Only count PDFs where that specific file has `use_for_ml=True`
+   - NOT just checking if the media item has any file with ML=True
+
+3. **Parent Authority Records**: Only display authorities with media counts > 0
+   - Filters out individual media item records in database
+   - Shows only parent collection records for UI display
 
 ### Corrected Script: `quick_sync_pids.py`
-- ✅ Counts **actual PDF files** (not media items)
-- ✅ Implements **ML gate**: Only counts PDFs in media items where `use_for_ml=TRUE`
+- ✅ Counts **actual master PDF files** (role=pdf_master, not browser versions)
+- ✅ Implements **file-level ML gate**: Matches PDFs to digital assets by filename
 - ✅ Uses **backend infrastructure**: Direct database access via LocalSessionLocal
 - ✅ **Parameterized queries**: No SQL injection, proper JSON handling
 - ✅ **Provenance tracking**: Metadata includes sync timestamps
 
-### Correct Counts
+### Correct Counts (Validated Feb 2026)
 - Bruce Archer collection: **4 PDFs** (media item 3 has 12 PDFs but ML=FALSE → excluded)
 - Kenneth Agnew collection: **7 PDFs** 
-- RCA Prospectuses: **20 PDFs** (not 1!)
-- RCA Rector's reports: **16 PDFs** (not 1!)
+- RCA Prospectuses | 1967-85: **19 PDFs** (1 file has ML=FALSE → excluded, not 20!)
+- RCA Rector's reports | 1967-85: **16 PDFs**
 
 ## How to Sync PIDs (Permanent Method)
 
