@@ -28,7 +28,7 @@ const Dashboard = () => {
                 Epistemic drift detection
               </h1>
               <p className="dashboard__hero-subtitle">
-                PID-gated NLP for design methods research (1965-1985). 
+                PID-gated NLP for Royal College of Art's Department of Design Research (DDR, 1965-1985). 
                 BERT embeddings + provenance tracking + IBM Granite fine-tuning with full academic attribution.
               </p>
             </div>

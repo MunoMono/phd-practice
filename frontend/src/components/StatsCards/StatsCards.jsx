@@ -230,7 +230,7 @@ const StatsCards = () => {
             <div className="stats-card__number">
               {formatNumber(stats?.total_pid_pdfs || 0)}
             </div>
-            <div className="stats-card__label">PID Documents</div>
+            <div className="stats-card__label">DDR Documents</div>
             <div className="stats-card__progress">
               <ProgressBar 
                 label="Year 1 target" 
