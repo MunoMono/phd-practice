@@ -193,12 +193,12 @@ const StatsCards = () => {
             <div className="stats-card__progress" style={{ marginTop: '12px' }}>
               <ProgressBar 
                 label="Year 1 Document target" 
-                value={stats?.total_pid_pdfs || 0} 
+                value={stats?.totalPidPdfs || 0} 
                 max={100} 
                 size="sm"
               />
               <div className="stats-card__progress-label">
-                {stats?.total_pid_pdfs || 0}/100 Documents sourced
+                {stats?.totalPidPdfs || 0}/100 Documents sourced
               </div>
             </div>
             <div className="stats-card__breakdown">
