@@ -239,7 +239,7 @@ const StatsCards = () => {
                 size="sm"
               />
               <div className="stats-card__progress-label">
-                {stats?.total_pid_pdfs || 0}/100 Documents sourced
+                {stats?.total_pid_pdfs || 0}/100 Documents ingested
               </div>
             </div>
             <div className="stats-card__breakdown">
