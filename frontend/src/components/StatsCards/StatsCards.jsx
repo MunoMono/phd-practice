@@ -57,6 +57,7 @@ const StatsCards = () => {
             }
             coreAuthorities
             criticalAuthorities
+            totalPidPdfs
           }
           recentDocuments(days: 7) {
             pid
@@ -187,6 +188,17 @@ const StatsCards = () => {
               />
               <div className="stats-card__progress-label">
                 {stats?.pid_count || 0}/50 authorities curated
+              </div>
+            </div>
+            <div className="stats-card__progress" style={{ marginTop: '12px' }}>
+              <ProgressBar 
+                label="Year 1 Document target" 
+                value={stats?.total_pid_pdfs || 0} 
+                max={100} 
+                size="sm"
+              />
+              <div className="stats-card__progress-label">
+                {stats?.total_pid_pdfs || 0}/100 Documents sourced
               </div>
             </div>
             <div className="stats-card__breakdown">

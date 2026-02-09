@@ -132,6 +132,7 @@ class SystemMetrics:
     pid_authorities: List['PidAuthority']
     core_authorities: int  # 5 core intended categories (provenance)
     critical_authorities: int  # 6 critical categories (ML labels)
+    total_pid_pdfs: int  # Total Documents across all PID authorities
 
 
 @strawberry.type
@@ -288,6 +289,9 @@ class Query:
         # Calculate total (database records + digital assets)
         total_items = total_records + digital_assets_count
         
+        # Calculate total PDFs across all PID authorities
+        total_pid_pdfs = sum(auth.pdf_count for auth in pid_authorities)
+        
         return SystemMetrics(
             local_db=db_stats,
             s3_storage=s3_stats,
@@ -295,7 +299,8 @@ class Query:
             pid_count=pid_count,
             pid_authorities=pid_authorities,
             core_authorities=core_authorities_count,
-            critical_authorities=critical_authorities_count
+            critical_authorities=critical_authorities_count,
+            total_pid_pdfs=total_pid_pdfs
         )
     
     @strawberry.field
