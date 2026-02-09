@@ -44,7 +44,7 @@ services:
       S3_ACCESS_KEY: ${S3_ACCESS_KEY}
       S3_SECRET_KEY: ${S3_SECRET_KEY}
     ports:
-      - "8000:8000"
+      - "8001:8000"
     volumes:
       - ./backend:/app
       - backend_logs:/app/logs
@@ -63,8 +63,7 @@ services:
       dockerfile: Dockerfile
     container_name: epistemic-drift-frontend
     ports:
-      - "80:80"
-      - "443:443"
+      - "8080:80"
     volumes:
       - /etc/letsencrypt:/etc/letsencrypt:ro
     depends_on:
