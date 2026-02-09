@@ -116,6 +116,7 @@ const StatsCards = () => {
         s3_tiffs: metrics.s3Storage.tiffs || 0,
         total_items: metrics.totalItems,
         pid_count: metrics.pidCount || 3,
+        total_pid_pdfs: metrics.totalPidPdfs || 0,
         core_authorities: metrics.coreAuthorities || 0,
         critical_authorities: metrics.criticalAuthorities || 0
       })
@@ -190,17 +191,6 @@ const StatsCards = () => {
                 {stats?.pid_count || 0}/50 authorities curated
               </div>
             </div>
-            <div className="stats-card__progress" style={{ marginTop: '12px' }}>
-              <ProgressBar 
-                label="Year 1 Document target" 
-                value={stats?.totalPidPdfs || 0} 
-                max={100} 
-                size="sm"
-              />
-              <div className="stats-card__progress-label">
-                {stats?.totalPidPdfs || 0}/100 Documents sourced
-              </div>
-            </div>
             <div className="stats-card__breakdown">
               <Tag type="blue" size="sm">{formatNumber(stats?.local_table_counts?.documents || 0)} docs ingested</Tag>
               {pidAuthorities.length > 0 && (
@@ -226,6 +216,34 @@ const StatsCards = () => {
                   ))}
                 </div>
               )}
+            </div>
+          </div>
+        </Tile>
+      </Column>
+
+      <Column lg={4} md={2} sm={4}>
+        <Tile className="stats-card stats-card--pid-docs">
+          <div className="stats-card__icon">
+            <DataBase size={32} />
+          </div>
+          <div className="stats-card__content">
+            <div className="stats-card__number">
+              {formatNumber(stats?.total_pid_pdfs || 0)}
+            </div>
+            <div className="stats-card__label">PID Documents</div>
+            <div className="stats-card__progress">
+              <ProgressBar 
+                label="Year 1 target" 
+                value={stats?.total_pid_pdfs || 0} 
+                max={100} 
+                size="sm"
+              />
+              <div className="stats-card__progress-label">
+                {stats?.total_pid_pdfs || 0}/100 Documents sourced
+              </div>
+            </div>
+            <div className="stats-card__breakdown">
+              <Tag type="blue" size="sm">Training Corpus</Tag>
             </div>
           </div>
         </Tile>
