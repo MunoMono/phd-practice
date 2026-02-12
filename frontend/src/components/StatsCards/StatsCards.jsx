@@ -77,7 +77,8 @@ const StatsCards = () => {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ query })
+        body: JSON.stringify({ query }),
+        cache: 'no-store'
       })
       
       if (!response.ok) throw new Error('Failed to fetch stats')
@@ -115,7 +116,7 @@ const StatsCards = () => {
         s3_pdfs: metrics.s3Storage.pdfs,
         s3_tiffs: metrics.s3Storage.tiffs || 0,
         total_items: metrics.totalItems,
-        pid_count: metrics.pidCount || 3,
+        pid_count: metrics.pidCount || 0,
         total_pid_pdfs: metrics.totalPidPdfs || 0,
         core_authorities: metrics.coreAuthorities || 0,
         critical_authorities: metrics.criticalAuthorities || 0
@@ -184,11 +185,11 @@ const StatsCards = () => {
               <ProgressBar 
                 label="Year 1 target" 
                 value={stats?.pid_count || 0} 
-                max={50} 
+                max={20} 
                 size="sm"
               />
               <div className="stats-card__progress-label">
-                {stats?.pid_count || 0}/50 authorities curated
+                {stats?.pid_count || 0}/20 authorities curated
               </div>
             </div>
             <div className="stats-card__breakdown">
