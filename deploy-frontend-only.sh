@@ -21,6 +21,10 @@ cd /root/phd-practice
 echo "📥 Pulling latest frontend changes..."
 git pull
 
+echo "🧹 Stopping legacy frontend container on 8080 if present..."
+docker stop epistemic-drift-frontend >/dev/null 2>&1 || true
+docker rm epistemic-drift-frontend >/dev/null 2>&1 || true
+
 echo "🔨 Rebuilding frontend only (uses cached layers)..."
 docker compose -f docker-compose.prod.yml build frontend
 

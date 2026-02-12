@@ -81,7 +81,8 @@ services:
 
 networks:
   phd-practice-network:
-    driver: bridge
+    external: true
+    name: ai-methods_epistemic-network
 
 volumes:
   postgres_data:
