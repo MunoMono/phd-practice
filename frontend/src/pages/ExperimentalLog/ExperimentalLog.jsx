@@ -33,11 +33,19 @@ const ExperimentalLog = () => {
           <h3>Training run provenance</h3>
           <p className="log__note">
             Connects to <code>/api/provenance/training/*</code> endpoints to display:
-            <br/>• Which PIDs were used in each training run
-            <br/>• Corpus snapshot checksums for reproducibility
-            <br/>• Hyperparameters, loss curves, and evaluation metrics
-            <br/>• Dataset versions for academic peer review
           </p>
+          <div style={{ paddingLeft: '28px', textIndent: '-16px', marginTop: '12px' }}>
+            • Which PIDs were used in each training run
+          </div>
+          <div style={{ paddingLeft: '28px', textIndent: '-16px' }}>
+            • Corpus snapshot checksums for reproducibility
+          </div>
+          <div style={{ paddingLeft: '28px', textIndent: '-16px' }}>
+            • Hyperparameters, loss curves, and evaluation metrics
+          </div>
+          <div style={{ paddingLeft: '28px', textIndent: '-16px' }}>
+            • Dataset versions for academic peer review
+          </div>
         </Tile>
       </Column>
     </Grid>

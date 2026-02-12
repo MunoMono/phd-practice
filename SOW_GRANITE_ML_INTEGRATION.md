@@ -706,7 +706,7 @@ Institution: Royal College of Art (RCA)
 Project Site: https://innovationdesign.io
 
 **Technical Support:**  
-Repository: https://github.com/MunoMono/ai-methods  
+Repository: https://github.com/MunoMono/phd-practice  
 Issue Tracker: GitHub Issues  
 Documentation: In-repo markdown files
 

@@ -383,4 +383,4 @@ The current architecture provides a **solid foundation for academically rigorous
 **Document Version**: 1.0  
 **Last Updated**: January 18, 2026  
 **Contact**: graham@example.edu  
-**Repository**: https://github.com/graham/ai-methods (private)
+**Repository**: https://github.com/graham/phd-practice (private)

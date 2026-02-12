@@ -4,7 +4,7 @@ services:
   # PostgreSQL with pgvector extension
   db:
     image: ankane/pgvector:latest
-    container_name: epistemic-drift-db-dev
+    container_name: phd-practice-db-dev
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
@@ -28,7 +28,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: epistemic-drift-backend-dev
+    container_name: phd-practice-backend-dev
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
@@ -62,7 +62,7 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile.dev
-    container_name: epistemic-drift-frontend-dev
+    container_name: phd-practice-frontend-dev
     ports:
       - "5173:5173"  # Vite dev server
     volumes:

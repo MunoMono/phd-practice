@@ -56,7 +56,7 @@ SSH into your server and update the `.env` file:
 ```bash
 ssh root@innovationdesign.io
 
-cd /root/ai-methods/backend
+cd /root/phd-practice/backend
 nano .env
 ```
 
@@ -72,7 +72,7 @@ Save and exit (Ctrl+X, Y, Enter)
 ### Deploy Both Frontend and Backend
 
 ```bash
-cd /root/ai-methods
+cd /root/phd-practice
 git pull
 docker compose -f docker-compose.prod.yml build --no-cache
 docker compose -f docker-compose.prod.yml up -d

@@ -177,10 +177,10 @@ Located at: `frontend/src/pages/MLDashboard/MLDashboard.jsx`
 ssh root@104.248.170.26
 
 # Apply migration 004
-docker exec -i epistemic-drift-db psql -U postgres -d epistemic_drift < /path/to/004_ml_enrichment_schema.sql
+docker exec -i phd-practice-db psql -U postgres -d epistemic_drift < /path/to/004_ml_enrichment_schema.sql
 
 # Verify pgvector extension
-docker exec epistemic-drift-db psql -U postgres -d epistemic_drift -c "\dx"
+docker exec phd-practice-db psql -U postgres -d epistemic_drift -c "\dx"
 ```
 
 ### 2. Update Backend Dependencies
@@ -191,7 +191,7 @@ No Python package changes needed - routes use existing SQLAlchemy and FastAPI.
 ### 3. Rebuild Containers
 ```bash
 # On production server
-cd ~/epistemic-drift
+cd ~/phd-practice
 docker-compose down
 docker-compose up -d --build
 
@@ -360,7 +360,7 @@ User explores corpus via Carbon-styled visualizations
 **pgvector not available:**
 ```bash
 # Check if extension is installed
-docker exec epistemic-drift-db psql -U postgres -d epistemic_drift -c "CREATE EXTENSION IF NOT EXISTS vector;"
+docker exec phd-practice-db psql -U postgres -d epistemic_drift -c "CREATE EXTENSION IF NOT EXISTS vector;"
 ```
 
 **Slow vector queries:**

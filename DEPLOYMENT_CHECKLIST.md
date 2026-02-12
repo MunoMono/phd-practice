@@ -102,7 +102,7 @@ git push origin main
 ssh root@104.248.170.26
 
 # Navigate to project
-cd /path/to/ai-methods
+cd /path/to/phd-practice
 
 # Run deployment script
 ./deploy.sh
@@ -111,7 +111,7 @@ cd /path/to/ai-methods
 ### 3. Run Database Migration
 ```bash
 # Connect to database container
-docker exec -it epistemic-drift-db psql -U postgres -d epistemic_drift
+docker exec -it phd-practice-db psql -U postgres -d epistemic_drift
 
 # Or from host
 psql -h localhost -U postgres -d epistemic_drift -f backend/migrations/001_add_pid_to_documents.sql

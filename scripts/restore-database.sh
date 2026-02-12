@@ -12,14 +12,14 @@ if [ $# -eq 0 ]; then
     echo "Usage: $0 <backup_file.sql.gz>"
     echo ""
     echo "Available backups:"
-    ls -lht /Users/graham/Documents/repos/ai-methods/backups/*.sql.gz 2>/dev/null | head -10 || echo "No backups found"
+    ls -lht /Users/graham/Documents/repos/phd-practice/backups/*.sql.gz 2>/dev/null | head -10 || echo "No backups found"
     exit 1
 fi
 
 BACKUP_FILE="$1"
 POSTGRES_USER="${POSTGRES_USER:-postgres}"
 POSTGRES_DB="${POSTGRES_DB:-epistemic_drift}"
-CONTAINER_NAME="${CONTAINER_NAME:-epistemic-drift-db}"
+CONTAINER_NAME="${CONTAINER_NAME:-phd-practice-db}"
 
 # Verify backup file exists
 if [ ! -f "${BACKUP_FILE}" ]; then
@@ -47,7 +47,7 @@ fi
 echo ""
 echo "Creating pre-restore backup..."
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
-PRE_RESTORE_BACKUP="/Users/graham/Documents/repos/ai-methods/backups/pre_restore_${TIMESTAMP}.sql.gz"
+PRE_RESTORE_BACKUP="/Users/graham/Documents/repos/phd-practice/backups/pre_restore_${TIMESTAMP}.sql.gz"
 docker exec -t "${CONTAINER_NAME}" pg_dump -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" | gzip > "${PRE_RESTORE_BACKUP}"
 echo "Pre-restore backup saved: ${PRE_RESTORE_BACKUP}"
 

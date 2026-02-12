@@ -16,7 +16,7 @@ echo -e "${BLUE}📡 Connecting to droplet...${NC}"
 ssh ${DROPLET_USER}@${DROPLET_IP} << 'ENDSSH'
 set -e
 
-cd /root/ai-methods
+cd /root/phd-practice
 
 echo "📥 Pulling latest frontend changes..."
 git pull

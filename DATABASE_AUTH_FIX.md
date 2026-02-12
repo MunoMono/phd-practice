@@ -78,17 +78,17 @@ To verify the fix is working:
 
 1. **Check environment variables in container:**
 ```bash
-docker exec epistemic-drift-backend env | grep POSTGRES
+docker exec phd-practice-backend env | grep POSTGRES
 ```
 
 2. **Check database connection:**
 ```bash
-docker exec epistemic-drift-backend python -c "from app.core.config import settings; print(settings.DATABASE_URL)"
+docker exec phd-practice-backend python -c "from app.core.config import settings; print(settings.DATABASE_URL)"
 ```
 
 3. **Test database connectivity:**
 ```bash
-docker exec epistemic-drift-db psql -U postgres -d epistemic_drift -c "SELECT 1;"
+docker exec phd-practice-db psql -U postgres -d epistemic_drift -c "SELECT 1;"
 ```
 
 ## Best Practices Applied

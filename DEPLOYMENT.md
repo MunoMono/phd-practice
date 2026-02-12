@@ -1,7 +1,7 @@
 # Deployment Guide for innovationdesign.io
 
 ## Overview
-This guide covers deploying the ai-methods repository to Digital Ocean droplet at 104.248.170.26 for innovationdesign.io.
+This guide covers deploying the phd-practice repository to Digital Ocean droplet at 104.248.170.26 for innovationdesign.io.
 
 ## Prerequisites
 - Digital Ocean droplet: 104.248.170.26
@@ -61,9 +61,9 @@ apt-get install git -y
 ### 3. Clone Repository
 ```bash
 cd /root
-rm -rf ai-methods  # Remove old version if exists
-git clone https://github.com/MunoMono/ai-methods.git
-cd ai-methods
+rm -rf phd-practice  # Remove old version if exists
+git clone git.com:MunoMono/phd-practice.git
+cd phd-practice
 ```
 
 ### 4. Create Environment File
@@ -116,14 +116,14 @@ apt-get install certbot python3-certbot-nginx -y
 certbot certonly --standalone -d innovationdesign.io -d www.innovationdesign.io
 
 # Create SSL directory
-mkdir -p /root/ai-methods/ssl
+mkdir -p /root/phd-practice/ssl
 
 # Copy certificates
-cp /etc/letsencrypt/live/innovationdesign.io/fullchain.pem /root/ai-methods/ssl/
-cp /etc/letsencrypt/live/innovationdesign.io/privkey.pem /root/ai-methods/ssl/
+cp /etc/letsencrypt/live/innovationdesign.io/fullchain.pem /root/phd-practice/ssl/
+cp /etc/letsencrypt/live/innovationdesign.io/privkey.pem /root/phd-practice/ssl/
 
 # Rebuild container
-cd /root/ai-methods
+cd /root/phd-practice
 docker-compose -f docker-compose.prod.yml down
 docker-compose -f docker-compose.prod.yml up -d
 
@@ -134,7 +134,7 @@ docker-compose -f docker-compose.prod.yml up -d
 
 ### Update Deployment
 ```bash
-cd /root/ai-methods
+cd /root/phd-practice
 git pull origin main
 ./deploy.sh
 ```

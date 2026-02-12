@@ -7,7 +7,7 @@ set -e
 
 DROPLET_IP="104.248.170.26"
 DROPLET_USER="root"
-REPO_URL="https://github.com/MunoMono/ai-methods.git"
+REPO_URL="git@github.com:MunoMono/phd-practice.git"
 
 echo "🚀 Deploying to innovationdesign.io (${DROPLET_IP})..."
 
@@ -44,16 +44,16 @@ echo "📂 Setting up repository..."
 cd /root
 
 # Clone or update repository
-if [ -d "ai-methods" ]; then
+if [ -d "phd-practice" ]; then
     echo "Updating existing repository..."
-    cd ai-methods
+    cd phd-practice
     git fetch origin
     git reset --hard origin/main
     git pull origin main
 else
     echo "Cloning repository..."
-    git clone https://github.com/MunoMono/ai-methods.git
-    cd ai-methods
+    git clone ${REPO_URL}
+    cd phd-practice
 fi
 
 # Create .env file with Auth0 credentials and database configuration
@@ -98,7 +98,7 @@ docker compose -f docker-compose.prod.yml up -d
 
 echo "🔒 Ensuring database password is synced..."
 sleep 5
-docker exec epistemic-drift-db psql -U postgres -c "ALTER USER postgres WITH PASSWORD 'postgres';" 2>/dev/null || echo "Database password already correct or container not ready"
+docker exec phd-practice-db psql -U postgres -c "ALTER USER postgres WITH PASSWORD 'postgres';" 2>/dev/null || echo "Database password already correct or container not ready"
 
 echo "🔥 Configuring firewall..."
 if ! ufw status | grep -q "Status: active"; then

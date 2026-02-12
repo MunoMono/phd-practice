@@ -193,7 +193,7 @@ git push
 docker compose -f docker-compose.dev.yml ps
 
 # Production (on droplet)
-ssh root@104.248.170.26 "cd /root/ai-methods && docker compose -f docker-compose.prod.yml ps"
+ssh root@104.248.170.26 "cd /root/phd-practice && docker compose -f docker-compose.prod.yml ps"
 ```
 
 ### View logs
@@ -202,7 +202,7 @@ ssh root@104.248.170.26 "cd /root/ai-methods && docker compose -f docker-compose
 docker compose -f docker-compose.dev.yml logs -f frontend
 
 # Production frontend
-ssh root@104.248.170.26 "cd /root/ai-methods && docker compose -f docker-compose.prod.yml logs -f frontend"
+ssh root@104.248.170.26 "cd /root/phd-practice && docker compose -f docker-compose.prod.yml logs -f frontend"
 ```
 
 ---
@@ -222,7 +222,7 @@ ssh root@104.248.170.26 "cd /root/ai-methods && docker compose -f docker-compose
 You can work directly on droplet (not recommended):
 ```bash
 ssh root@104.248.170.26
-cd /root/ai-methods
+cd /root/phd-practice
 # Make changes
 docker compose -f docker-compose.prod.yml up -d --build frontend
 ```

@@ -11,7 +11,7 @@ NC='\033[0m' # No Color
 
 # Pull latest code
 echo -e "${BLUE}📥 Pulling latest code...${NC}"
-cd /root/ai-methods
+cd /root/phd-practice
 git pull
 
 # Build and deploy with Docker Compose v2
@@ -24,7 +24,7 @@ docker compose -f docker-compose.prod.yml down --remove-orphans
 
 # Clean up any stale containers with our names
 echo -e "${BLUE}🧹 Cleaning up stale containers...${NC}"
-docker ps -a --format '{{.Names}}' | grep -E 'epistemic-drift|ai-methods' | xargs -r docker rm -f 2>/dev/null || true
+docker ps -a --format '{{.Names}}' | grep -E 'phd-practice|phd-practice' | xargs -r docker rm -f 2>/dev/null || true
 
 # Start new containers
 echo -e "${BLUE}▶️  Starting new containers...${NC}"

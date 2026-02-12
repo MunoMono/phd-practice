@@ -33,16 +33,16 @@ echo "📂 Setting up repository..."
 cd /root
 
 # Clone or update repository
-if [ -d "ai-methods" ]; then
+if [ -d "phd-practice" ]; then
     echo "Updating existing repository..."
-    cd ai-methods
+    cd phd-practice
     git fetch origin
     git reset --hard origin/main
     git pull origin main
 else
     echo "Cloning repository..."
-    git clone https://github.com/MunoMono/ai-methods.git
-    cd ai-methods
+    git clone git.com:MunoMono/phd-practice.git
+    cd phd-practice
 fi
 
 # Create .env file with Auth0 credentials

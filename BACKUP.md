@@ -51,7 +51,7 @@ ls -lht backups/*.sql.gz
 ## Directory Structure
 
 ```
-ai-methods/
+phd-practice/
 ├── backups/                          # Backup files stored here
 │   ├── epistemic_drift_backup_*.sql.gz
 │   └── volume_info_*.json
@@ -72,15 +72,15 @@ The backup script uses the following environment variables (with defaults):
 
 ```bash
 # Backup configuration
-BACKUP_DIR=/Users/graham/Documents/repos/ai-methods/backups
-LOG_DIR=/Users/graham/Documents/repos/ai-methods/logs
+BACKUP_DIR=/Users/graham/Documents/repos/phd-practice/backups
+LOG_DIR=/Users/graham/Documents/repos/phd-practice/logs
 RETENTION_DAYS=30
 
 # Database credentials (from .env or defaults)
 POSTGRES_USER=postgres
 POSTGRES_PASSWORD=postgres
 POSTGRES_DB=epistemic_drift
-CONTAINER_NAME=epistemic-drift-db
+CONTAINER_NAME=phd-practice-db
 
 # Optional S3 storage
 S3_BUCKET=your-bucket-name
@@ -230,7 +230,7 @@ If the automated backup fails:
 
 ```bash
 # Direct PostgreSQL backup
-docker exec epistemic-drift-db pg_dump -U postgres epistemic_drift | gzip > emergency_backup_$(date +%Y%m%d_%H%M%S).sql.gz
+docker exec phd-practice-db pg_dump -U postgres epistemic_drift | gzip > emergency_backup_$(date +%Y%m%d_%H%M%S).sql.gz
 ```
 
 ## Troubleshooting
@@ -242,7 +242,7 @@ docker exec epistemic-drift-db pg_dump -U postgres epistemic_drift | gzip > emer
 docker-compose up -d db
 
 # Verify container is running
-docker ps | grep epistemic-drift-db
+docker ps | grep phd-practice-db
 ```
 
 ### Permission Issues

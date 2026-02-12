@@ -17,7 +17,7 @@ From your GraphQL response, you have **3 authority records**:
 ### 1. Run Database Migration
 
 ```bash
-cd /Users/graham/Documents/repos/ai-methods
+cd /Users/graham/Documents/repos/phd-practice
 
 # Option A: Via psql
 psql -d epistemic_drift -f backend/migrations/001_add_pid_to_documents.sql

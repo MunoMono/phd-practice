@@ -387,7 +387,7 @@ conn.close()
         # Copy script into container and execute
         result = subprocess.run([
             'ssh', f'root@{DB_CONFIG["host"]}',
-            'docker cp /tmp/run_sync.py epistemic-drift-backend:/tmp/run_sync.py && docker cp /tmp/parent_pids_data.json epistemic-drift-backend:/tmp/parent_pids_data.json && docker exec epistemic-drift-backend python /tmp/run_sync.py'
+            'docker cp /tmp/run_sync.py phd-practice-backend:/tmp/run_sync.py && docker cp /tmp/parent_pids_data.json phd-practice-backend:/tmp/parent_pids_data.json && docker exec phd-practice-backend python /tmp/run_sync.py'
         ], capture_output=True, text=True)
         
         print(result.stdout)

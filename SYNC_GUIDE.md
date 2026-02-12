@@ -237,7 +237,7 @@ SYNC_API_KEY=change_me_in_production  # For cron endpoint security
 ssh root@104.248.170.26
 
 # Setup cron
-cd /root/ai-methods
+cd /root/phd-practice
 ./scripts/setup-cron-sync.sh
 
 # Check cron is running

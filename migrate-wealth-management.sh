@@ -10,21 +10,21 @@ NC='\033[0m' # No Color
 
 # Step 1: Copy wealth-management folder to parent directory
 echo -e "${BLUE}📦 Step 1: Copying wealth-management to /Users/graham/Documents/repos/${NC}"
-cp -r /Users/graham/Documents/repos/ai-methods/wealth-management /Users/graham/Documents/repos/
+cp -r /Users/graham/Documents/repos/phd-practice/wealth-management /Users/graham/Documents/repos/
 
-# Step 2: Remove from ai-methods git tracking
-echo -e "${BLUE}🗑️  Step 2: Removing from ai-methods git tracking${NC}"
-cd /Users/graham/Documents/repos/ai-methods
+# Step 2: Remove from phd-practice git tracking
+echo -e "${BLUE}🗑️  Step 2: Removing from phd-practice git tracking${NC}"
+cd /Users/graham/Documents/repos/phd-practice
 git rm -r --cached wealth-management
 
-# Step 3: Add to ai-methods .gitignore
-echo -e "${BLUE}🚫 Step 3: Adding to ai-methods .gitignore${NC}"
+# Step 3: Add to phd-practice .gitignore
+echo -e "${BLUE}🚫 Step 3: Adding to phd-practice .gitignore${NC}"
 echo "" >> .gitignore
 echo "# Wealth management app (now independent repo)" >> .gitignore
 echo "wealth-management/" >> .gitignore
 
 # Step 4: Commit the removal
-echo -e "${BLUE}💾 Step 4: Committing removal from ai-methods${NC}"
+echo -e "${BLUE}💾 Step 4: Committing removal from phd-practice${NC}"
 git add .gitignore
 git commit -m "Remove wealth-management folder - now independent repo"
 
@@ -51,6 +51,6 @@ echo "3. git branch -M main"
 echo "4. git push -u origin main"
 echo ""
 echo "Then update server paths:"
-echo "• SSH to server and move /root/ai-methods/wealth-management to /root/wealth-management"
+echo "• SSH to server and move /root/phd-practice/wealth-management to /root/wealth-management"
 echo "• Update nginx config if needed"
 echo "• Run deployment from new location"

@@ -1,6 +1,6 @@
 # Epistemic Drift Research Platform
 
-**🌐 [View Live Site](https://munomono.github.io/ai-methods/)**
+**🌐 [View Live Site](https://munomono.github.io/phd-practice/)**
 
 A cybernetic research platform for analyzing epistemic drift in academic literature using human-AI collaboration with IBM's Granite LLM.
 
@@ -166,7 +166,7 @@ python -m app.main
 ## Project Structure
 
 ```
-ai-methods/
+phd-practice/
 ├── frontend/                 # React application
 │   ├── src/
 │   │   ├── components/

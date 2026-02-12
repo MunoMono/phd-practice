@@ -16,7 +16,7 @@ apt-get install -y certbot
 
 # Stop the frontend container temporarily
 echo "Stopping frontend container..."
-cd /root/ai-methods
+cd /root/phd-practice
 docker compose -f docker-compose.prod.yml stop frontend
 
 # Get SSL certificate
@@ -46,7 +46,7 @@ docker compose -f docker-compose.prod.yml exec frontend nginx -s reload
 
 # Setup auto-renewal
 echo "Setting up SSL certificate auto-renewal..."
-(crontab -l 2>/dev/null; echo "0 0 * * * certbot renew --quiet && docker compose -f /root/ai-methods/docker-compose.prod.yml exec frontend nginx -s reload") | crontab -
+(crontab -l 2>/dev/null; echo "0 0 * * * certbot renew --quiet && docker compose -f /root/phd-practice/docker-compose.prod.yml exec frontend nginx -s reload") | crontab -
 
 echo "=========================================="
 echo "SSL Setup Complete!"

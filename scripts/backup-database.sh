@@ -13,19 +13,19 @@
 set -e
 
 # Configuration
-BACKUP_DIR="${BACKUP_DIR:-/Users/graham/Documents/repos/ai-methods/backups}"
-LOG_DIR="${LOG_DIR:-/Users/graham/Documents/repos/ai-methods/logs}"
+BACKUP_DIR="${BACKUP_DIR:-/Users/graham/Documents/repos/phd-practice/backups}"
+LOG_DIR="${LOG_DIR:-/Users/graham/Documents/repos/phd-practice/logs}"
 RETENTION_DAYS="${RETENTION_DAYS:-30}"
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
 DATE=$(date +"%Y-%m-%d")
-BACKUP_FILE="epistemic_drift_backup_${TIMESTAMP}.sql.gz"
+BACKUP_FILE="phd_practice_backup_${TIMESTAMP}.sql.gz"
 LOG_FILE="${LOG_DIR}/backup_${DATE}.log"
 
 # Database credentials (from .env or defaults)
 POSTGRES_USER="${POSTGRES_USER:-postgres}"
 POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-postgres}"
 POSTGRES_DB="${POSTGRES_DB:-epistemic_drift}"
-CONTAINER_NAME="${CONTAINER_NAME:-epistemic-drift-db}"
+CONTAINER_NAME="${CONTAINER_NAME:-phd-practice-db}"
 
 # Create directories if they don't exist
 mkdir -p "${BACKUP_DIR}"
@@ -77,13 +77,13 @@ fi
 
 # Clean up old backups (keep only last RETENTION_DAYS days)
 log "Cleaning up old backups (keeping last ${RETENTION_DAYS} days)..."
-find "${BACKUP_DIR}" -name "epistemic_drift_backup_*.sql.gz" -type f -mtime +${RETENTION_DAYS} -delete
-REMAINING=$(find "${BACKUP_DIR}" -name "epistemic_drift_backup_*.sql.gz" -type f | wc -l | tr -d ' ')
+find "${BACKUP_DIR}" -name "phd_practice_backup_*.sql.gz" -type f -mtime +${RETENTION_DAYS} -delete
+REMAINING=$(find "${BACKUP_DIR}" -name "phd_practice_backup_*.sql.gz" -type f | wc -l | tr -d ' ')
 log "Cleanup complete. ${REMAINING} backup(s) remaining."
 
 # Optional: Backup volumes
 log "Creating volume backup info..."
-docker volume inspect epistemic-drift-db_postgres_data > "${BACKUP_DIR}/volume_info_${TIMESTAMP}.json" 2>/dev/null || true
+docker volume inspect phd-practice-db_postgres_data > "${BACKUP_DIR}/volume_info_${TIMESTAMP}.json" 2>/dev/null || true
 
 log "=== Backup completed successfully ==="
 log ""

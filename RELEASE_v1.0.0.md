@@ -47,17 +47,17 @@ First production release with Auth0 authentication, PID-validated authority trac
 
 ## 💾 Backups Created
 
-All backups stored on production server at `/root/backups/` and `/root/ai-methods/backups/`
+All backups stored on production server at `/root/backups/` and `/root/phd-practice/backups/`
 
 ### Database Backup
 ```
 epistemic_drift_v1.0_20260130_132839.sql (29KB)
-Location: /root/ai-methods/backups/
+Location: /root/phd-practice/backups/
 ```
 
 ### Code Backup
 ```
-ai-methods_v1.0_code_20260130_132909.tar.gz (3.8MB)
+phd-practice_v1.0_code_20260130_132909.tar.gz (3.8MB)
 Location: /root/backups/
 Excludes: node_modules, __pycache__, .git
 ```
@@ -77,26 +77,26 @@ git push origin v1.0.0
 - **UI Library:** IBM Carbon Design System
 - **Auth:** @auth0/auth0-react
 - **Deployment:** Nginx (port 80/443)
-- **Container:** epistemic-drift-frontend
+- **Container:** phd-practice-frontend
 
 ### Backend
 - **Framework:** FastAPI + Uvicorn
 - **Auth:** python-jose (JWT validation ready, not enforced yet)
 - **API:** REST + GraphQL (Strawberry)
 - **Deployment:** Docker (port 8000)
-- **Container:** epistemic-drift-backend
+- **Container:** phd-practice-backend
 
 ### Database
 - **Engine:** PostgreSQL 15
 - **Extensions:** pgvector (for BERT embeddings)
-- **Container:** epistemic-drift-db (ankane/pgvector:latest)
+- **Container:** phd-practice-db (ankane/pgvector:latest)
 - **Deployment:** Docker (port 5432)
 
 ### Docker Volumes
-- `ai-methods_postgres_data` - Database persistence
-- `ai-methods_backend_logs` - Application logs
-- `ai-methods_model_cache` - Hugging Face models
-- `ai-methods_minio_data` - S3-compatible storage (not yet configured)
+- `phd-practice_postgres_data` - Database persistence
+- `phd-practice_backend_logs` - Application logs
+- `phd-practice_model_cache` - Hugging Face models
+- `phd-practice_minio_data` - S3-compatible storage (not yet configured)
 
 ---
 
@@ -104,14 +104,14 @@ git push origin v1.0.0
 
 ### Full Stack Restart
 ```bash
-cd /root/ai-methods
+cd /root/phd-practice
 docker compose -f docker-compose.prod.yml down
 docker compose -f docker-compose.prod.yml up -d
 ```
 
 ### Backend Only
 ```bash
-cd /root/ai-methods
+cd /root/phd-practice
 git pull
 docker compose -f docker-compose.prod.yml build backend
 docker compose -f docker-compose.prod.yml up -d backend
@@ -119,7 +119,7 @@ docker compose -f docker-compose.prod.yml up -d backend
 
 ### Frontend Only
 ```bash
-cd /root/ai-methods
+cd /root/phd-practice
 git pull
 docker compose -f docker-compose.prod.yml build frontend
 docker compose -f docker-compose.prod.yml up -d frontend
@@ -127,12 +127,12 @@ docker compose -f docker-compose.prod.yml up -d frontend
 
 ### Database Backup
 ```bash
-docker exec epistemic-drift-db pg_dump -U postgres epistemic_drift > backup_$(date +%Y%m%d).sql
+docker exec phd-practice-db pg_dump -U postgres epistemic_drift > backup_$(date +%Y%m%d).sql
 ```
 
 ### Database Restore
 ```bash
-docker exec -i epistemic-drift-db psql -U postgres epistemic_drift < backup_20260130.sql
+docker exec -i phd-practice-db psql -U postgres epistemic_drift < backup_20260130.sql
 ```
 
 ---

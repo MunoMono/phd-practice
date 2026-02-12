@@ -4,7 +4,7 @@ services:
   # PostgreSQL with pgvector extension
   db:
     image: ankane/pgvector:latest
-    container_name: epistemic-drift-db
+    container_name: phd-practice-db
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
@@ -16,7 +16,7 @@ services:
       - postgres_data:/var/lib/postgresql/data
       - ./init-db.sql:/docker-entrypoint-initdb.d/init.sql
     networks:
-      - epistemic-network
+      - phd-practice-network
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 10s
@@ -28,7 +28,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: epistemic-drift-backend
+    container_name: phd-practice-backend
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
@@ -53,7 +53,7 @@ services:
       db:
         condition: service_healthy
     networks:
-      - epistemic-network
+      - phd-practice-network
     restart: unless-stopped
 
   # React Frontend
@@ -61,7 +61,7 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    container_name: epistemic-drift-frontend
+    container_name: phd-practice-frontend
     ports:
       - "8080:80"
     volumes:
@@ -69,13 +69,13 @@ services:
     depends_on:
       - backend
     networks:
-      - epistemic-network
+      - phd-practice-network
     restart: unless-stopped
 
   # MinIO (S3-compatible storage) - Optional
   minio:
     image: minio/minio:latest
-    container_name: epistemic-drift-minio
+    container_name: phd-practice-minio
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
@@ -86,11 +86,11 @@ services:
     volumes:
       - minio_data:/data
     networks:
-      - epistemic-network
+      - phd-practice-network
     restart: unless-stopped
 
 networks:
-  epistemic-network:
+  phd-practice-network:
     driver: bridge
 
 volumes:

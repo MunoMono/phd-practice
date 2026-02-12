@@ -189,7 +189,7 @@ def insert_pids_to_droplet(parent_records):
             doc_metadata = EXCLUDED.doc_metadata;
         """
         
-        cmd = f'ssh root@104.248.170.26 "docker exec epistemic-drift-db psql -U postgres -d epistemic_drift -c \\"{insert_sql}\\""'
+        cmd = f'ssh root@104.248.170.26 "docker exec phd-practice-db psql -U postgres -d epistemic_drift -c \\"{insert_sql}\\""'
         print(f"  Inserting PID: {pid} ({title})")
         print(f"    PDF count (ML=TRUE): {pdf_count}")
         import subprocess
@@ -219,7 +219,7 @@ if __name__ == "__main__":
             print("\n🔍 Verifying database...")
             import subprocess
             result = subprocess.run(
-                'ssh root@104.248.170.26 "docker exec epistemic-drift-db psql -U postgres -d epistemic_drift -c \\"SELECT pid, title FROM documents WHERE pid IS NOT NULL ORDER BY pid;\\""',
+                 'ssh root@104.248.170.26 "docker exec phd-practice-db psql -U postgres -d epistemic_drift -c \\"SELECT pid, title FROM documents WHERE pid IS NOT NULL ORDER BY pid;\\""',
                 shell=True,
                 capture_output=True,
                 text=True

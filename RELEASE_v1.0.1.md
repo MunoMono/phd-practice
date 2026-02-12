@@ -58,7 +58,7 @@ Data quality baseline with corrected PDF/TIFF counts and ML provenance tracking.
 - **Backup:** `epistemic_drift_v1.0.1_20260130_140402.sql` (29KB)
 
 ### Code
-- **Backup:** `ai-methods_v1.0.1_code_20260130_140418.tar.gz` (7.6MB)
+- **Backup:** `phd-practice_v1.0.1_code_20260130_140418.tar.gz` (7.6MB)
 - **Location:** `/root/` on production server
 
 ### Deployment
@@ -106,16 +106,16 @@ Data quality baseline with corrected PDF/TIFF counts and ML provenance tracking.
 
 ```bash
 # Pull latest code
-ssh root@innovationdesign.io "cd /root/ai-methods && git pull"
+ssh root@innovationdesign.io "cd /root/phd-practice && git pull"
 
 # Rebuild and restart backend
-ssh root@innovationdesign.io "cd /root/ai-methods && docker compose -f docker-compose.prod.yml build --no-cache backend && docker compose -f docker-compose.prod.yml up -d backend"
+ssh root@innovationdesign.io "cd /root/phd-practice && docker compose -f docker-compose.prod.yml build --no-cache backend && docker compose -f docker-compose.prod.yml up -d backend"
 
 # Rebuild and restart frontend
-ssh root@innovationdesign.io "cd /root/ai-methods && docker compose -f docker-compose.prod.yml build --no-cache frontend && docker compose -f docker-compose.prod.yml up -d frontend"
+ssh root@innovationdesign.io "cd /root/phd-practice && docker compose -f docker-compose.prod.yml build --no-cache frontend && docker compose -f docker-compose.prod.yml up -d frontend"
 
 # Reset database password if needed
-ssh root@innovationdesign.io "docker exec epistemic-drift-db psql -U postgres -d epistemic_drift -c \"ALTER USER postgres WITH PASSWORD 'postgres';\""
+ssh root@innovationdesign.io "docker exec phd-practice-db psql -U postgres -d epistemic_drift -c \"ALTER USER postgres WITH PASSWORD 'postgres';\""
 ```
 
 ---

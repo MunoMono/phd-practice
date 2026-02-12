@@ -43,7 +43,7 @@ The sync now enforces these **permanent policies** for training corpus curation:
 
 ### Option 1: Automated on Deployment
 ```bash
-ssh root@104.248.170.26 "cd /root/ai-methods && ./startup-sync.sh"
+ssh root@104.248.170.26 "cd /root/phd-practice && ./startup-sync.sh"
 ```
 
 ### Option 2: Manual Sync
@@ -51,18 +51,18 @@ ssh root@104.248.170.26 "cd /root/ai-methods && ./startup-sync.sh"
 # From local machine
 scp quick_sync_pids.py root@104.248.170.26:/tmp/quick_sync.py
 ssh root@104.248.170.26 "
-  docker cp /tmp/quick_sync.py epistemic-drift-backend:/app/quick_sync.py &&
-  docker exec epistemic-drift-db psql -U postgres -c \"ALTER USER postgres WITH PASSWORD 'postgres';\" &&
-  docker restart epistemic-drift-backend &&
-  sleep 5 &&
-  docker exec epistemic-drift-backend python /app/quick_sync.py
+   docker cp /tmp/quick_sync.py phd-practice-backend:/app/quick_sync.py &&
+   docker exec phd-practice-db psql -U postgres -c \"ALTER USER postgres WITH PASSWORD 'postgres';\" &&
+   docker restart phd-practice-backend &&
+   sleep 5 &&
+   docker exec phd-practice-backend python /app/quick_sync.py
 "
 ```
 
 ### Option 3: Inside Backend Container
 ```bash
 ssh root@104.248.170.26
-docker exec -it epistemic-drift-backend bash
+docker exec -it phd-practice-backend bash
 python /app/quick_sync.py
 ```
 
@@ -75,7 +75,7 @@ The database password issue is fixed by:
 ## Verification
 ```bash
 # Check database has PIDs
-ssh root@104.248.170.26 "docker exec epistemic-drift-db psql -U postgres -d epistemic_drift -c 'SELECT pid, title, pdf_count FROM documents WHERE pid IS NOT NULL;'"
+ssh root@104.248.170.26 "docker exec phd-practice-db psql -U postgres -d epistemic_drift -c 'SELECT pid, title, pdf_count FROM documents WHERE pid IS NOT NULL;'"
 
 # Expected output:
 #      pid       |              title              | pdf_count 
