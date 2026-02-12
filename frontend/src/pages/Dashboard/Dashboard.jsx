@@ -25,7 +25,7 @@ const Dashboard = () => {
           <div className="dashboard__hero">
             <div className="dashboard__hero-wrapper">
               <h1 className="dashboard__hero-title">
-                Epistemic drift detection
+                Epistemic shift detection
               </h1>
               <p className="dashboard__hero-subtitle">
                 PID-gated NLP for Royal College of Art's Department of Design Research (DDR, 1965-1985). 
@@ -59,7 +59,7 @@ const Dashboard = () => {
                 <p className="dashboard__granite-hero-description">
                   IBM Granite is a family of open, performant, and trusted AI models purpose-built for business and optimized for 
                   scientific tasks. This research platform leverages <strong>Granite 3.1 8B Instruct</strong> with 8-bit quantization 
-                  for efficient CPU-based inference, enabling epistemic drift detection across historical design methods literature 
+                  for efficient CPU-based inference, enabling epistemic shift detection across historical design methods literature 
                   (1965-1985) with full provenance tracking and formal academic attribution.
                 </p>
                 {graniteInfo && (
@@ -150,13 +150,13 @@ const Dashboard = () => {
               <DataVis_1 size={32} />
             </div>
             <h3>Temporal analysis</h3>
-            <p>Monitor epistemic drift patterns and model behavior changes</p>
+            <p>Monitor epistemic shift patterns and model behavior changes</p>
           </Tile>
         </Column>
 
         <Column lg={16} md={8} sm={4}>
           <Tile className="dashboard__chart-tile">
-            <h3 className="dashboard__chart-title">Temporal drift analysis</h3>
+            <h3 className="dashboard__chart-title">Temporal shift analysis</h3>
             <TemporalDriftChart />
           </Tile>
         </Column>

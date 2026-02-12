@@ -3,6 +3,8 @@
 ## Overview
 This guide covers deploying the phd-practice repository to Digital Ocean droplet at 104.248.170.26 for innovationdesign.io.
 
+**Source of truth & deploy model**: The GitHub repo (`git@github.com:MunoMono/phd-practice.git`) is the source of truth. No GitHub Actions are used. Deployments run directly from your local machine to the droplet using the provided scripts.
+
 ## Prerequisites
 - Digital Ocean droplet: 104.248.170.26
 - Domain: innovationdesign.io (add to Auth0 allowed callbacks)
@@ -62,7 +64,7 @@ apt-get install git -y
 ```bash
 cd /root
 rm -rf phd-practice  # Remove old version if exists
-git clone git.com:MunoMono/phd-practice.git
+git clone git@github.com:MunoMono/phd-practice.git
 cd phd-practice
 ```
 

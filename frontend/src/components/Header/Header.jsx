@@ -39,7 +39,7 @@ const Header = ({ currentTheme, onThemeToggle }) => {
   }
 
   return (
-    <CarbonHeader aria-label="Epistemic Drift Research">
+    <CarbonHeader aria-label="Epistemic Shift Research">
       <SkipToContent />
       <HeaderMenuButton
         aria-label={isSideNavExpanded ? 'Close menu' : 'Open menu'}

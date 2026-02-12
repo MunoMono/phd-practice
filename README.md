@@ -2,6 +2,10 @@
 
 **🌐 [View Live Site](https://munomono.github.io/phd-practice/)**
 
+**Source of truth & deploy:**
+- Code lives in `git@github.com:MunoMono/phd-practice.git` (no GitHub Actions).
+- Work locally on any machine, push to GitHub, and deploy directly from your machine to the droplet via the deploy scripts; GitHub does not touch the droplet.
+
 A cybernetic research platform for analyzing epistemic drift in academic literature using human-AI collaboration with IBM's Granite LLM.
 
 ## Architecture
