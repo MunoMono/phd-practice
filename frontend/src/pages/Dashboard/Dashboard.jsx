@@ -103,7 +103,7 @@ const Dashboard = () => {
               <Checkmark size={16} /> PID-Gated Architecture
             </Tag>
             <img 
-              src="/diagrams/home/phd-model.svg" 
+              src="/diagrams/home/phd-model.svg?v=20260227" 
               alt="PhD research framework diagram showing the three strands of research"
               className="dashboard__diagram"
             />
