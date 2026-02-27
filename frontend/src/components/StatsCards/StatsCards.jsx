@@ -10,9 +10,56 @@ const StatsCards = () => {
   const [recentDocs, setRecentDocs] = useState([])
   const [pidAuthorities, setPidAuthorities] = useState([])
 
+  // Static demo data to render the cards while backend metrics are unavailable
+  const useStaticDemo = true
+  const demoStats = {
+    total_db_records: 18240,
+    local_db_records: 18240,
+    local_table_counts: {
+      document_embeddings: 48211,
+      research_sessions: 132,
+      experiments: 14,
+      documents: 88,
+      training_runs: 6,
+      corpus_snapshots: 3
+    },
+    total_s3_assets: 2140,
+    total_s3_size_mb: 0,
+    s3_configured: true,
+    s3_images: 1426,
+    s3_pdfs: 88,
+    s3_tiffs: 14,
+    total_items: 18240,
+    pid_count: 20,
+    total_pid_pdfs: 88,
+    core_authorities: 5,
+    critical_authorities: 6
+  }
+
+  const demoPidAuthorities = [
+    { title: 'DDR Projects', pid: 'DDR-PRJ', pdfCount: 28, tiffCount: 4 },
+    { title: 'Ref Students', pid: 'DDR-STU', pdfCount: 16, tiffCount: 0 },
+    { title: 'Ref Fonds', pid: 'DDR-FND', pdfCount: 22, tiffCount: 6 },
+    { title: 'Ref Publications', pid: 'DDR-PUB', pdfCount: 12, tiffCount: 2 }
+  ]
+
+  const demoRecentDocs = [
+    { title: 'Systems of circulation in design pedagogy', pid: 'DDR-2024-001' },
+    { title: 'Epistemic drift in multimodal archives', pid: 'DDR-2024-002' },
+    { title: 'Method repertoires for situated research', pid: 'DDR-2024-003' }
+  ]
+
   useEffect(() => {
+    if (useStaticDemo) {
+      setStats(demoStats)
+      setPidAuthorities(demoPidAuthorities)
+      setRecentDocs(demoRecentDocs)
+      setError(null)
+      setLoading(false)
+      return
+    }
+
     fetchStats()
-    // Refresh every 30 seconds
     const interval = setInterval(fetchStats, 30000)
     return () => clearInterval(interval)
   }, [])
