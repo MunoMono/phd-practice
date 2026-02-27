@@ -11,7 +11,7 @@ const StatsCards = () => {
   const [pidAuthorities, setPidAuthorities] = useState([])
 
   // Static demo data to render the cards while backend metrics are unavailable
-  const useStaticDemo = true
+  const useStaticDemo = false
   const demoStats = {
     total_db_records: 18240,
     local_db_records: 18240,
