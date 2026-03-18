@@ -22,6 +22,9 @@
     width: 64px;
     height: 64px;
     border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: transparent;
+    color: #0f62fe;
     flex-shrink: 0;
   }
 
@@ -90,15 +93,15 @@
   // Color variants
   &--database {
     .stats-card__icon {
-      background: linear-gradient(135deg, #0f62fe, #4589ff);
-      color: white;
+      background: transparent;
+      color: #0f62fe;
     }
   }
 
   &--storage {
     .stats-card__icon {
-      background: linear-gradient(135deg, #24a148, #42be65);
-      color: white;
+      background: transparent;
+      color: #0f62fe;
     }
 
     .stats-card__number {
@@ -111,8 +114,8 @@
 
   &--total {
     .stats-card__icon {
-      background: linear-gradient(135deg, #8a3ffc, #a56eff);
-      color: white;
+      background: transparent;
+      color: #0f62fe;
     }
 
     .stats-card__number {
@@ -125,8 +128,8 @@
 
   &--experiments {
     .stats-card__icon {
-      background: linear-gradient(135deg, #ff832b, #ffb000);
-      color: white;
+      background: transparent;
+      color: #0f62fe;
     }
 
     .stats-card__number {

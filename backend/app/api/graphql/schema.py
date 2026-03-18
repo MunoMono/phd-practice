@@ -154,6 +154,7 @@ class Query:
                     result = db.execute(text(f"SELECT COUNT(*) FROM {table}"))
                     count = result.scalar()
                 except:
+                    db.rollback()
                     count = 0
                 counts[table] = count
                 total_records += count
@@ -173,6 +174,7 @@ class Query:
                 result = db.execute(text("SELECT COUNT(*) FROM digital_assets WHERE file_type LIKE 'image/tiff'"))
                 tiffs_count = result.scalar()
             except:
+                db.rollback()
                 digital_assets_count = 0
                 images_count = 0
                 pdfs_count = 0
@@ -183,18 +185,21 @@ class Query:
                 result = db.execute(text("SELECT COUNT(*) FROM documents"))
                 documents_count = result.scalar()
             except:
+                db.rollback()
                 documents_count = 0
             
             try:
                 result = db.execute(text("SELECT COUNT(*) FROM training_runs"))
                 training_runs_count = result.scalar()
             except:
+                db.rollback()
                 training_runs_count = 0
             
             try:
                 result = db.execute(text("SELECT COUNT(*) FROM corpus_snapshots"))
                 corpus_snapshots_count = result.scalar()
             except:
+                db.rollback()
                 corpus_snapshots_count = 0
             
             # Get PID count (unique PIDs)
@@ -202,44 +207,45 @@ class Query:
                 result = db.execute(text("SELECT COUNT(DISTINCT pid) FROM documents WHERE pid IS NOT NULL"))
                 pid_count = result.scalar()
             except:
+                db.rollback()
                 pid_count = 0
             
             # Get PID authorities with titles and media counts
-            # PERMANENT ML GATE POLICY (Feb 2026):
-            # - Only show parent authority records (those with actual media counts > 0)
-            # - This filters out individual media item records
-            # - Counts are from pdf_count/tiff_count columns (synced via quick_sync_pids.py)
-            # - These counts already reflect master-only PDFs with use_for_ml=True
+            # Use ML-gated PDF counts (ml_pdf_count) as the authoritative PDF total per PID
             try:
                 result = db.execute(text("""
                     SELECT 
                         pid,
                         MAX(title) as title,
                         COUNT(*) as document_count,
-                        MAX(pdf_count) as pdf_count,
-                        MAX((doc_metadata->>'ml_pdf_count')::int) as ml_pdf_count,
-                        MAX(tiff_count) as tiff_count,
-                        MAX((doc_metadata->>'ml_tiff_count')::int) as ml_tiff_count
+                        COALESCE(MAX(pdf_count), 0) as pdf_count,
+                        COALESCE(MAX((doc_metadata->>'ml_pdf_count')::int), 0) as ml_pdf_count,
+                        COALESCE(MAX(tiff_count), 0) as tiff_count,
+                        COALESCE(MAX((doc_metadata->>'ml_tiff_count')::int), 0) as ml_tiff_count
                     FROM documents 
                     WHERE pid IS NOT NULL
-                    AND (pdf_count > 0 OR tiff_count > 0)
                     GROUP BY pid
                     ORDER BY pid
                 """))
-                pid_authorities = [
-                    PidAuthority(
-                        pid=row[0],
-                        title=row[1] or 'Untitled',
-                        document_count=row[2],
-                        pdf_count=row[3] or 0,
-                        ml_pdf_count=row[4] or 0,
-                        tiff_count=row[5] or 0,
-                        ml_tiff_count=row[6] or 0,
-                        total_media_count=(row[3] or 0) + (row[5] or 0)  # PDFs + TIFFs
+                pid_authorities = []
+                for row in result.fetchall():
+                    # Use ML-gated PDF count; fall back to pdf_count column but never to document_count
+                    pdf_count = row[4] or row[3] or 0
+                    tiff_count = row[5] or 0
+                    pid_authorities.append(
+                        PidAuthority(
+                            pid=row[0],
+                            title=row[1] or 'Untitled',
+                            document_count=row[2],
+                            pdf_count=pdf_count,
+                            ml_pdf_count=row[4] or 0,
+                            tiff_count=tiff_count,
+                            ml_tiff_count=row[6] or 0,
+                            total_media_count=pdf_count + tiff_count
+                        )
                     )
-                    for row in result.fetchall()
-                ]
             except Exception as e:
+                db.rollback()
                 logger.error(f"Error fetching PID authorities: {e}")
                 pid_authorities = []
             
@@ -250,14 +256,26 @@ class Query:
                 result = db.execute(text("SELECT COUNT(*) FROM database_authorities WHERE category = 'core'"))
                 core_authorities_count = result.scalar() or 0
             except:
+                db.rollback()
                 core_authorities_count = 0
             
             try:
                 result = db.execute(text("SELECT COUNT(*) FROM database_authorities WHERE category = 'critical'"))
                 critical_authorities_count = result.scalar() or 0
             except:
+                db.rollback()
                 critical_authorities_count = 0
             
+            # Recompute total across all tracked tables
+            total_records = (
+                counts['document_embeddings'] +
+                counts['research_sessions'] +
+                counts['experiments'] +
+                documents_count +
+                training_runs_count +
+                corpus_snapshots_count
+            )
+
             table_counts = TableCounts(
                 document_embeddings=counts['document_embeddings'],
                 research_sessions=counts['research_sessions'],
@@ -289,7 +307,7 @@ class Query:
         # Calculate total (database records + digital assets)
         total_items = total_records + digital_assets_count
         
-        # Calculate total PDFs across all PID authorities
+        # Calculate total PDFs across all PID authorities (ML-gated where available)
         total_pid_pdfs = sum(auth.pdf_count for auth in pid_authorities)
         
         return SystemMetrics(

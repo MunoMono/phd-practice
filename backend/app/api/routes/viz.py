@@ -397,6 +397,7 @@ async def get_dashboard_stats():
             "overview": {
                 "totalDocuments": stats.total_documents,
                 "totalPdfs": stats.total_pdfs,
+                "totalPages": stats.total_pages,
                 "yearRange": stats.year_range
             },
             "mlProcessing": {

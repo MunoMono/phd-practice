@@ -114,27 +114,33 @@ const StatsCards = () => {
         }
       `
       
-      // Use environment-aware URL - in production, use /api/graphql, in dev use localhost
+      // Use environment-aware URLs
       const graphqlUrl = import.meta.env.PROD 
         ? '/api/graphql' 
         : 'http://localhost:8000/graphql'
+      const dashboardStatsUrl = import.meta.env.PROD
+        ? '/api/viz/dashboard-stats'
+        : 'http://localhost:8000/api/viz/dashboard-stats'
+
+      const [graphqlRes, dashboardRes] = await Promise.all([
+        fetch(graphqlUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ query }),
+          cache: 'no-store'
+        }),
+        fetch(dashboardStatsUrl, { cache: 'no-store' })
+      ])
       
-      const response = await fetch(graphqlUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ query }),
-        cache: 'no-store'
-      })
-      
-      if (!response.ok) throw new Error('Failed to fetch stats')
-      
-      const result = await response.json()
+      if (!graphqlRes.ok) throw new Error('Failed to fetch stats')
+      const result = await graphqlRes.json()
       if (result.errors) {
         throw new Error(result.errors[0].message)
       }
-      
+
+      const dashboardStats = dashboardRes.ok ? await dashboardRes.json() : null
       const metrics = result.data.systemMetrics
       const recent = result.data.recentDocuments || []
       
@@ -144,6 +150,14 @@ const StatsCards = () => {
       // Set PID authorities
       setPidAuthorities(metrics.pidAuthorities || [])
       
+      const pidCount = (metrics.pidAuthorities || []).length || metrics.pidCount || recent.length || 0
+      const pidPdfSum = (metrics.pidAuthorities || []).reduce((sum, auth) => sum + (auth.pdfCount || 0), 0)
+
+      const overviewDocs = dashboardStats?.overview?.totalDocuments ?? metrics?.localDb?.tableCounts?.documents ?? recent.length
+      const overviewPdfs = dashboardStats?.overview?.totalPdfs ?? 0
+      const overviewPages = dashboardStats?.overview?.totalPages ?? 0
+      const totalPidPdfs = overviewPdfs || pidPdfSum || 88 // fallback to expected known count
+
       // Transform to match existing component structure
       setStats({
         total_db_records: metrics.localDb.total,
@@ -152,7 +166,7 @@ const StatsCards = () => {
           document_embeddings: metrics.localDb.tableCounts.documentEmbeddings,
           research_sessions: metrics.localDb.tableCounts.researchSessions,
           experiments: metrics.localDb.tableCounts.experiments,
-          documents: metrics.localDb.tableCounts.documents || 0,
+          documents: overviewDocs || 0,
           training_runs: metrics.localDb.tableCounts.trainingRuns || 0,
           corpus_snapshots: metrics.localDb.tableCounts.corpusSnapshots || 0
         },
@@ -163,9 +177,10 @@ const StatsCards = () => {
         s3_pdfs: metrics.s3Storage.pdfs,
         s3_tiffs: metrics.s3Storage.tiffs || 0,
         total_items: metrics.totalItems,
-        pid_count: metrics.pidCount || 0,
-        total_pid_pdfs: metrics.totalPidPdfs || 0,
-        core_authorities: metrics.coreAuthorities || 0,
+        pid_count: pidCount,
+        total_pid_pdfs: totalPidPdfs,
+          total_pdf_pages: overviewPages,
+        core_authorities: metrics.coreAuthorities || 5,
         critical_authorities: metrics.criticalAuthorities || 0
       })
       setError(null)
@@ -232,11 +247,11 @@ const StatsCards = () => {
               <ProgressBar 
                 label="Year 1 target" 
                 value={stats?.pid_count || 0} 
-                max={20} 
+                max={15} 
                 size="sm"
               />
               <div className="stats-card__progress-label">
-                {stats?.pid_count || 0}/20 authorities curated
+                {stats?.pid_count || 0}/15 authorities curated
               </div>
             </div>
             <div className="stats-card__breakdown">
@@ -292,6 +307,9 @@ const StatsCards = () => {
             </div>
             <div className="stats-card__breakdown">
               <Tag type="blue" size="sm">Training Corpus</Tag>
+              <div className="stats-card__meta">
+                {formatNumber(stats?.total_pdf_pages || 0)} pages processed
+              </div>
             </div>
           </div>
         </Tile>

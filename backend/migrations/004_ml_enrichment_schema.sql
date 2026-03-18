@@ -157,25 +157,75 @@ CREATE TABLE IF NOT EXISTS temporal_trends (
 
 CREATE INDEX IF NOT EXISTS idx_temporal_trends_year ON temporal_trends(year);
 
--- Materialized view for fast dashboard queries
+-- Note: we avoid set-returning functions in aggregates (SRF in agg is
+-- disallowed in PostgreSQL 14+) by using a lateral unnest inside a
+-- separate CTE, then cross joining the distinct theme count.
 CREATE MATERIALIZED VIEW IF NOT EXISTS ml_dashboard_stats AS
+WITH docs AS (
+    SELECT *
+    FROM documents
+    WHERE pid IS NOT NULL
+),
+theme_counts AS (
+    SELECT COUNT(DISTINCT theme) AS unique_themes
+    FROM docs d
+    CROSS JOIN LATERAL unnest(d.ml_themes) AS t(theme)
+),
+agg AS (
+    SELECT 
+        COUNT(*) AS total_documents,
+        COUNT(*) FILTER (WHERE embeddings IS NOT NULL) AS documents_with_embeddings,
+        COUNT(*) FILTER (WHERE ml_summary IS NOT NULL) AS documents_with_summaries,
+        COUNT(*) FILTER (WHERE ml_entities IS NOT NULL) AS documents_with_entities,
+        AVG(ml_confidence) AS avg_confidence,
+        AVG(ml_processing_time_seconds) AS avg_processing_time,
+        SUM(pdf_count) AS total_pdfs,
+        SUM(page_count) AS total_pages,
+        MIN(publication_year) AS earliest_year,
+        MAX(publication_year) AS latest_year,
+        NOW() AS last_updated
+    FROM docs
+),
+recent_activity AS (
+    SELECT COALESCE(
+        json_agg(
+            json_build_object(
+                'stage', stage,
+                'status', status,
+                'started_at', started_at,
+                'duration_seconds', duration_seconds
+            )
+            ORDER BY started_at DESC
+        ),
+        '[]'::json
+    ) AS items
+    FROM (
+        SELECT stage, status, started_at, duration_seconds
+        FROM ml_processing_log
+        ORDER BY started_at DESC
+        LIMIT 10
+    ) sub
+)
 SELECT 
-    COUNT(*) as total_documents,
-    COUNT(*) FILTER (WHERE embeddings IS NOT NULL) as documents_with_embeddings,
-    COUNT(*) FILTER (WHERE ml_summary IS NOT NULL) as documents_with_summaries,
-    COUNT(*) FILTER (WHERE ml_entities IS NOT NULL) as documents_with_entities,
-    AVG(ml_confidence) as avg_confidence,
-    AVG(ml_processing_time_seconds) as avg_processing_time,
-    SUM(pdf_count) as total_pdfs,
-    SUM(page_count) as total_pages,
-    MIN(publication_year) as earliest_year,
-    MAX(publication_year) as latest_year,
-    COUNT(DISTINCT unnest(ml_themes)) as unique_themes,
-    NOW() as last_updated
-FROM documents
-WHERE pid IS NOT NULL;
+    agg.total_documents,
+    agg.documents_with_embeddings,
+    agg.documents_with_summaries,
+    agg.documents_with_entities,
+    agg.avg_confidence,
+    agg.avg_processing_time,
+    agg.total_pdfs,
+    agg.total_pages,
+    agg.earliest_year,
+    agg.latest_year,
+    CONCAT(agg.earliest_year, ' - ', agg.latest_year) AS year_range,
+    COALESCE(theme_counts.unique_themes, 0) AS unique_themes,
+    recent_activity.items AS recent_activity,
+    agg.last_updated
+FROM agg
+CROSS JOIN theme_counts
+CROSS JOIN recent_activity;
 
-CREATE UNIQUE INDEX ON ml_dashboard_stats (last_updated);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_ml_dashboard_stats_last_updated ON ml_dashboard_stats (last_updated);
 
 -- Function to refresh dashboard stats
 CREATE OR REPLACE FUNCTION refresh_ml_dashboard_stats()

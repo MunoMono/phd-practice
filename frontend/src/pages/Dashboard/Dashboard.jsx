@@ -25,11 +25,10 @@ const Dashboard = () => {
           <div className="dashboard__hero">
             <div className="dashboard__hero-wrapper">
               <h1 className="dashboard__hero-title">
-                Epistemic shift detection
+                Critical testamentary traces of contested design knowledge using multimodal machine learning and visual analytics
               </h1>
               <p className="dashboard__hero-subtitle">
-                PID-gated NLP for Royal College of Art's Department of Design Research (DDR, 1965-1985). 
-                BERT embeddings + provenance tracking + IBM Granite fine-tuning with full academic attribution.
+                I investigate how institutions record, structure and reshape contested knowledge, and turn that analysis into traceable research outcomes. In my PhD, I do that through the RCA's Department of Design Research archive, using it as a live case of how organizations make some forms of knowledge visible while obscuring others. My practice combines critical analysis, communication design and computational modelling to surface auditable patterns, gaps and signals that conventional research methods often miss.
               </p>
             </div>
           </div>
@@ -54,13 +53,10 @@ const Dashboard = () => {
                   )}
                 </div>
                 <h2 className="dashboard__granite-hero-title">
-                  Enterprise AI for academic research
+                  Enterprise AI for academic research in codifying testamentary traces
                 </h2>
                 <p className="dashboard__granite-hero-description">
-                  IBM Granite is a family of open, performant, and trusted AI models purpose-built for business and optimized for 
-                  scientific tasks. This research platform leverages <strong>Granite 3.1 8B Instruct</strong> with 8-bit quantization 
-                  for efficient CPU-based inference, enabling epistemic shift detection across historical design methods literature 
-                  (1965-1985) with full provenance tracking and formal academic attribution.
+                  PID-gated natural language processing (NLP) framework integrating BERT embeddings with robust provenance tracking and IBM Granite fine-tuning to ensure full academic attribution. IBM Granite, a family of open, performant, and trusted AI models designed for enterprise and scientific applications, underpins the system through the deployment of Granite 3.1 8B Instruct with 8-bit quantization for efficient CPU-based inference.
                 </p>
                 {graniteInfo && (
                   <div className="dashboard__granite-hero-specs">
