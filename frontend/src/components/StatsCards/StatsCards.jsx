@@ -49,6 +49,8 @@ const StatsCards = () => {
     { title: 'Method repertoires for situated research', pid: 'DDR-2024-003' }
   ]
 
+  const [ddrDocumentTitles, setDdrDocumentTitles] = useState([])
+
   useEffect(() => {
     if (useStaticDemo) {
       setStats(demoStats)
@@ -102,6 +104,7 @@ const StatsCards = () => {
               mlTiffCount
               totalMediaCount
             }
+            ddrDocumentTitles
             coreAuthorities
             criticalAuthorities
             totalPidPdfs
@@ -143,12 +146,14 @@ const StatsCards = () => {
       const dashboardStats = dashboardRes.ok ? await dashboardRes.json() : null
       const metrics = result.data.systemMetrics
       const recent = result.data.recentDocuments || []
+      const docTitles = metrics.ddrDocumentTitles || []
       
       // Set recent documents
       setRecentDocs(recent)
       
       // Set PID authorities
       setPidAuthorities(metrics.pidAuthorities || [])
+      setDdrDocumentTitles(docTitles)
       
       const pidCount = (metrics.pidAuthorities || []).length || metrics.pidCount || recent.length || 0
       const pidPdfSum = (metrics.pidAuthorities || []).reduce((sum, auth) => sum + (auth.pdfCount || 0), 0)
@@ -181,7 +186,8 @@ const StatsCards = () => {
         total_pid_pdfs: totalPidPdfs,
           total_pdf_pages: overviewPages,
         core_authorities: metrics.coreAuthorities || 5,
-        critical_authorities: metrics.criticalAuthorities || 0
+        critical_authorities: metrics.criticalAuthorities || 0,
+        ddr_document_titles: docTitles
       })
       setError(null)
     } catch (err) {
@@ -310,6 +316,19 @@ const StatsCards = () => {
               <div className="stats-card__meta">
                 {formatNumber(stats?.total_pdf_pages || 0)} pages processed
               </div>
+              {ddrDocumentTitles.length > 0 && (
+                <div className="stats-card__recent" style={{ marginTop: '8px', fontSize: '0.75rem', color: 'var(--cds-text-secondary)' }}>
+                  <div style={{ fontWeight: '600', marginBottom: '4px' }}>DDR documents (A–Z):</div>
+                  {ddrDocumentTitles.slice(0, 20).map((title, idx) => (
+                    <div key={idx} style={{ paddingLeft: '20px', textIndent: '-12px', marginBottom: '6px' }}>
+                      • {title}
+                    </div>
+                  ))}
+                  {ddrDocumentTitles.length > 20 && (
+                    <div style={{ paddingLeft: '20px', fontStyle: 'italic' }}>… and {ddrDocumentTitles.length - 20} more</div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </Tile>

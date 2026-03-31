@@ -133,6 +133,7 @@ class SystemMetrics:
     core_authorities: int  # 5 core intended categories (provenance)
     critical_authorities: int  # 6 critical categories (ML labels)
     total_pid_pdfs: int  # Total Documents across all PID authorities
+    ddr_document_titles: List[str]  # Alphabetical list of DDR document titles (PID-linked)
 
 
 @strawberry.type
@@ -248,6 +249,26 @@ class Query:
                 db.rollback()
                 logger.error(f"Error fetching PID authorities: {e}")
                 pid_authorities = []
+
+            # Filter out authorities with no media (0 PDFs and 0 TIFFs) to avoid noise in metrics/logs
+            pid_authorities = [
+                auth for auth in pid_authorities
+                if (auth.pdf_count or 0) > 0 or (auth.tiff_count or 0) > 0
+            ]
+
+            # Alphabetical list of DDR document titles (PID-linked only)
+            try:
+                title_rows = db.execute(text("""
+                    SELECT DISTINCT COALESCE(title, '') AS title
+                    FROM documents
+                    WHERE pid IS NOT NULL AND title IS NOT NULL AND title <> ''
+                    ORDER BY title ASC
+                """))
+                ddr_document_titles = [row[0] for row in title_rows.fetchall()]
+            except Exception as e:
+                db.rollback()
+                logger.error(f"Error fetching DDR document titles: {e}")
+                ddr_document_titles = []
             
             # Get database authorities counts
             # 5 core intended categories (provenance): agent_employment, ddr_projects, ref_students, ref_fonds, ref_publication_type
@@ -318,7 +339,8 @@ class Query:
             pid_authorities=pid_authorities,
             core_authorities=core_authorities_count,
             critical_authorities=critical_authorities_count,
-            total_pid_pdfs=total_pid_pdfs
+            total_pid_pdfs=total_pid_pdfs,
+            ddr_document_titles=ddr_document_titles
         )
     
     @strawberry.field

@@ -82,7 +82,11 @@ for record in records:
     year_str = record.get('project_start_date', '1970')
     year = int(year_str[:4]) if year_str and len(year_str) >= 4 else 1970
     
-    metadata = {'pdf_count': pdf_count, 'synced_from': 'ddr_graphql'}
+    metadata = {
+        'pdf_count': pdf_count,
+        'ml_pdf_count': pdf_count,
+        'synced_from': 'ddr_graphql'
+    }
     
     # Check if exists
     result = db.execute(text("SELECT pid FROM documents WHERE pid = :pid"), {'pid': pid})
@@ -94,8 +98,7 @@ for record in records:
                 title = :title,
                 publication_year = :year,
                 pdf_count = :pdf_count,
-                doc_metadata = CAST(:metadata AS jsonb),
-                last_synced_at = NOW()
+                doc_metadata = CAST(:metadata AS jsonb)
             WHERE pid = :pid
         """), {
             'title': title, 'year': year, 'pdf_count': pdf_count,
@@ -106,10 +109,10 @@ for record in records:
         db.execute(text("""
             INSERT INTO documents (
                 document_id, title, publication_year, filename,
-                pid, pdf_count, doc_metadata, last_synced_at
+                pid, pdf_count, doc_metadata
             ) VALUES (
                 :doc_id, :title, :year, :filename,
-                :pid, :pdf_count, CAST(:metadata AS jsonb), NOW()
+                :pid, :pdf_count, CAST(:metadata AS jsonb)
             )
         """), {
             'doc_id': f"doc_pid_{pid}", 'title': title, 'year': year,
