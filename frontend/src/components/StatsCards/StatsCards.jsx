@@ -308,11 +308,11 @@ const StatsCards = () => {
                 size="sm"
               />
               <div className="stats-card__progress-label">
-                {stats?.total_pid_pdfs || 0}/100 Documents ingested
+                {stats?.total_pid_pdfs || 0}/100 documents ingested
               </div>
             </div>
             <div className="stats-card__breakdown">
-              <Tag type="blue" size="sm">Training Corpus</Tag>
+              <Tag type="blue" size="sm">Training corpus</Tag>
               <div className="stats-card__meta">
                 {formatNumber(stats?.total_pdf_pages || 0)} pages processed
               </div>
@@ -343,7 +343,7 @@ const StatsCards = () => {
             <div className="stats-card__number">
               {formatNumber(stats?.core_authorities || 0)}
             </div>
-            <div className="stats-card__label">Core Authorities</div>
+            <div className="stats-card__label">Core authorities</div>
             <div className="stats-card__breakdown">
               <Tag type="purple" size="sm">Provenance</Tag>
               <div className="stats-card__meta" style={{ marginTop: '4px', fontSize: '0.7rem', lineHeight: '1.3' }}>
@@ -363,7 +363,7 @@ const StatsCards = () => {
             <div className="stats-card__number">
               {formatNumber(stats?.critical_authorities || 0)}
             </div>
-            <div className="stats-card__label">Critical Authorities</div>
+            <div className="stats-card__label">Critical authorities</div>
             <div className="stats-card__breakdown">
               <Tag type="teal" size="sm">ML Labels</Tag>
               <div className="stats-card__meta" style={{ marginTop: '4px', fontSize: '0.7rem', lineHeight: '1.3' }}>

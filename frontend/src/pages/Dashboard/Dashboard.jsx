@@ -96,7 +96,7 @@ const Dashboard = () => {
         <Column lg={16} md={8} sm={4}>
           <div className="dashboard__diagram-section">
             <Tag type="blue" size="md" className="dashboard__diagram-badge">
-              <Checkmark size={16} /> PID-Gated Architecture
+              <Checkmark size={16} /> PID-gated architecture
             </Tag>
             <img 
               src="/diagrams/home/phd-model.svg?v=20260227" 

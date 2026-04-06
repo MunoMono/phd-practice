@@ -159,7 +159,7 @@ const ThemeDistribution = () => {
       .attr('dy', '1.5em')
       .style('font-size', '14px')
       .style('fill', carbonColors.gray[70])
-      .text('Total Documents');
+      .text('Total documents');
   };
 
   const renderBarChart = (svg, width, height, margin) => {
@@ -266,7 +266,7 @@ const ThemeDistribution = () => {
       .attr('text-anchor', 'middle')
       .style('font-size', '14px')
       .style('fill', carbonColors.gray[70])
-      .text('Number of Documents');
+      .text('Number of documents');
   };
 
   const createTooltip = () => {
@@ -306,7 +306,7 @@ const ThemeDistribution = () => {
       <div className="chart-controls">
         <Toggle
           id="view-toggle"
-          labelText="Chart Type"
+          labelText="Chart type"
           labelA="Donut"
           labelB="Bar"
           toggled={viewType === 'bar'}

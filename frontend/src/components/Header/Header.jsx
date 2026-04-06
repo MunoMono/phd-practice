@@ -191,7 +191,7 @@ const Header = ({ currentTheme, onThemeToggle }) => {
             onClick={() => handleNavClick('/ml-dashboard')}
             isActive={location.pathname === '/ml-dashboard'}
           >
-            ML Dashboard
+            ML dashboard
           </SideNavLink>
           <SideNavMenu title="DDR Archive">
             <SideNavMenuItem

@@ -25,7 +25,7 @@ const EvidenceTracer = () => {
             </p>
           </div>
           <Tag type="blue" size="md">
-            <Checkmark size={16} /> Provenance Enabled
+            <Checkmark size={16} /> Provenance enabled
           </Tag>
         </div>
       </Column>

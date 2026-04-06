@@ -145,7 +145,7 @@ const GraniteChatPanel = () => {
     <Tile className="granite-chat-tile">
       <div className="granite-chat__header">
         <div>
-          <h4>Granite Archive Chat</h4>
+          <h4>Granite archive chat</h4>
           <p>Query the ingested transcripts directly from the dashboard.</p>
         </div>
         <Tag type="blue">IBM Granite</Tag>
@@ -209,7 +209,7 @@ const GraniteChatPanel = () => {
 
         {loading && (
           <div className="granite-chat__loading">
-            <InlineLoading description="Waiting for Granite response" status="active" />
+            <InlineLoading description="Waiting for Granite response..." status="active" />
           </div>
         )}
       </div>

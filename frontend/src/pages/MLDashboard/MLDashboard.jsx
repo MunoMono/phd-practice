@@ -78,7 +78,7 @@ const MLDashboard = () => {
   if (loading) {
     return (
       <div className="ml-dashboard-loading">
-        <Loading description="Loading ML Dashboard..." withOverlay={false} />
+        <Loading description="Loading ML dashboard..." withOverlay={false} />
       </div>
     );
   }
@@ -92,7 +92,7 @@ const MLDashboard = () => {
         <Column lg={16} md={8} sm={4} className="dashboard-header">
           <div className="header-content">
             <div>
-              <h1>ML Processing Dashboard</h1>
+              <h1>ML processing dashboard</h1>
               <p className="header-subtitle">
                 RCA PhD Research Corpus Analysis & Visualization
               </p>
@@ -103,7 +103,7 @@ const MLDashboard = () => {
               onClick={handleRefresh}
               disabled={refreshing}
             >
-              {refreshing ? 'Refreshing...' : 'Refresh Stats'}
+              {refreshing ? 'Refreshing...' : 'Refresh stats'}
             </Button>
           </div>
         </Column>
@@ -116,7 +116,7 @@ const MLDashboard = () => {
             </div>
             <div className="stats-content">
               <h3 className="stats-number">{stats?.overview?.totalDocuments || 0}</h3>
-              <p className="stats-label">Total Documents</p>
+              <p className="stats-label">Total documents</p>
               <p className="stats-meta">{stats?.overview?.totalPdfs || 0} PDFs</p>
             </div>
           </Tile>
@@ -129,7 +129,7 @@ const MLDashboard = () => {
             </div>
             <div className="stats-content">
               <h3 className="stats-number">{stats?.mlProcessing?.documentsWithEmbeddings || 0}</h3>
-              <p className="stats-label">Embeddings Generated</p>
+              <p className="stats-label">Embeddings generated</p>
               <ProgressBar
                 value={completionRate}
                 label={`${completionRate}% Complete`}
@@ -146,7 +146,7 @@ const MLDashboard = () => {
             </div>
             <div className="stats-content">
               <h3 className="stats-number">{stats?.mlProcessing?.documentsWithEntities || 0}</h3>
-              <p className="stats-label">Entities Extracted</p>
+              <p className="stats-label">Entities extracted</p>
               <p className="stats-meta">
                 Avg Confidence: {(stats?.mlProcessing?.avgConfidence * 100 || 0).toFixed(1)}%
               </p>
@@ -161,7 +161,7 @@ const MLDashboard = () => {
             </div>
             <div className="stats-content">
               <h3 className="stats-number">{stats?.themes?.uniqueThemes || 0}</h3>
-              <p className="stats-label">Unique Themes</p>
+              <p className="stats-label">Unique themes</p>
               <p className="stats-meta">
                 Years: {stats?.overview?.yearRange || 'N/A'}
               </p>
@@ -173,15 +173,15 @@ const MLDashboard = () => {
         <Column lg={16} className="visualization-section">
           <Tabs>
             <TabList aria-label="Visualization tabs" contained>
-              <Tab renderIcon={Network_3}>Document Network</Tab>
-              <Tab renderIcon={DataVis_1}>Theme Distribution</Tab>
-              <Tab renderIcon={ChartLine}>Temporal Trends</Tab>
-              <Tab renderIcon={Search}>Entity Network</Tab>
+              <Tab renderIcon={Network_3}>Document network</Tab>
+              <Tab renderIcon={DataVis_1}>Theme distribution</Tab>
+              <Tab renderIcon={ChartLine}>Temporal trends</Tab>
+              <Tab renderIcon={Search}>Entity network</Tab>
             </TabList>
             <TabPanels>
               <TabPanel>
                 <Tile className="visualization-tile">
-                  <h4>Document Similarity Network</h4>
+                  <h4>Document similarity network</h4>
                   <p className="tile-description">
                     Interactive network showing relationships between documents based on semantic similarity,
                     shared themes, and entity overlap. Node size represents PDF count.
@@ -192,7 +192,7 @@ const MLDashboard = () => {
               
               <TabPanel>
                 <Tile className="visualization-tile">
-                  <h4>Theme Distribution Analysis</h4>
+                  <h4>Theme distribution analysis</h4>
                   <p className="tile-description">
                     Distribution of themes across the research corpus. Colors from Carbon Design palette.
                   </p>
@@ -202,7 +202,7 @@ const MLDashboard = () => {
               
               <TabPanel>
                 <Tile className="visualization-tile">
-                  <h4>Publication Timeline</h4>
+                  <h4>Publication timeline</h4>
                   <p className="tile-description">
                     Document publication trends over time with theme evolution.
                   </p>
@@ -212,7 +212,7 @@ const MLDashboard = () => {
               
               <TabPanel>
                 <Tile className="visualization-tile">
-                  <h4>Entity Co-occurrence Network</h4>
+                  <h4>Entity co-occurrence network</h4>
                   <p className="tile-description">
                     Network of people, organizations, and concepts mentioned across documents.
                   </p>
@@ -230,7 +230,7 @@ const MLDashboard = () => {
         {/* Recent Activity */}
         <Column lg={16}>
           <Tile className="activity-tile">
-            <h4>Recent ML Processing Activity</h4>
+            <h4>Recent ML processing activity</h4>
             <div className="activity-table">
               {stats?.recentActivity && stats.recentActivity.length > 0 ? (
                 <DataTable
@@ -242,7 +242,7 @@ const MLDashboard = () => {
                     { key: 'stage', header: 'Stage' },
                     { key: 'status', header: 'Status' },
                     { key: 'count', header: 'Count' },
-                    { key: 'avgDuration', header: 'Avg Duration (s)' },
+                    { key: 'avgDuration', header: 'Avg duration (s)' },
                   ]}
                 >
                   {({ rows, headers, getTableProps, getHeaderProps, getRowProps }) => (
@@ -287,7 +287,7 @@ const MLDashboard = () => {
                   )}
                 </DataTable>
               ) : (
-                <p className="no-activity">No recent activity in the last 24 hours</p>
+                <p className="no-activity">No recent activity in the last 24 hours.</p>
               )}
             </div>
             <p className="activity-footer">

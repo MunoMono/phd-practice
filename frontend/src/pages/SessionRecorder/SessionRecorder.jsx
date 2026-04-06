@@ -6,7 +6,7 @@ const SessionRecorder = () => {
   const headers = [
     { key: 'timestamp', header: 'Timestamp' },
     { key: 'query', header: 'Query' },
-    { key: 'chunks', header: 'Retrieved Chunks' },
+    { key: 'chunks', header: 'Retrieved chunks' },
     { key: 'confidence', header: 'Confidence' }
   ]
 
@@ -32,7 +32,7 @@ const SessionRecorder = () => {
             </p>
           </div>
           <Tag type="green" size="md">
-            <Recording size={16} /> XAI Enabled
+            <Recording size={16} /> XAI enabled
           </Tag>
         </div>
       </Column>
