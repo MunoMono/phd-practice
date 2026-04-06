@@ -16,6 +16,9 @@ COPY requirements.txt .
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Keep docling explicitly pinned in the image for ingestion scripts.
+RUN pip install --no-cache-dir --prefer-binary docling==2.15.0
+
 # Copy application code
 COPY . .
 

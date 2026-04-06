@@ -154,6 +154,138 @@
   }
 }
 
+.granite-chat-tile {
+  padding: $spacing-06;
+  margin-bottom: $spacing-07;
+}
+
+.granite-chat__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: $spacing-05;
+  margin-bottom: $spacing-05;
+
+  h4 {
+    @include type-style('heading-03');
+    color: $text-primary;
+    margin-bottom: $spacing-02;
+  }
+
+  p {
+    @include type-style('body-01');
+    color: $text-secondary;
+  }
+}
+
+.granite-chat__history {
+  max-height: 28rem;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-04;
+  padding: $spacing-02 0 $spacing-05;
+  margin-bottom: $spacing-05;
+  border-top: 1px solid $border-subtle-01;
+  border-bottom: 1px solid $border-subtle-01;
+}
+
+.granite-chat__message {
+  max-width: 88%;
+  padding: $spacing-04;
+  border-radius: 1rem;
+  background: $layer-accent-01;
+}
+
+.granite-chat__message--user {
+  align-self: flex-end;
+  background: $layer-selected-inverse;
+  color: $text-inverse;
+
+  .granite-chat__message-body,
+  .granite-chat__meta {
+    color: $text-inverse;
+  }
+}
+
+.granite-chat__message--assistant {
+  align-self: flex-start;
+}
+
+.granite-chat__message-head {
+  margin-bottom: $spacing-03;
+}
+
+.granite-chat__message-body {
+  @include type-style('body-01');
+  white-space: pre-wrap;
+  color: $text-primary;
+}
+
+.granite-chat__meta {
+  display: flex;
+  gap: $spacing-05;
+  flex-wrap: wrap;
+  margin-top: $spacing-03;
+  @include type-style('helper-text-01');
+  color: $text-secondary;
+}
+
+.granite-chat__loading {
+  padding: $spacing-03 0;
+}
+
+.granite-chat__sources {
+  margin-top: $spacing-04;
+  padding-top: $spacing-03;
+  border-top: 1px solid $border-subtle-01;
+}
+
+.granite-chat__sources-label {
+  @include type-style('label-01');
+  color: $text-secondary;
+  display: block;
+  margin-bottom: $spacing-02;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.granite-chat__source-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-03;
+}
+
+.granite-chat__source-item {
+  @include type-style('helper-text-01');
+  line-height: 1.5;
+}
+
+.granite-chat__source-quote {
+  font-style: italic;
+  color: $text-primary;
+}
+
+.granite-chat__source-ref {
+  color: $text-secondary;
+}
+
+.granite-chat__source-pid {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.7rem;
+  color: $text-placeholder;
+}
+
+.granite-chat__composer {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: $spacing-04;
+  align-items: end;
+}
+
 // Carbon DataTable overrides
 .activity-tile {
   .cds--data-table {
@@ -194,5 +326,21 @@
 
   .activity-tile {
     padding: $spacing-05;
+  }
+
+  .granite-chat-tile {
+    padding: $spacing-05;
+  }
+
+  .granite-chat__header {
+    flex-direction: column;
+  }
+
+  .granite-chat__message {
+    max-width: 100%;
+  }
+
+  .granite-chat__composer {
+    grid-template-columns: 1fr;
   }
 }

@@ -1,83 +1,140 @@
-"""
-Granite LLM Service for Epistemic Drift Analysis
+"""Granite service backed by a local quantized GGUF runtime (Ollama)."""
 
-This service manages IBM Granite model loading, inference, and integration
-with the provenance system for academically rigorous AI outputs.
-"""
-
+import asyncio
 import logging
-from typing import Optional, Dict, Any, List
-import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
-from datetime import datetime
 import os
+from datetime import datetime
+from enum import Enum
+from typing import Any, Dict, List, Optional
+
+import httpx
+import psutil
 
 logger = logging.getLogger(__name__)
 
 
+class ModelStatus(Enum):
+    """Model loading status states."""
+    NOT_LOADED = "not_loaded"
+    LOADING = "loading"
+    READY = "ready"
+    ERROR = "error"
+
+
 class GraniteService:
-    """Service for managing Granite LLM inference with provenance tracking."""
+    """Low-resource Granite inference service via local Ollama HTTP API."""
     
     def __init__(self):
         self.model = None
         self.tokenizer = None
-        self.model_name = os.getenv("GRANITE_MODEL_PATH", "ibm-granite/granite-3.1-8b-instruct")
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        self.max_new_tokens = int(os.getenv("GRANITE_MAX_TOKENS", "512"))
-        self.temperature = float(os.getenv("GRANITE_TEMPERATURE", "0.7"))
+        # Quantized Granite-compatible runtime model tag.
+        self.model_name = os.getenv("OLLAMA_MODEL", "granite3.1-dense:2b-instruct-q4_K_M")
+        self.ollama_base_url = os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434")
+        self.device = "cpu"
+        self.max_new_tokens = int(os.getenv("GRANITE_MAX_TOKENS", "384"))
+        self.temperature = float(os.getenv("GRANITE_TEMPERATURE", "0.2"))
+        self.max_input_chars = int(os.getenv("GRANITE_MAX_INPUT_CHARS", "6000"))
+        self.timeout_seconds = int(os.getenv("GRANITE_TIMEOUT_SECONDS", "45"))
+        self._lock = asyncio.Lock()
+
+        self._status = ModelStatus.NOT_LOADED
+        self._error_message: Optional[str] = None
         
     def load_model(self) -> bool:
+        """Validate local Ollama runtime and ensure model is available."""
+        try:
+            self._status = ModelStatus.LOADING
+            self._error_message = None
+
+            logger.info(f"Validating Ollama runtime at {self.ollama_base_url}")
+            logger.info(f"Target model tag: {self.model_name}")
+            with httpx.Client(timeout=30.0) as client:
+                health = client.get(f"{self.ollama_base_url}/api/tags")
+                health.raise_for_status()
+                tags = health.json().get("models", [])
+                installed = {m.get("name") for m in tags if m.get("name")}
+
+                if self.model_name not in installed:
+                    logger.info(f"Model not present locally, pulling: {self.model_name}")
+                    pull_resp = client.post(
+                        f"{self.ollama_base_url}/api/pull",
+                        json={"name": self.model_name, "stream": False},
+                    )
+                    pull_resp.raise_for_status()
+                    logger.info(f"Model pull completed: {self.model_name}")
+
+            # Keep compatibility with existing route checks.
+            self.model = {"runtime": "ollama", "model": self.model_name}
+            self.tokenizer = {"runtime": "ollama"}
+
+            self._status = ModelStatus.READY
+            logger.info("Ollama Granite runtime ready")
+            return True
+
+        except Exception as e:
+            self._status = ModelStatus.ERROR
+            self._error_message = str(e)
+            logger.exception(f"Failed to initialize Ollama Granite runtime: {e}")
+            return False
+
+    def get_load_status(self) -> Dict[str, Any]:
         """
-        Load Granite model with 8-bit quantization for memory efficiency.
+        Get current model load status, memory usage, and any error.
         
         Returns:
-            bool: True if model loaded successfully, False otherwise
+            Dict with model_status, last_error, memory_usage_mb
         """
+        status = self._status.value
+        error = self._error_message
+
+        # Get memory usage (safe to call outside lock)
         try:
-            logger.info(f"Loading Granite model: {self.model_name}")
-            logger.info(f"Device: {self.device}")
-            
-            # Configure 8-bit quantization for memory efficiency
-            quantization_config = BitsAndBytesConfig(
-                load_in_8bit=True,
-                llm_int8_threshold=6.0,
-                llm_int8_has_fp16_weight=False,
-            ) if self.device == "cuda" else None
-            
-            # Load tokenizer
-            logger.info("Loading tokenizer...")
-            self.tokenizer = AutoTokenizer.from_pretrained(
-                self.model_name,
-                trust_remote_code=True
-            )
-            
-            # Load model
-            logger.info("Loading model (this may take a few minutes)...")
-            model_kwargs = {
-                "trust_remote_code": True,
-                "torch_dtype": torch.float16 if self.device == "cuda" else torch.float32,
-            }
-            
-            if quantization_config:
-                model_kwargs["quantization_config"] = quantization_config
-                model_kwargs["device_map"] = "auto"
-            
-            self.model = AutoModelForCausalLM.from_pretrained(
-                self.model_name,
-                **model_kwargs
-            )
-            
-            if self.device == "cpu" and quantization_config is None:
-                self.model = self.model.to(self.device)
-            
-            logger.info(f"✓ Granite model loaded successfully on {self.device}")
-            return True
-            
+            memory_mb = psutil.Process(os.getpid()).memory_info().rss / 1024 / 1024
         except Exception as e:
-            logger.error(f"Failed to load Granite model: {str(e)}")
-            return False
+            logger.warning(f"Could not read memory usage: {e}")
+            memory_mb = None
+
+        return {
+            "model_status": status,
+            "model_ready": status == "ready",
+            "last_error": error,
+            "model_loaded": self.model is not None and self.tokenizer is not None,
+            "memory_usage_mb": round(memory_mb, 1) if memory_mb else None
+        }
+
     
-    def generate_analysis(
+    async def _generate_via_ollama(
+        self,
+        prompt: str,
+        max_tokens: Optional[int] = None,
+        temperature: Optional[float] = None,
+    ) -> str:
+        """Generate text via Ollama local HTTP API."""
+        generation_max_tokens = min(max_tokens or self.max_new_tokens, 384)
+        generation_temperature = self.temperature if temperature is None else temperature
+
+        payload = {
+            "model": self.model_name,
+            "prompt": prompt,
+            "stream": False,
+            "options": {
+                "num_predict": generation_max_tokens,
+                "temperature": generation_temperature,
+            },
+        }
+
+        timeout = httpx.Timeout(self.timeout_seconds)
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            response = await client.post(f"{self.ollama_base_url}/api/generate", json=payload)
+            response.raise_for_status()
+            data = response.json()
+
+        generated = data.get("response", "")
+        if not generated:
+            raise RuntimeError("Empty response from Ollama /api/generate")
+        return generated.strip()
+
+    async def generate_analysis(
         self,
         query: str,
         context_chunks: List[Dict[str, Any]],
@@ -95,37 +152,41 @@ class GraniteService:
             
         Returns:
             Dict containing analysis text, metadata, and timing info
+            
+        Raises:
+            RuntimeError if model not loaded or loading in progress
         """
-        if self.model is None or self.tokenizer is None:
-            raise RuntimeError("Granite model not loaded. Call load_model() first.")
+        status_info = self.get_load_status()
+        
+        if status_info["model_status"] == "not_loaded":
+            raise RuntimeError("Granite model not loaded. Call /api/granite/load-model to load it.")
+        elif status_info["model_status"] == "loading":
+            raise RuntimeError("Granite model is still loading. Check /api/granite/load-status and retry.")
+        elif status_info["model_status"] == "error":
+            raise RuntimeError(f"Granite model load failed: {status_info.get('last_error', 'unknown error')}")
+        
+        if self.model is None:
+            raise RuntimeError("Granite model not loaded.")
         
         start_time = datetime.now()
         
-        # Build prompt with context
         prompt = self._build_prompt(query, context_chunks)
-        
-        # Tokenize
-        inputs = self.tokenizer(prompt, return_tensors="pt")
-        if self.device == "cuda":
-            inputs = {k: v.to(self.device) for k, v in inputs.items()}
-        
-        # Generate
-        logger.info(f"Generating response for query: {query[:100]}...")
-        with torch.no_grad():
-            outputs = self.model.generate(
-                **inputs,
-                max_new_tokens=max_tokens or self.max_new_tokens,
-                temperature=temperature or self.temperature,
-                do_sample=True,
-                top_p=0.95,
-                pad_token_id=self.tokenizer.eos_token_id
-            )
-        
-        # Decode
-        response = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
-        
-        # Extract only the generated portion (remove prompt)
-        generated_text = response[len(prompt):].strip()
+
+        async with self._lock:
+            logger.info(f"Generating response for query: {query[:100]}...")
+            try:
+                generated_text = await asyncio.wait_for(
+                    self._generate_via_ollama(
+                        prompt,
+                        max_tokens,
+                        temperature,
+                    ),
+                    timeout=self.timeout_seconds,
+                )
+            except asyncio.TimeoutError as exc:
+                raise RuntimeError(
+                    f"Granite inference timed out after {self.timeout_seconds}s"
+                ) from exc
         
         end_time = datetime.now()
         inference_time = (end_time - start_time).total_seconds()
@@ -153,7 +214,6 @@ class GraniteService:
         Returns:
             Formatted prompt string
         """
-        # Format context with citations
         context_parts = []
         for i, chunk in enumerate(context_chunks, 1):
             text = chunk.get("text", "")
@@ -162,44 +222,59 @@ class GraniteService:
         
         context_text = "\n\n".join(context_parts)
         
-        # Build prompt following Granite instruction format
-        prompt = f"""You are an expert in design methods research, analyzing historical literature from 1965-1985.
+        prompt = f"""You are an archival research analyst specialising in design history. Answer the question below using only the sources provided.
 
-Your task is to analyze the following archival sources to answer a research question about epistemic drift in design theory.
-
-IMPORTANT GUIDELINES:
-1. Base your analysis ONLY on the provided sources
-2. Cite specific sources using [1], [2], etc. when making claims
-3. If sources don't contain enough information, say so explicitly
-4. Focus on epistemological assumptions and theoretical frameworks
-5. Note any shifts in terminology, concepts, or methodological approaches
+Rules:
+- Write 150–250 words maximum.
+- Be specific: quote or paraphrase exact details from the sources rather than restating generic themes.
+- Use short paragraphs or bullet points.
+- Where sources differ or contradict each other, name the tension explicitly.
+- Cite inline with [1], [2], etc. only when the source directly supports the claim. Do not invent citations.
+- Do not open with "Based on the sources" or any similar preamble. Start with substance.
+- If the sources do not contain enough information to answer, say so in one sentence.
 
 SOURCES:
 {context_text}
 
-RESEARCH QUESTION:
-{query}
+QUESTION: {query}
 
-ANALYSIS:
+ANSWER:
 """
-        
+
+        if len(prompt) > self.max_input_chars:
+            return prompt[:self.max_input_chars]
+
         return prompt
     
     def get_model_info(self) -> Dict[str, Any]:
         """
-        Get information about the loaded model.
+        Get information about the loaded model and its status.
         
         Returns:
-            Dict with model metadata
+            Dict with model metadata and current loading status
         """
+        status_info = self.get_load_status()
+        
         return {
             "model_name": self.model_name,
             "device": self.device,
             "loaded": self.model is not None,
+            "model_status": status_info["model_status"],
             "max_tokens": self.max_new_tokens,
             "temperature": self.temperature,
-            "quantized": "8bit" if self.device == "cuda" else "none"
+            "quantized": "q4_gguf_via_ollama",
+            "memory_usage_mb": status_info["memory_usage_mb"],
+            "last_error": status_info["last_error"],
+            "runtime": "ollama",
+            "base_url": self.ollama_base_url,
         }
+
+    def unload_model(self) -> None:
+        """Reset service-side loaded state; Ollama process keeps model lifecycle."""
+        self.model = None
+        self.tokenizer = None
+        self._status = ModelStatus.NOT_LOADED
+        self._error_message = None
 
 
 # Global instance

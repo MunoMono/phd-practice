@@ -47,10 +47,10 @@ class Settings(BaseSettings):
         return f"postgresql://{self.DDR_POSTGRES_USER}:{self.DDR_POSTGRES_PASSWORD}@{self.DDR_POSTGRES_HOST}:{self.DDR_POSTGRES_PORT}/{self.DDR_POSTGRES_DB}"
     
     # Granite Model
-    GRANITE_MODEL_PATH: str = "ibm-granite/granite-4.0-h-small-instruct"
-    GRANITE_DEVICE: str = "cuda"  # or "cpu"
-    MAX_TOKENS: int = 2048
-    TEMPERATURE: float = 0.7
+    GRANITE_MODEL_PATH: str = "ibm-granite/granite-3.1-2b-instruct"
+    GRANITE_DEVICE: str = "cpu"
+    MAX_TOKENS: int = 384
+    TEMPERATURE: float = 0.2
     
     # Vector DB
     EMBEDDING_MODEL: str = "sentence-transformers/all-MiniLM-L6-v2"

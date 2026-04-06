@@ -23,3 +23,6 @@ bitsandbytes==0.42.0
 
 # S3 storage
 boto3==1.35.60
+
+# System monitoring
+psutil==6.0.0

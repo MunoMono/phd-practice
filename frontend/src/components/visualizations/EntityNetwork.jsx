@@ -2,9 +2,11 @@ import React, { useEffect, useRef, useState } from 'react';
 import * as d3 from 'd3';
 import { Loading, Tag } from '@carbon/react';
 import { carbonColors, d3Scales, chartStyles, animations } from '../../utils/carbonD3Theme';
+import getApiBaseUrl from '../../utils/apiBaseUrl';
 import './EntityNetwork.scss';
 
 const EntityNetwork = () => {
+  const apiBaseUrl = getApiBaseUrl();
   const svgRef = useRef();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -36,7 +38,7 @@ const EntityNetwork = () => {
 
   const fetchEntityData = async () => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/viz/entity-network`);
+      const response = await fetch(`${apiBaseUrl}/api/viz/entity-network`);
       const entityData = await response.json();
       setData(entityData);
     } catch (error) {

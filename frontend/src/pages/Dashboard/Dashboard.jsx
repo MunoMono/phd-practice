@@ -46,9 +46,9 @@ const Dashboard = () => {
                     <Chip size={20} /> Powered by IBM Granite
                   </Tag>
                   {graniteInfo && (
-                    <Tag type={graniteInfo.is_loaded ? 'green' : 'gray'} size="md">
-                      {graniteInfo.is_loaded ? <Checkmark size={16} /> : <InProgress size={16} />}
-                      {graniteInfo.is_loaded ? ' Active' : ' Standby'}
+                    <Tag type={graniteInfo.loaded ? 'green' : 'gray'} size="md">
+                      {graniteInfo.loaded ? <Checkmark size={16} /> : <InProgress size={16} />}
+                      {graniteInfo.loaded ? ' Active' : ' Standby'}
                     </Tag>
                   )}
                 </div>
@@ -56,27 +56,27 @@ const Dashboard = () => {
                   Enterprise AI for academic research in codifying testamentary traces
                 </h2>
                 <p className="dashboard__granite-hero-description">
-                  PID-gated natural language processing (NLP) framework integrating BERT embeddings with robust provenance tracking and IBM Granite fine-tuning to ensure full academic attribution. IBM Granite, a family of open, performant, and trusted AI models designed for enterprise and scientific applications, underpins the system through the deployment of Granite 3.1 8B Instruct with 8-bit quantization for efficient CPU-based inference.
+                  PID-gated natural language processing (NLP) framework integrating BERT embeddings with robust provenance tracking and IBM Granite fine-tuning to ensure full academic attribution. IBM Granite, a family of open, performant, and trusted AI models designed for enterprise and scientific applications, underpins the system through the deployment of Granite 3.1 2B Instruct with 4-bit quantization (q4_K_M), served via Ollama for efficient CPU-based inference.
                 </p>
                 {graniteInfo && (
                   <div className="dashboard__granite-hero-specs">
                     <div className="dashboard__granite-hero-spec">
                       <span className="dashboard__granite-hero-spec-label">Model</span>
-                      <span className="dashboard__granite-hero-spec-value">{graniteInfo.model_name || 'granite-3.1-8b-instruct'}</span>
+                      <span className="dashboard__granite-hero-spec-value">{graniteInfo.model_name || 'granite3.1-dense:2b-instruct-q4_K_M'}</span>
                     </div>
                     <div className="dashboard__granite-hero-spec">
                       <span className="dashboard__granite-hero-spec-label">Device</span>
                       <span className="dashboard__granite-hero-spec-value">{graniteInfo.device || 'CPU'}</span>
                     </div>
-                    {graniteInfo.config && (
+                    {graniteInfo.max_tokens != null && (
                       <>
                         <div className="dashboard__granite-hero-spec">
                           <span className="dashboard__granite-hero-spec-label">Max Tokens</span>
-                          <span className="dashboard__granite-hero-spec-value">{graniteInfo.config.max_tokens}</span>
+                          <span className="dashboard__granite-hero-spec-value">{graniteInfo.max_tokens}</span>
                         </div>
                         <div className="dashboard__granite-hero-spec">
                           <span className="dashboard__granite-hero-spec-label">Temperature</span>
-                          <span className="dashboard__granite-hero-spec-value">{graniteInfo.config.temperature}</span>
+                          <span className="dashboard__granite-hero-spec-value">{graniteInfo.temperature}</span>
                         </div>
                       </>
                     )}

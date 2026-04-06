@@ -35,9 +35,12 @@ import DocumentNetwork from '../../components/visualizations/DocumentNetwork';
 import ThemeDistribution from '../../components/visualizations/ThemeDistribution';
 import TemporalTrends from '../../components/visualizations/TemporalTrends';
 import EntityNetwork from '../../components/visualizations/EntityNetwork';
+import GraniteChatPanel from './GraniteChatPanel';
+import getApiBaseUrl from '../../utils/apiBaseUrl';
 import './MLDashboard.scss';
 
 const MLDashboard = () => {
+  const apiBaseUrl = getApiBaseUrl();
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -48,7 +51,7 @@ const MLDashboard = () => {
 
   const fetchDashboardStats = async () => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/viz/dashboard-stats`);
+      const response = await fetch(`${apiBaseUrl}/api/viz/dashboard-stats`);
       const data = await response.json();
       setStats(data);
     } catch (error) {
@@ -61,7 +64,7 @@ const MLDashboard = () => {
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
-      await fetch(`${import.meta.env.VITE_API_URL}/api/viz/refresh-stats`, {
+      await fetch(`${apiBaseUrl}/api/viz/refresh-stats`, {
         method: 'POST'
       });
       await fetchDashboardStats();
@@ -218,6 +221,10 @@ const MLDashboard = () => {
               </TabPanel>
             </TabPanels>
           </Tabs>
+        </Column>
+
+        <Column lg={16}>
+          <GraniteChatPanel />
         </Column>
 
         {/* Recent Activity */}

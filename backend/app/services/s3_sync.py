@@ -6,17 +6,18 @@ import logging
 import re
 import tempfile
 import os
+import shutil
 from typing import List, Dict, Optional
 import boto3
 from botocore.exceptions import ClientError
 import uuid
 from datetime import datetime
+from sqlalchemy import text
 
 from app.core.config import settings
 from app.core.database import LocalSessionLocal
 from app.models.document import Document, DocumentChunk
 from app.services.docling_processor import DoclingProcessor
-from app.services.embedding_service import EmbeddingService
 from app.services.authority_service import AuthorityService
 
 logger = logging.getLogger(__name__)
@@ -28,10 +29,48 @@ class S3SyncService:
     def __init__(self):
         self.s3_client = None
         self.docling = DoclingProcessor()
-        self.embeddings = EmbeddingService()
         self.authorities = AuthorityService()  # For PID validation and metadata enrichment
+        self.min_free_gb = float(os.getenv("INGEST_MIN_FREE_GB", "10"))
         self._init_s3_client()
         self._valid_pids_cache = None  # Cache of PIDs from Postgres authorities
+
+    def _get_free_disk_gb(self, path: str = "/") -> float:
+        """Return free disk space in GB for resource safety checks."""
+        usage = shutil.disk_usage(path)
+        return usage.free / (1024 ** 3)
+
+    def _upsert_ingestion_state(
+        self,
+        db,
+        source_key: str,
+        status: str,
+        error: Optional[str] = None,
+    ) -> None:
+        """Store resumable ingestion state per source asset."""
+        db.execute(
+            text(
+                """
+                INSERT INTO ingestion_state (source_key, status, last_error, updated_at, retries)
+                VALUES (
+                    :source_key,
+                    :status,
+                    :error,
+                    NOW(),
+                    CASE WHEN :status = 'failed' THEN 1 ELSE 0 END
+                )
+                ON CONFLICT (source_key)
+                DO UPDATE SET
+                    status = EXCLUDED.status,
+                    last_error = EXCLUDED.last_error,
+                    updated_at = NOW(),
+                    retries = CASE
+                        WHEN EXCLUDED.status = 'failed' THEN ingestion_state.retries + 1
+                        ELSE ingestion_state.retries
+                    END
+                """
+            ),
+            {"source_key": source_key, "status": status, "error": error},
+        )
     
     def _init_s3_client(self):
         """Initialize S3 client for DigitalOcean Spaces"""
@@ -242,7 +281,7 @@ class S3SyncService:
         temp_path: str
     ) -> Optional[str]:
         """
-        Process a PDF/TIFF: extract text, generate embeddings, store in DB
+        Process a PDF/TIFF: extract text and store chunks in DB
         
         CRITICAL: Requires PID in pdf_info - only authority-linked assets are processed
         
@@ -265,7 +304,12 @@ class S3SyncService:
             
             if existing:
                 logger.info(f"Document {pdf_info['key']} already processed (PID: {existing.pid})")
+                self._upsert_ingestion_state(db, pdf_info['key'], 'completed')
+                db.commit()
                 return existing.document_id
+
+            self._upsert_ingestion_state(db, pdf_info['key'], 'processing')
+            db.commit()
             
             # Generate document ID
             document_id = f"doc_{uuid.uuid4().hex[:12]}"
@@ -301,6 +345,7 @@ class S3SyncService:
             if result['status'] == 'failed':
                 doc.processing_status = 'failed'
                 doc.processing_error = result.get('error')
+                self._upsert_ingestion_state(db, pdf_info['key'], 'failed', result.get('error'))
                 db.commit()
                 return None
             
@@ -308,18 +353,13 @@ class S3SyncService:
             doc.extracted_text = result.get('text', '')
             doc.has_diagrams = len(result.get('diagrams', []))
             
-            # Chunk text for embeddings
-            chunks_text = self.docling.chunk_text(doc.extracted_text)
+            # Chunk text for lightweight full-text retrieval
+            chunks_text = self.docling.chunk_text(doc.extracted_text, chunk_size=800, overlap=120)
             
             logger.info(f"Generated {len(chunks_text)} chunks from {pdf_info['filename']}")
-            
-            # Generate embeddings for each chunk
-            embeddings = self.embeddings.generate_batch_embeddings(chunks_text)
-            
-            # Store chunks with embeddings
-            for idx, (chunk_text, embedding) in enumerate(zip(chunks_text, embeddings)):
-                if not embedding:
-                    continue
+
+            # Store chunks only (FTS retrieval path)
+            for idx, chunk_text in enumerate(chunks_text):
                 
                 chunk_id = f"{document_id}_chunk_{idx}"
                 
@@ -330,8 +370,8 @@ class S3SyncService:
                     chunk_index=idx,
                     chunk_type='paragraph',
                     publication_year=doc.publication_year,
-                    embedding_vector=str(embedding),  # Store as JSON string
-                    embedding_model=self.embeddings.model_name
+                    embedding_vector=None,
+                    embedding_model=None,
                 )
                 
                 db.add(chunk)
@@ -339,6 +379,7 @@ class S3SyncService:
             # Mark as completed
             doc.processing_status = 'completed'
             doc.processed_at = datetime.utcnow()
+            self._upsert_ingestion_state(db, pdf_info['key'], 'completed')
             
             db.commit()
             logger.info(f"Successfully processed {pdf_info['filename']}")
@@ -354,7 +395,9 @@ class S3SyncService:
                 if doc:
                     doc.processing_status = 'failed'
                     doc.processing_error = str(e)
-                    db.commit()
+            if 'key' in pdf_info:
+                self._upsert_ingestion_state(db, pdf_info['key'], 'failed', str(e))
+            db.commit()
             return None
             
         finally:
@@ -378,7 +421,7 @@ class S3SyncService:
                 'skipped': 0
             }
         
-        pdfs = self.list_pdfs_in_bucket()
+        pdfs = self.list_training_assets_in_bucket(enforce_pid_filter=True)
         
         if not pdfs:
             return {
@@ -404,10 +447,30 @@ class S3SyncService:
         
         for pdf_info in pdfs:
             try:
+                free_gb = self._get_free_disk_gb("/")
+                if free_gb < self.min_free_gb:
+                    logger.error(
+                        "Stopping ingestion due to low disk space: %.2fGB free < %.2fGB threshold",
+                        free_gb,
+                        self.min_free_gb,
+                    )
+                    break
+
                 # Download PDF
                 temp_path = self.download_pdf_from_s3(pdf_info['key'])
                 
                 if not temp_path:
+                    db = LocalSessionLocal()
+                    try:
+                        self._upsert_ingestion_state(
+                            db,
+                            pdf_info['key'],
+                            'failed',
+                            'Failed to download from S3',
+                        )
+                        db.commit()
+                    finally:
+                        db.close()
                     failed += 1
                     continue
                 

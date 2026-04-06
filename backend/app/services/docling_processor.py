@@ -3,6 +3,7 @@ Docling document processing service
 Extracts text from PDFs and TIFFs (OCR for images)
 """
 import logging
+import os
 from typing import Dict, List, Optional
 from pathlib import Path
 import tempfile
@@ -15,6 +16,7 @@ class DoclingProcessor:
     
     def __init__(self):
         self.temp_dir = tempfile.gettempdir()
+        self.enable_ocr = os.getenv("DOCLING_ENABLE_OCR", "false").lower() == "true"
     
     async def process_document(
         self, 
@@ -41,7 +43,7 @@ class DoclingProcessor:
     async def process_pdf(
         self, 
         pdf_path: str,
-        extract_diagrams: bool = True
+        extract_diagrams: bool = False
     ) -> Dict:
         """
         Process PDF with Docling
@@ -54,11 +56,20 @@ class DoclingProcessor:
             Dict with extracted text, diagrams, metadata
         """
         try:
-            # TODO: Implement Docling processing
-            # For now, return mock structure
-            
-            result = {
-                "text": "",
+            logger.info(f"Processing PDF with Docling: {pdf_path}")
+
+            from docling.document_converter import DocumentConverter
+
+            converter = DocumentConverter()
+            conversion = converter.convert(pdf_path)
+            document = conversion.document if conversion else None
+
+            extracted_text = ""
+            if document is not None:
+                extracted_text = document.export_to_markdown() or ""
+
+            return {
+                "text": extracted_text,
                 "diagrams": [],
                 "metadata": {
                     "pages": 0,
@@ -66,20 +77,9 @@ class DoclingProcessor:
                     "extraction_method": "docling",
                     "file_type": "pdf"
                 },
-                "status": "pending",
+                "status": "completed",
                 "error": None
             }
-            
-            # Placeholder for Docling implementation
-            logger.info(f"Processing PDF: {pdf_path}")
-            
-            # When implemented, will use:
-            # from docling.document_converter import DocumentConverter
-            # converter = DocumentConverter()
-            # result = converter.convert(pdf_path)
-            # text = result.document.export_to_markdown()
-            
-            return result
             
         except Exception as e:
             logger.error(f"Error processing PDF with Docling: {e}")
@@ -102,33 +102,41 @@ class DoclingProcessor:
             Dict with OCR'd text and metadata
         """
         try:
-            # TODO: Implement Docling TIFF/OCR processing
-            # Docling supports image-based documents with OCR
-            
-            result = {
-                "text": "",
+            if not self.enable_ocr:
+                return {
+                    "text": "",
+                    "diagrams": [],
+                    "metadata": {
+                        "has_diagrams": False,
+                        "extraction_method": "skipped_ocr",
+                        "file_type": "tiff"
+                    },
+                    "status": "completed",
+                    "error": None
+                }
+
+            logger.info(f"Processing TIFF with Docling OCR: {tiff_path}")
+
+            from docling.document_converter import DocumentConverter
+            from docling.datamodel.pipeline_options import PipelineOptions
+
+            options = PipelineOptions(do_ocr=True)
+            converter = DocumentConverter(pipeline_options=options)
+            conversion = converter.convert(tiff_path)
+            document = conversion.document if conversion else None
+            extracted_text = document.export_to_markdown() if document else ""
+
+            return {
+                "text": extracted_text or "",
                 "diagrams": [],
                 "metadata": {
                     "has_diagrams": False,
                     "extraction_method": "docling_ocr",
                     "file_type": "tiff"
                 },
-                "status": "pending",
+                "status": "completed",
                 "error": None
             }
-            
-            logger.info(f"Processing TIFF with OCR: {tiff_path}")
-            
-            # When implemented:
-            # from docling.document_converter import DocumentConverter
-            # from docling.datamodel.pipeline_options import PipelineOptions
-            # 
-            # options = PipelineOptions(do_ocr=True)
-            # converter = DocumentConverter(pipeline_options=options)
-            # result = converter.convert(tiff_path)
-            # text = result.document.export_to_markdown()
-            
-            return result
             
         except Exception as e:
             logger.error(f"Error processing TIFF with Docling OCR: {e}")
@@ -143,11 +151,11 @@ class DoclingProcessor:
     def chunk_text(
         self,
         text: str,
-        chunk_size: int = 512,
-        overlap: int = 50
+        chunk_size: int = 800,
+        overlap: int = 120
     ) -> List[str]:
         """
-        Split text into overlapping chunks for embedding
+        Split text into overlapping chunks for retrieval and QA.
         
         Args:
             text: Full document text

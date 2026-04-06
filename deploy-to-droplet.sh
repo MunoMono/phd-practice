@@ -77,8 +77,12 @@ POSTGRES_PASSWORD=postgres
 POSTGRES_DB=epistemic_drift
 
 # Backend Configuration
-GRANITE_MODEL_PATH=ibm-granite/granite-4.0-h-small-instruct
+GRANITE_MODEL_PATH=ibm-granite/granite-3.1-2b-instruct
 GRANITE_DEVICE=cpu
+GRANITE_MAX_TOKENS=384
+GRANITE_TEMPERATURE=0.2
+GRANITE_MAX_INPUT_CHARS=6000
+GRANITE_TIMEOUT_SECONDS=45
 
 # S3/Storage Configuration (optional)
 S3_BUCKET=

@@ -2,9 +2,11 @@ import React, { useEffect, useRef, useState } from 'react';
 import * as d3 from 'd3';
 import { Loading, Toggle } from '@carbon/react';
 import { carbonColors, d3Scales, chartStyles, animations, utils } from '../../utils/carbonD3Theme';
+import getApiBaseUrl from '../../utils/apiBaseUrl';
 import './ThemeDistribution.scss';
 
 const ThemeDistribution = () => {
+  const apiBaseUrl = getApiBaseUrl();
   const svgRef = useRef();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -36,7 +38,7 @@ const ThemeDistribution = () => {
 
   const fetchThemeData = async () => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/viz/theme-distribution`);
+      const response = await fetch(`${apiBaseUrl}/api/viz/theme-distribution`);
       const themeData = await response.json();
       setData(themeData);
     } catch (error) {

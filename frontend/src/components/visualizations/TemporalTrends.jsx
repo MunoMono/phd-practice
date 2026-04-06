@@ -2,9 +2,11 @@ import React, { useEffect, useRef, useState } from 'react';
 import * as d3 from 'd3';
 import { Loading } from '@carbon/react';
 import { carbonColors, d3Scales, chartStyles, animations } from '../../utils/carbonD3Theme';
+import getApiBaseUrl from '../../utils/apiBaseUrl';
 import './TemporalTrends.scss';
 
 const TemporalTrends = () => {
+  const apiBaseUrl = getApiBaseUrl();
   const svgRef = useRef();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -35,7 +37,7 @@ const TemporalTrends = () => {
 
   const fetchTrendsData = async () => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/viz/temporal-trends`);
+      const response = await fetch(`${apiBaseUrl}/api/viz/temporal-trends`);
       const trendsData = await response.json();
       setData(trendsData);
     } catch (error) {
