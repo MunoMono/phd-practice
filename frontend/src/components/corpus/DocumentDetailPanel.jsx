@@ -34,6 +34,20 @@ const renderValue = (value, fallback = 'Not available from the current endpoint.
   return value
 }
 
+const renderTagValues = (values, emptyLabel = 'Not yet recorded') => {
+  if (!hasValue(values)) {
+    return <p className="corpus-panel__empty">{emptyLabel}</p>
+  }
+
+  return (
+    <div className="app-tag-row corpus-panel__tag-row corpus-panel__tag-row--wrap">
+      {values.map((value) => (
+        <Tag key={value} type="cool-gray">{value}</Tag>
+      ))}
+    </div>
+  )
+}
+
 const formatMlEligibility = (annotations) => {
   if (!annotations) {
     return 'Not available from the current endpoint.'
@@ -99,6 +113,31 @@ const formatStatusLabel = (value) => {
   return value.replaceAll('_', ' ')
 }
 
+const formatAccessRestriction = (value) => {
+  if (!value) {
+    return null
+  }
+
+  const normalized = value.toLowerCase()
+  if (normalized === 'int') {
+    return 'Internal'
+  }
+
+  return value
+}
+
+const formatExtent = (number, unit) => {
+  if (!hasValue(number) && !hasValue(unit)) {
+    return null
+  }
+
+  if (hasValue(number) && hasValue(unit)) {
+    return `${number} ${unit}`
+  }
+
+  return number || unit
+}
+
 const formatMetadataList = (metadata) => Object.entries(metadata || {}).filter(([, value]) => {
   if (Array.isArray(value)) {
     return value.length > 0
@@ -112,6 +151,21 @@ const buildFieldRows = (rows) => rows.filter((row) => hasValue(row.value))
 const formatFieldLabel = (value) => value.replaceAll('_', ' ')
 
 const formatAuthorityRole = (value) => value.replaceAll('_', ' ')
+
+const HUMAN_FIELD_LABELS = {
+  title: 'Object title',
+  subjects: 'Subjects',
+  scope_and_content: 'Scope and content',
+  abstract: 'Abstract',
+  project_theme: 'Project theme',
+  project_title: 'Project title',
+  methodology: 'Methodology',
+  level: 'Archival level',
+  fonds_code: 'Fonds code',
+  series_id: 'Series',
+  ddr_period: 'DDR period',
+  parent_collection: 'Parent collection',
+}
 
 const copyCitation = async (detail) => {
   const document = detail?.document || {}
@@ -148,8 +202,9 @@ const DocumentDetailPanel = ({ detail, loading, onTraceEvidence, onViewAnalytics
   }
 
   const { document, annotations, similarDocuments, error } = detail
-  const catalogueMetadata = formatMetadataList(annotations?.catalogue_metadata)
+  const catalogueMetadata = annotations?.catalogue_metadata || {}
   const provenanceMetadata = annotations?.retrieval_provenance || {}
+  const rightsAccess = annotations?.rights_access || {}
   const policyReason = formatPolicyReason(annotations)
   const recordPublicUrl = annotations?.record_public_uri || provenanceMetadata.record_public_uri || null
   const policyStatusLabel = formatStatusLabel(annotations?.ml_policy_status)
@@ -163,12 +218,55 @@ const DocumentDetailPanel = ({ detail, loading, onTraceEvidence, onViewAnalytics
     { label: 'Asset PID', value: annotations?.asset_pid },
     { label: 'Asset ID', value: annotations?.asset_id },
     { label: 'Source filename', value: annotations?.source_filename || document.filename },
+    { label: 'Repository', value: provenanceMetadata.repository },
+    { label: 'Accession / shelfmark', value: provenanceMetadata.accession_shelfmark },
+    { label: 'Box / container', value: provenanceMetadata.box_number },
+    { label: 'Container title', value: provenanceMetadata.container_title },
+    { label: 'Location note', value: provenanceMetadata.location_note },
+    { label: 'Reference code', value: provenanceMetadata.reference_code || provenanceMetadata.archive_reference },
+    { label: 'Page count', value: annotations?.page_count ?? document.page_count ?? provenanceMetadata.page_count ?? null, fallback: 'Not yet recorded' },
+    { label: 'Page-count source', value: annotations?.page_count_source || provenanceMetadata.page_count_source, fallback: 'Not yet recorded' },
     { label: 'Source URI', value: annotations?.source_uri || document.source_uri },
-    { label: 'Archive reference', value: provenanceMetadata.archive_reference },
-    { label: 'Creator', value: provenanceMetadata.creator },
-    { label: 'Date', value: provenanceMetadata.document_date },
-    { label: 'Page count', value: annotations?.page_count ?? document.page_count ?? null }
   ])
+  const rightsRows = [
+    { label: 'Copyright', value: rightsAccess.copyright },
+    { label: 'Copyright holder', value: rightsAccess.copyright_holder },
+    { label: 'Copyright holder (other)', value: rightsAccess.copyright_holder_other },
+    { label: 'Data rights', value: rightsAccess.data_rights },
+    { label: 'Data rights holder', value: rightsAccess.data_rights_holder },
+    { label: 'Image rights', value: rightsAccess.image_rights },
+    { label: 'Image rights holder', value: rightsAccess.image_rights_holder },
+    { label: 'Rights owner', value: rightsAccess.rights_owner },
+    { label: 'Rights holders', value: rightsAccess.rights_holders },
+    { label: 'Access restriction', value: formatAccessRestriction(rightsAccess.access_restriction) },
+    { label: 'Rights statement', value: rightsAccess.rights_statement_uri },
+    { label: 'Consent status', value: rightsAccess.consent_status },
+    { label: 'Consent scope', value: rightsAccess.consent_scope },
+    { label: 'Consent evidence URI', value: rightsAccess.consent_evidence_uri },
+    { label: 'Takedown contact', value: rightsAccess.takedown_contact },
+  ]
+  const catalogueRows = buildFieldRows([
+    { label: 'Caption / asset title', value: catalogueMetadata.caption },
+    { label: 'Creator', value: catalogueMetadata.creator },
+    { label: 'Date', value: catalogueMetadata.date },
+    { label: 'Date qualifier', value: catalogueMetadata.date_qualifier },
+    { label: 'Language', value: catalogueMetadata.language },
+    { label: 'Document / publication type', value: catalogueMetadata.document_type },
+    { label: 'Extent', value: formatExtent(catalogueMetadata.extent_number, catalogueMetadata.extent_unit) },
+  ])
+  const extraCatalogueRows = formatMetadataList(catalogueMetadata).filter(([key]) => ![
+    'caption',
+    'creator',
+    'date',
+    'date_qualifier',
+    'language',
+    'document_type',
+    'extent_number',
+    'extent_unit',
+    'keywords',
+    'normalized_date',
+    'date_unknown',
+  ].includes(key))
   const persistence = annotations?.persistence || {}
   const persistenceRows = [
     { label: 'Local persistence status', value: document.processing_status || annotations?.processing_status, fallback: 'Unknown' },
@@ -196,7 +294,18 @@ const DocumentDetailPanel = ({ detail, loading, onTraceEvidence, onViewAnalytics
           <p className="corpus-panel__copy">Policy status: {renderValue(policyStatusLabel, 'Policy unresolved')}</p>
           {policyReason ? <p className="corpus-panel__copy">Reason: {policyReason}</p> : null}
           {policyExplanation ? <p className="corpus-panel__meta">{policyExplanation}</p> : null}
-          <p className="corpus-panel__copy">Access and rights control: {renderValue(annotations?.corpus_control?.access_level || annotations?.corpus_control?.rights_note, 'Not recorded on this local record.')}</p>
+        </div>
+
+        <div>
+          <h4 className="corpus-panel__section-title">Rights and access</h4>
+          <div className="corpus-panel__list">
+            {rightsRows.map((row) => (
+              <div key={row.label} className="corpus-panel__field-row">
+                <p className="corpus-panel__field-label">{row.label}</p>
+                <p className="corpus-panel__field-value">{renderValue(row.value, 'Not recorded')}</p>
+              </div>
+            ))}
+          </div>
         </div>
 
         <div>
@@ -209,24 +318,41 @@ const DocumentDetailPanel = ({ detail, loading, onTraceEvidence, onViewAnalytics
               </div>
             ))}
           </div>
-          <p className="corpus-panel__meta">Additional archive provenance is not yet exposed through this local record.</p>
         </div>
 
         <div>
           <h4 className="corpus-panel__section-title">Archive / catalogue metadata</h4>
-          {catalogueMetadata.length > 0 ? (
-            <div className="corpus-panel__list">
-              {catalogueMetadata.map(([key, value]) => (
-                <div key={key} className="corpus-panel__field-row">
-                  <p className="corpus-panel__field-label">{formatFieldLabel(key)}</p>
-                  <p className="corpus-panel__field-value">{renderValue(value)}</p>
+          {catalogueRows.length > 0 ? (
+            <>
+              <div className="corpus-panel__list">
+                {catalogueRows.map((row) => (
+                  <div key={row.label} className="corpus-panel__field-row">
+                    <p className="corpus-panel__field-label">{row.label}</p>
+                    <p className="corpus-panel__field-value">{renderValue(row.value, 'Not recorded')}</p>
+                  </div>
+                ))}
+              </div>
+
+              <div className="corpus-panel__catalogue-tags">
+                <p className="corpus-panel__field-label">Keywords / controlled terms</p>
+                {renderTagValues(catalogueMetadata.keywords, 'Not recorded')}
+              </div>
+
+              {extraCatalogueRows.length > 0 ? (
+                <div className="corpus-panel__list">
+                  {extraCatalogueRows.map(([key, value]) => (
+                    <div key={key} className="corpus-panel__field-row">
+                      <p className="corpus-panel__field-label">{HUMAN_FIELD_LABELS[key] || formatFieldLabel(key)}</p>
+                      <p className="corpus-panel__field-value">{renderValue(value)}</p>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
+              ) : null}
+            </>
           ) : (
             <p className="corpus-panel__empty">No archive/catalogue metadata is currently attached to this local corpus record.</p>
           )}
-          <p className="corpus-panel__meta">Catalogue metadata is descriptive context about the archived object, not a transcription of the PDF source text.</p>
+          <p className="corpus-panel__meta">Archive / catalogue metadata is descriptive context about the archived object, not a transcription of the PDF source text.</p>
         </div>
 
         <div>

@@ -5,14 +5,14 @@ from __future__ import annotations
 from typing import Any, Dict, Mapping, Optional
 
 
-ROLE_VERSION = 'turin-phase2-metadata-v1'
+ROLE_VERSION = 'turin-phase2-metadata-v2'
 
 
 def _has_value(value: Any) -> bool:
     if value is None:
         return False
     if isinstance(value, str):
-        return bool(value.strip())
+        return value.strip() not in {'', '[]', '{}', 'null', 'None'}
     if isinstance(value, (list, tuple, set, dict)):
         return bool(value)
     return True
@@ -56,16 +56,27 @@ def partition_metadata(metadata: Mapping[str, Any]) -> Dict[str, Dict[str, Any]]
             'ml_page_scope': _coalesce(metadata.get('ml_page_scope'), metadata.get('ml_pages')),
             'ml_policy_status': metadata.get('ml_policy_status'),
             'ml_exclusion_reason': metadata.get('ml_exclusion_reason'),
-            'access_level': metadata.get('access_level'),
-            'rights_note': metadata.get('rights_note'),
-            'rights_statement_uri': metadata.get('rights_statement_uri'),
-            'current_consent_status': metadata.get('current_consent_status'),
-            'takedown_contact': metadata.get('takedown_contact'),
-            'source_uri': metadata.get('source_uri', metadata.get('master_url')),
-            'asset_id': metadata.get('asset_id'),
-            'asset_pid': metadata.get('asset_pid'),
-            'asset_id_or_asset_pid': metadata.get('asset_id_or_asset_pid'),
             'authority_id': metadata.get('authority_id', metadata.get('media_id')),
+        }
+    )
+
+    rights_access = _clean_mapping(
+        {
+            'access_restriction': metadata.get('access_level'),
+            'rights_owner': metadata.get('rights_owner'),
+            'rights_holders': metadata.get('rights_holders'),
+            'rights_note': metadata.get('rights_note'),
+            'copyright_holder': metadata.get('copyright_holder'),
+            'copyright_holder_other': metadata.get('copyright_holder_other'),
+            'data_rights': metadata.get('data_rights'),
+            'data_rights_holder': metadata.get('data_rights_holder'),
+            'image_rights': metadata.get('image_rights'),
+            'image_rights_holder': metadata.get('image_rights_holder'),
+            'rights_statement_uri': metadata.get('rights_statement_uri'),
+            'consent_status': metadata.get('current_consent_status'),
+            'consent_scope': metadata.get('current_consent_scope'),
+            'consent_evidence_uri': metadata.get('consent_evidence_uri'),
+            'takedown_contact': metadata.get('takedown_contact'),
         }
     )
 
@@ -73,18 +84,24 @@ def partition_metadata(metadata: Mapping[str, Any]) -> Dict[str, Dict[str, Any]]
         {
             'archive_record_pid': _coalesce(metadata.get('archive_record_pid'), metadata.get('record_pid')),
             'archive_record_id': _coalesce(metadata.get('archive_record_id'), metadata.get('record_id')),
+            'attached_media_pid': _coalesce(metadata.get('attached_media_pid'), metadata.get('pid')),
             'asset_pid': metadata.get('asset_pid'),
             'asset_id': metadata.get('asset_id'),
             'asset_id_or_asset_pid': metadata.get('asset_id_or_asset_pid'),
             'media_id': _coalesce(metadata.get('authority_id'), metadata.get('media_id'), metadata.get('id')),
-            'title': document_title,
             'source_filename': source_filename,
+            'source_uri': metadata.get('source_uri', metadata.get('master_url')),
             'archive_reference': metadata.get('archive_reference', metadata.get('reference_code')),
+            'reference_code': metadata.get('reference_code', metadata.get('archive_reference')),
             'collection_title': metadata.get('record_title'),
             'repository': metadata.get('location_repository'),
-            'document_date': document_date,
-            'creator': creator,
+            'accession_shelfmark': metadata.get('location_accession'),
+            'box_number': metadata.get('location_box'),
+            'container_title': metadata.get('box_title'),
+            'location_note': metadata.get('location_note'),
             'record_public_uri': _coalesce(metadata.get('record_public_uri'), metadata.get('public_uri')),
+            'page_count': metadata.get('page_count'),
+            'page_count_source': metadata.get('page_count_source'),
             'page': metadata.get('source_page'),
             'page_scope': metadata.get('ml_page_scope'),
             'chunk_id': metadata.get('chunk_id'),
@@ -96,14 +113,23 @@ def partition_metadata(metadata: Mapping[str, Any]) -> Dict[str, Dict[str, Any]]
     catalogue_metadata = _clean_mapping(
         {
             'caption': _coalesce(metadata.get('caption'), metadata.get('master_label')),
+            'title': document_title,
+            'creator': creator,
+            'date': document_date,
+            'date_qualifier': metadata.get('date_qualifier'),
+            'normalized_date': metadata.get('normalized_date'),
+            'date_unknown': metadata.get('date_unknown'),
+            'keywords': metadata.get('keywords'),
             'subjects': metadata.get('subjects'),
             'scope_and_content': metadata.get('scope_and_content'),
             'abstract': metadata.get('abstract'),
             'document_type': _coalesce(metadata.get('document_type'), metadata.get('category')),
+            'extent_number': metadata.get('extent_number'),
+            'extent_unit': metadata.get('extent_unit'),
             'project_theme': metadata.get('project_theme'),
             'project_title': metadata.get('project_title'),
             'methodology': metadata.get('methodology'),
-            'language_codes': metadata.get('language_codes'),
+            'language': metadata.get('language_codes'),
             'level': metadata.get('level'),
             'fonds_code': metadata.get('fonds_code'),
             'series_id': metadata.get('series_id'),
@@ -115,6 +141,7 @@ def partition_metadata(metadata: Mapping[str, Any]) -> Dict[str, Dict[str, Any]]
 
     return {
         'corpus_control': corpus_control,
+        'rights_access': rights_access,
         'retrieval_provenance': retrieval_provenance,
         'catalogue_metadata': catalogue_metadata,
     }
@@ -129,13 +156,16 @@ def attach_metadata_roles(metadata: Mapping[str, Any]) -> Dict[str, Any]:
 
 def extract_metadata_roles(metadata: Optional[Mapping[str, Any]]) -> Dict[str, Dict[str, Any]]:
     payload = dict(metadata or {})
-    if all(key in payload for key in ('corpus_control', 'retrieval_provenance', 'catalogue_metadata')):
+    if all(key in payload for key in ('corpus_control', 'rights_access', 'retrieval_provenance', 'catalogue_metadata')):
         return {
             'corpus_control': dict(payload.get('corpus_control') or {}),
+            'rights_access': dict(payload.get('rights_access') or {}),
             'retrieval_provenance': dict(payload.get('retrieval_provenance') or {}),
             'catalogue_metadata': dict(payload.get('catalogue_metadata') or {}),
         }
-    return partition_metadata(payload)
+    roles = partition_metadata(payload)
+    roles.setdefault('rights_access', {})
+    return roles
 
 
 def _render_lines(label_map: Mapping[str, str], payload: Mapping[str, Any]) -> list[str]:

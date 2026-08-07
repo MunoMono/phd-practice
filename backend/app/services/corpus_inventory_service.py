@@ -53,6 +53,31 @@ MANIFEST_FIELDS = [
     'metadata_source',
     'access_level',
     'rights_note',
+    'rights_owner',
+    'rights_holders',
+    'copyright_holder',
+    'copyright_holder_other',
+    'data_rights',
+    'data_rights_holder',
+    'image_rights',
+    'image_rights_holder',
+    'current_consent_status',
+    'current_consent_scope',
+    'consent_evidence_uri',
+    'location_repository',
+    'location_accession',
+    'location_box',
+    'box_title',
+    'location_note',
+    'language_codes',
+    'keywords',
+    'subjects',
+    'extent_number',
+    'extent_unit',
+    'date_qualifier',
+    'normalized_date',
+    'date_unknown',
+    'page_count_source',
     'media_used_for_ml',
     'use_for_ml',
     'ml_pages',
@@ -75,7 +100,7 @@ class CorpusInventoryService:
             if value is None:
                 continue
             text = str(value).strip()
-            if text:
+            if text and text not in {'[]', '{}', 'null', 'None'}:
                 return text
         return None
 
@@ -108,6 +133,22 @@ class CorpusInventoryService:
                 if label:
                     labels.append(label)
         return '; '.join(labels) if labels else None
+
+    @staticmethod
+    def _extract_keyword_labels(values: Any) -> List[str]:
+        if not values:
+            return []
+
+        labels: List[str] = []
+        for value in values:
+            if isinstance(value, dict):
+                label = value.get('label')
+            else:
+                label = value
+            text = str(label).strip() if label is not None else ''
+            if text:
+                labels.append(text)
+        return labels
 
     @staticmethod
     def _match_digital_asset(media_item: Dict[str, Any], pdf_file: Dict[str, Any]) -> Optional[Dict[str, Any]]:
@@ -162,7 +203,9 @@ class CorpusInventoryService:
                     if not (pid and source_uri and source_filename):
                         continue
 
-                    title = self._first_non_empty(pdf_file.get('label'), media_item.get('title'), record.get('title'))
+                    title = self._first_non_empty(pdf_file.get('label'), asset.get('label') if asset else None, media_item.get('title'), record.get('title'))
+                    asset_keywords = self._extract_keyword_labels(asset.get('keywords') if asset else None)
+                    media_keywords = self._extract_keyword_labels(media_item.get('keywords'))
                     row = {
                         'document_id': build_stable_document_id(
                             pid,
@@ -176,10 +219,14 @@ class CorpusInventoryService:
                         'checksum_sha256': None,
                         'title': title,
                         'creator': self._extract_creator(media_item),
-                        'date_text': self._build_date_text(media_item),
+                        'date_text': self._first_non_empty(asset.get('display_date') if asset else None, self._build_date_text(media_item)),
+                        'date_qualifier': self._first_non_empty(asset.get('date_qualifier') if asset else None),
+                        'normalized_date': self._first_non_empty(asset.get('normalized_date') if asset else None),
+                        'date_unknown': asset.get('date_unknown') if asset else None,
                         'document_type': media_item.get('category'),
                         'archive_reference': media_item.get('reference_code'),
                         'page_count': None,
+                        'page_count_source': None,
                         'ocr_status': 'unverified_remote_source',
                         'ingestion_status': 'pending',
                         'ingestion_error': None,
@@ -196,9 +243,25 @@ class CorpusInventoryService:
                         'asset_id_or_asset_pid': asset_identifier,
                         'metadata_source': 'archive_graphql.records_v1',
                         'attached_media_pid': pid,
-                        'access_level': media_item.get('access_level'),
-                        'rights_note': self._first_non_empty(media_item.get('rights_holders'), media_item.get('copyright_holder')),
-                        'rights_statement_uri': media_item.get('rights_statement_uri'),
+                        'access_level': self._first_non_empty(media_item.get('access_level'), record.get('access_level')),
+                        'rights_note': self._first_non_empty(
+                            asset.get('rights_holders') if asset else None,
+                            asset.get('data_rights_holder') if asset else None,
+                            asset.get('copyright_holder') if asset else None,
+                            media_item.get('rights_holders'),
+                            media_item.get('copyright_holder'),
+                            record.get('rights_holders'),
+                            record.get('copyright_holder'),
+                        ),
+                        'rights_owner': self._first_non_empty(asset.get('rights_owner') if asset else None, media_item.get('rights_owner'), record.get('rights_owner')),
+                        'rights_holders': self._first_non_empty(asset.get('rights_holders') if asset else None, media_item.get('rights_holders'), record.get('rights_holders')),
+                        'copyright_holder': self._first_non_empty(asset.get('copyright_holder') if asset else None, media_item.get('copyright_holder'), record.get('copyright_holder')),
+                        'copyright_holder_other': self._first_non_empty(media_item.get('copyright_holder_other'), record.get('copyright_holder_other')),
+                        'data_rights': self._first_non_empty(asset.get('data_rights') if asset else None, media_item.get('data_rights'), record.get('data_rights')),
+                        'data_rights_holder': self._first_non_empty(asset.get('data_rights_holder') if asset else None, media_item.get('data_rights_holder'), record.get('data_rights_holder')),
+                        'image_rights': self._first_non_empty(asset.get('image_rights') if asset else None, media_item.get('image_rights'), record.get('image_rights')),
+                        'image_rights_holder': self._first_non_empty(asset.get('image_rights_holder') if asset else None, media_item.get('image_rights_holder'), record.get('image_rights_holder')),
+                        'rights_statement_uri': self._first_non_empty(media_item.get('rights_statement_uri'), record.get('rights_statement_uri')),
                         'level': media_item.get('level'),
                         'fonds_code': media_item.get('fonds_code'),
                         'series_id': media_item.get('series_id'),
@@ -207,14 +270,23 @@ class CorpusInventoryService:
                         'methodology': media_item.get('methodology'),
                         'project_theme': media_item.get('project_theme'),
                         'project_title': media_item.get('project_title'),
-                        'location_repository': media_item.get('location_repository'),
-                        'current_consent_status': media_item.get('current_consent_status'),
-                        'takedown_contact': media_item.get('takedown_contact'),
+                        'location_repository': self._first_non_empty(asset.get('location_repository') if asset else None, media_item.get('location_repository'), record.get('location_repository')),
+                        'location_accession': self._first_non_empty(asset.get('location_accession') if asset else None, media_item.get('location_accession'), record.get('location_accession')),
+                        'location_box': self._first_non_empty(asset.get('location_box') if asset else None, media_item.get('location_box'), record.get('location_box')),
+                        'box_title': self._first_non_empty(media_item.get('box_title'), record.get('box_title')),
+                        'location_note': self._first_non_empty(asset.get('location_note') if asset else None, media_item.get('location_note'), record.get('location_note')),
+                        'current_consent_status': self._first_non_empty(media_item.get('current_consent_status'), record.get('current_consent_status')),
+                        'current_consent_scope': self._first_non_empty(media_item.get('current_consent_scope'), record.get('current_consent_scope')),
+                        'consent_evidence_uri': self._first_non_empty(media_item.get('consent_evidence_uri'), record.get('consent_evidence_uri')),
+                        'takedown_contact': self._first_non_empty(media_item.get('takedown_contact'), record.get('takedown_contact')),
                         'abstract': media_item.get('abstract'),
-                        'caption': media_item.get('caption'),
-                        'subjects': media_item.get('subjects'),
+                        'caption': self._first_non_empty(asset.get('label') if asset else None, media_item.get('caption'), media_item.get('title')),
+                        'keywords': asset_keywords or media_keywords,
+                        'subjects': media_item.get('subjects') or [],
                         'parent_collection': media_item.get('parent_collection'),
-                        'language_codes': media_item.get('language_codes'),
+                        'language_codes': self._first_non_empty(asset.get('language_codes') if asset else None, media_item.get('language_codes'), record.get('language_codes')),
+                        'extent_number': self._first_non_empty(asset.get('extent_number') if asset else None, media_item.get('extent_number')),
+                        'extent_unit': self._first_non_empty(asset.get('extent_unit') if asset else None, media_item.get('extent_unit')),
                         'media_used_for_ml': media_item.get('used_for_ml'),
                         'use_for_ml': policy.get('use_for_ml'),
                         'ml_pages': asset.get('ml_pages') if asset else None,
@@ -297,6 +369,7 @@ class CorpusInventoryService:
                 next_row['source_path'] = str(target_path)
                 next_row['checksum_sha256'] = compute_sha256(target_path)
                 next_row['page_count'] = self._page_count_from_pdfinfo(target_path)
+                next_row['page_count_source'] = 'pdfinfo_materialized_source' if next_row['page_count'] is not None else None
                 next_row['ocr_status'] = self._detect_text_layer(target_path)
                 next_row['ingestion_status'] = 'inventory_ready'
             except Exception as exc:
@@ -374,9 +447,22 @@ class CorpusInventoryService:
                         'date_text': row.get('date_text'),
                         'document_type': row.get('document_type'),
                         'archive_reference': row.get('archive_reference'),
+                        'page_count': row.get('page_count'),
+                        'page_count_source': row.get('page_count_source'),
                         'rights_note': row.get('rights_note'),
+                        'rights_owner': row.get('rights_owner'),
+                        'rights_holders': row.get('rights_holders'),
+                        'copyright_holder': row.get('copyright_holder'),
+                        'copyright_holder_other': row.get('copyright_holder_other'),
+                        'data_rights': row.get('data_rights'),
+                        'data_rights_holder': row.get('data_rights_holder'),
+                        'image_rights': row.get('image_rights'),
+                        'image_rights_holder': row.get('image_rights_holder'),
                         'rights_statement_uri': row.get('rights_statement_uri'),
                         'access_level': row.get('access_level'),
+                        'current_consent_status': row.get('current_consent_status'),
+                        'current_consent_scope': row.get('current_consent_scope'),
+                        'consent_evidence_uri': row.get('consent_evidence_uri'),
                         'level': row.get('level'),
                         'fonds_code': row.get('fonds_code'),
                         'series_id': row.get('series_id'),
@@ -386,13 +472,23 @@ class CorpusInventoryService:
                         'project_theme': row.get('project_theme'),
                         'project_title': row.get('project_title'),
                         'location_repository': row.get('location_repository'),
+                        'location_accession': row.get('location_accession'),
+                        'location_box': row.get('location_box'),
+                        'box_title': row.get('box_title'),
+                        'location_note': row.get('location_note'),
                         'current_consent_status': row.get('current_consent_status'),
                         'takedown_contact': row.get('takedown_contact'),
                         'abstract': row.get('abstract'),
                         'caption': row.get('caption'),
+                        'keywords': row.get('keywords'),
                         'subjects': row.get('subjects'),
                         'parent_collection': row.get('parent_collection'),
                         'language_codes': row.get('language_codes'),
+                        'extent_number': row.get('extent_number'),
+                        'extent_unit': row.get('extent_unit'),
+                        'date_qualifier': row.get('date_qualifier'),
+                        'normalized_date': row.get('normalized_date'),
+                        'date_unknown': row.get('date_unknown'),
                         'media_used_for_ml': row.get('media_used_for_ml'),
                         'use_for_ml': row.get('use_for_ml'),
                         'ml_pages': row.get('ml_pages'),

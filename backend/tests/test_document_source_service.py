@@ -147,6 +147,18 @@ class DocumentPayloadTests(unittest.TestCase):
                 'source_filename': '1b843.pdf',
                 'source_uri': 'https://archive.test/1b843.pdf',
                 'archive_reference': 'DEU/2',
+                'location_accession': 'AU.AAD.20718',
+                'location_note': 'AAD/1989/9 Part 2 of 3',
+                'location_repository': 'VAE',
+                'data_rights': 'Royal College of Art',
+                'data_rights_holder': 'Royal College of Art',
+                'image_rights': 'Royal College of Art',
+                'image_rights_holder': 'Royal College of Art',
+                'copyright_holder': 'Copyright © Royal College of Art',
+                'keywords': ['Bruce Archer', 'Product development'],
+                'date_qualifier': 'Circa',
+                'language_codes': 'en-GB',
+                'extent_unit': 'ITEM',
                 'caption': 'Signed memo',
                 'use_for_ml': False,
                 'ml_policy_status': 'excluded_use_for_ml_false',
@@ -164,6 +176,13 @@ class DocumentPayloadTests(unittest.TestCase):
         self.assertEqual(annotations['asset_pid'], '942396101474')
         self.assertEqual(annotations['ml_policy_status'], 'excluded_use_for_ml_false')
         self.assertEqual(annotations['corpus_control']['ml_exclusion_reason'], 'asset_marked_use_for_ml_false')
+        self.assertEqual(annotations['rights_access']['data_rights'], 'Royal College of Art')
+        self.assertEqual(annotations['rights_access']['copyright_holder'], 'Copyright © Royal College of Art')
+        self.assertEqual(annotations['retrieval_provenance']['accession_shelfmark'], 'AU.AAD.20718')
+        self.assertEqual(annotations['retrieval_provenance']['location_note'], 'AAD/1989/9 Part 2 of 3')
+        self.assertEqual(annotations['catalogue_metadata']['keywords'], ['Bruce Archer', 'Product development'])
+        self.assertEqual(annotations['catalogue_metadata']['date_qualifier'], 'Circa')
+        self.assertEqual(annotations['catalogue_metadata']['language'], 'en-GB')
         self.assertEqual(annotations['catalogue_metadata']['caption'], 'Signed memo')
         self.assertEqual(annotations['persistence']['metadata_roles_version'], 'turin-phase2-metadata-v1')
         self.assertEqual(detail['attached_media_pid'], '287080879712')
@@ -201,6 +220,7 @@ class DocumentPayloadTests(unittest.TestCase):
 
         annotations = build_document_annotations_payload(legacy)
         self.assertIsNone(annotations['asset_pid'])
+        self.assertEqual(annotations['rights_access'], {})
         self.assertEqual(annotations['retrieval_provenance'], {})
         self.assertEqual(annotations['catalogue_metadata'], {})
         self.assertIsNone(annotations['persistence']['metadata_roles_version'])

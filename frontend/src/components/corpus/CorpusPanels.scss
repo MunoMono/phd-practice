@@ -55,6 +55,11 @@
     gap: $spacing-02;
   }
 
+  &__catalogue-tags {
+    display: grid;
+    gap: $spacing-03;
+  }
+
   &__field-row {
     display: grid;
     gap: $spacing-02;
@@ -78,6 +83,10 @@
   &__field-value {
     @include type-style('body-01');
     color: $text-primary;
+  }
+
+  &__tag-row--wrap {
+    flex-wrap: wrap;
   }
 
   &__suggestion-label {

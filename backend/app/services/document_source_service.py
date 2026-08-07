@@ -123,9 +123,15 @@ def build_document_annotations_payload(document: Any) -> Dict[str, Any]:
     authority_data = dict(getattr(document, 'authority_data', None) or {})
     roles = extract_metadata_roles(authority_data)
     page_count = getattr(document, 'page_count', None)
+    page_count_source = authority_data.get('page_count_source') or ('persisted_document' if page_count is not None else None)
     ml_processed_at = getattr(document, 'ml_processed_at', None)
     source_filename = authority_data.get('source_filename') or document.filename
     public_url = roles['retrieval_provenance'].get('record_public_uri') or authority_data.get('record_public_uri') or authority_data.get('public_uri')
+    retrieval_provenance = dict(roles['retrieval_provenance'])
+    if page_count is not None:
+        retrieval_provenance.setdefault('page_count', page_count)
+    if page_count_source:
+        retrieval_provenance.setdefault('page_count_source', page_count_source)
 
     return {
         'document_id': document.document_id,
@@ -151,9 +157,11 @@ def build_document_annotations_payload(document: Any) -> Dict[str, Any]:
         'metadata_roles_version': authority_data.get('metadata_roles_version'),
         'record_public_uri': public_url,
         'corpus_control': roles['corpus_control'],
-        'retrieval_provenance': roles['retrieval_provenance'],
+        'rights_access': roles.get('rights_access', {}),
+        'retrieval_provenance': retrieval_provenance,
         'catalogue_metadata': roles['catalogue_metadata'],
         'persistence': _build_persistence_payload(document, authority_data),
         'page_count': page_count,
+        'page_count_source': page_count_source,
         'ml_processed_at': ml_processed_at.isoformat() if ml_processed_at else None,
     }

@@ -28,6 +28,27 @@ class AuthorityService:
             pid
             title
             public_uri
+            language_codes
+            reference_code
+            location_repository
+            location_accession
+            location_box
+            box_title
+            location_note
+            access_level
+            rights_owner
+            rights_holders
+            copyright_holder
+            copyright_holder_other
+            data_rights
+            data_rights_holder
+            image_rights
+            image_rights_holder
+            rights_statement_uri
+            current_consent_status
+            current_consent_scope
+            consent_evidence_uri
+            takedown_contact
             attached_media {
                 id
                 pid
@@ -46,20 +67,38 @@ class AuthorityService:
                 artefact_date_to
                 category
                 reference_code
+                extent_number
+                extent_unit
                 scope_and_content
                 methodology
                 project_theme
                 project_title
                 location_repository
+                location_accession
+                location_box
+                box_title
+                location_note
                 current_consent_status
+                current_consent_scope
+                consent_evidence_uri
                 takedown_contact
                 access_level
+                rights_owner
                 copyright_holder
+                copyright_holder_other
                 rights_holders
+                data_rights
+                data_rights_holder
+                image_rights
+                image_rights_holder
                 rights_statement_uri
                 abstract
                 caption
                 subjects
+                keywords {
+                    id
+                    label
+                }
                 parent_collection
                 used_for_ml
                 ml_annotation
@@ -78,6 +117,31 @@ class AuthorityService:
                     ml_pages
                     ml_annotation
                     mime
+                    bytes
+                    status
+                    sequence
+                    label
+                    display_date
+                    normalized_date
+                    date_qualifier
+                    date_unknown
+                    copyright_holder
+                    rights_holders
+                    data_rights
+                    data_rights_holder
+                    image_rights
+                    image_rights_holder
+                    extent_number
+                    extent_unit
+                    location_repository
+                    location_accession
+                    location_box
+                    location_note
+                    language_codes
+                    keywords {
+                        id
+                        label
+                    }
                 }
             }
         }
@@ -91,6 +155,27 @@ class AuthorityService:
             pid
             title
             public_uri
+            language_codes
+            reference_code
+            location_repository
+            location_accession
+            location_box
+            box_title
+            location_note
+            access_level
+            rights_owner
+            rights_holders
+            copyright_holder
+            copyright_holder_other
+            data_rights
+            data_rights_holder
+            image_rights
+            image_rights_holder
+            rights_statement_uri
+            current_consent_status
+            current_consent_scope
+            consent_evidence_uri
+            takedown_contact
             attached_media {
                 id
                 pid
@@ -109,20 +194,38 @@ class AuthorityService:
                 artefact_date_to
                 category
                 reference_code
+                extent_number
+                extent_unit
                 scope_and_content
                 methodology
                 project_theme
                 project_title
                 location_repository
+                location_accession
+                location_box
+                box_title
+                location_note
                 current_consent_status
+                current_consent_scope
+                consent_evidence_uri
                 takedown_contact
                 access_level
+                rights_owner
                 copyright_holder
+                copyright_holder_other
                 rights_holders
+                data_rights
+                data_rights_holder
+                image_rights
+                image_rights_holder
                 rights_statement_uri
                 abstract
                 caption
                 subjects
+                keywords {
+                    id
+                    label
+                }
                 parent_collection
                 used_for_ml
                 ml_annotation
@@ -141,6 +244,31 @@ class AuthorityService:
                     ml_pages
                     ml_annotation
                     mime
+                    bytes
+                    status
+                    sequence
+                    label
+                    display_date
+                    normalized_date
+                    date_qualifier
+                    date_unknown
+                    copyright_holder
+                    rights_holders
+                    data_rights
+                    data_rights_holder
+                    image_rights
+                    image_rights_holder
+                    extent_number
+                    extent_unit
+                    location_repository
+                    location_accession
+                    location_box
+                    location_note
+                    language_codes
+                    keywords {
+                        id
+                        label
+                    }
                 }
             }
         }
@@ -167,20 +295,38 @@ class AuthorityService:
             artefact_date_to
             category
             reference_code
+            extent_number
+            extent_unit
             scope_and_content
             methodology
             project_theme
             project_title
             location_repository
+            location_accession
+            location_box
+            box_title
+            location_note
             current_consent_status
+            current_consent_scope
+            consent_evidence_uri
             takedown_contact
             access_level
+            rights_owner
             copyright_holder
+            copyright_holder_other
             rights_holders
+            data_rights
+            data_rights_holder
+            image_rights
+            image_rights_holder
             rights_statement_uri
             abstract
             caption
             subjects
+            keywords {
+                id
+                label
+            }
             parent_collection
             used_for_ml
             ml_annotation
@@ -199,6 +345,31 @@ class AuthorityService:
                 ml_pages
                 ml_annotation
                 mime
+                bytes
+                status
+                sequence
+                label
+                display_date
+                normalized_date
+                date_qualifier
+                date_unknown
+                copyright_holder
+                rights_holders
+                data_rights
+                data_rights_holder
+                image_rights
+                image_rights_holder
+                extent_number
+                extent_unit
+                location_repository
+                location_accession
+                location_box
+                location_note
+                language_codes
+                keywords {
+                    id
+                    label
+                }
             }
         }
     }

@@ -71,6 +71,8 @@ class CorpusInventoryServiceTests(unittest.TestCase):
                     'pid': '014262507600',
                     'title': 'Design Education Unit | DEU',
                     'public_uri': 'https://ddrarchive.org/id/record/014262507600',
+                    'location_repository': 'RCA',
+                    'language_codes': 'en-GB',
                     'attached_media': [
                         {
                             'id': '149',
@@ -82,6 +84,7 @@ class CorpusInventoryServiceTests(unittest.TestCase):
                             'category': 'report',
                             'reference_code': 'DEU/2',
                             'access_level': 'Internal',
+                            'location_repository': 'RCA',
                             'copyright_holder': 'Copyright © Royal College of Art',
                             'rights_holders': 'V&A',
                             'used_for_ml': True,
@@ -104,6 +107,19 @@ class CorpusInventoryServiceTests(unittest.TestCase):
                                     'ml_pages': '1-5',
                                     'ml_annotation': 'sample',
                                     'mime': 'application/pdf',
+                                    'display_date': 'June 1978',
+                                    'date_qualifier': 'Month known',
+                                    'location_repository': 'VAE',
+                                    'location_accession': 'AU.AAD.20718',
+                                    'location_note': 'AAD/1989/9 Part 2 of 3',
+                                    'data_rights': 'Royal College of Art',
+                                    'data_rights_holder': 'Royal College of Art',
+                                    'image_rights': 'Royal College of Art',
+                                    'image_rights_holder': 'Royal College of Art',
+                                    'copyright_holder': 'Copyright © Royal College of Art',
+                                    'extent_unit': 'ITEM',
+                                    'language_codes': 'en-GB',
+                                    'keywords': [{'label': 'Bruce Archer'}, {'label': 'Design methods'}],
                                 }
                             ],
                         }
@@ -124,6 +140,14 @@ class CorpusInventoryServiceTests(unittest.TestCase):
         self.assertEqual(row['asset_id_or_asset_pid'], 'asset-149')
         self.assertEqual(row['ml_policy_status'], 'eligible_page_restricted')
         self.assertEqual(row['metadata_source'], 'archive_graphql.records_v1')
+        self.assertEqual(row['location_repository'], 'VAE')
+        self.assertEqual(row['location_accession'], 'AU.AAD.20718')
+        self.assertEqual(row['location_note'], 'AAD/1989/9 Part 2 of 3')
+        self.assertEqual(row['date_text'], 'June 1978')
+        self.assertEqual(row['date_qualifier'], 'Month known')
+        self.assertEqual(row['keywords'], ['Bruce Archer', 'Design methods'])
+        self.assertEqual(row['language_codes'], 'en-GB')
+        self.assertEqual(row['data_rights'], 'Royal College of Art')
 
     def test_flatten_record_with_multiple_assets_keeps_one_row_per_pdf_master(self):
         record = {

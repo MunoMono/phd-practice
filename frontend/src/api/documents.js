@@ -56,9 +56,11 @@ export const getDocumentAnnotations = async (documentId) => {
     record_public_uri: payload.record_public_uri || null,
     persistence: payload.persistence || {},
     corpus_control: payload.corpus_control || {},
+    rights_access: payload.rights_access || {},
     retrieval_provenance: payload.retrieval_provenance || {},
     catalogue_metadata: payload.catalogue_metadata || {},
     page_count: payload.page_count ?? null,
+    page_count_source: payload.page_count_source || null,
     ml_processed_at: payload.ml_processed_at || null
   }
 }
