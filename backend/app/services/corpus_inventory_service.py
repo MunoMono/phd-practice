@@ -159,6 +159,12 @@ class CorpusInventoryService:
                 return asset
         return None
 
+    @staticmethod
+    def _normalize_use_for_ml(value: Any) -> Optional[int]:
+        if value is None:
+            return None
+        return 1 if bool(value) else 0
+
     def flatten_published_pdf_sources(
         self,
         status: str = 'published',
@@ -425,7 +431,7 @@ class CorpusInventoryService:
                     'ingestion_version': row.get('ingestion_version'),
                     'corpus_version': row.get('corpus_version'),
                     'metadata_source': row.get('metadata_source'),
-                    'use_for_ml': row.get('use_for_ml'),
+                    'use_for_ml': self._normalize_use_for_ml(row.get('use_for_ml')),
                     'ml_page_scope': row.get('ml_page_scope'),
                     'ml_policy_status': row.get('ml_policy_status'),
                     'ml_exclusion_reason': row.get('ml_exclusion_reason'),

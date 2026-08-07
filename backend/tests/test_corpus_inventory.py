@@ -149,6 +149,106 @@ class CorpusInventoryServiceTests(unittest.TestCase):
         self.assertEqual(row['language_codes'], 'en-GB')
         self.assertEqual(row['data_rights'], 'Royal College of Art')
 
+    def test_matched_asset_caption_does_not_leak_from_media_or_sibling_asset(self):
+        record = {
+            'id': '127',
+            'pid': '873981573030',
+            'title': 'Bruce Archer collection',
+            'public_uri': 'https://ddrarchive.org/id/record/873981573030',
+            'attached_media': [
+                {
+                    'id': '120',
+                    'pid': '338541406157',
+                    'title': 'Bruce Archer papers',
+                    'caption': 'Systematic method for designers reprint with additional material',
+                    'pdf_files': [
+                        {
+                            'filename': 'cf66faa2.pdf',
+                            'role': 'pdf_master',
+                            'url': 'https://archive.test/cf66faa2.pdf',
+                            'label': 'Overhead transparency of Bruce Archer’s Fig. 5 taxonomy diagram',
+                        }
+                    ],
+                    'digital_assets': [
+                        {
+                            'role': 'pdf_master',
+                            'filename': 'sibling.pdf',
+                            'assetId': 'asset-sibling',
+                            'pid': '947567606659',
+                            'label': 'Systematic method for designers reprint with additional material',
+                            'use_for_ml': True,
+                            'ml_pages': '',
+                        },
+                        {
+                            'role': 'pdf_master',
+                            'filename': 'cf66faa2.pdf',
+                            'assetId': 'asset-target',
+                            'pid': '987235129265',
+                            'label': 'Overhead transparency of Bruce Archer’s Fig. 5 taxonomy diagram',
+                            'use_for_ml': True,
+                            'ml_pages': '',
+                        },
+                    ],
+                }
+            ],
+        }
+
+        row = self.service.flatten_records_pdf_sources([record])[0]
+        self.assertEqual(row['asset_pid'], '987235129265')
+        self.assertEqual(row['title'], 'Overhead transparency of Bruce Archer’s Fig. 5 taxonomy diagram')
+        self.assertEqual(row['caption'], 'Overhead transparency of Bruce Archer’s Fig. 5 taxonomy diagram')
+
+    def test_richer_metadata_does_not_change_stable_document_id(self):
+        base_record = {
+            'id': '125',
+            'pid': '880612075513',
+            'title': 'RCA prospectuses',
+            'public_uri': 'https://ddrarchive.org/id/record/880612075513',
+            'attached_media': [
+                {
+                    'id': '121',
+                    'pid': '964614721622',
+                    'title': 'RCA prospectus',
+                    'pdf_files': [
+                        {
+                            'filename': '4d190e.pdf',
+                            'role': 'pdf_master',
+                            'url': 'https://archive.test/4d190e.pdf',
+                            'label': 'RCA prospectus',
+                        }
+                    ],
+                    'digital_assets': [
+                        {
+                            'role': 'pdf_master',
+                            'filename': '4d190e.pdf',
+                            'assetId': '4d190e6164bcf9fb302821c0f750f2f30fb3b0946f21f42608c154178e8d5314',
+                            'pid': '437001480599',
+                            'label': 'RCA prospectus',
+                            'use_for_ml': True,
+                            'ml_pages': '6',
+                        },
+                    ],
+                }
+            ],
+        }
+        richer_record = json.loads(json.dumps(base_record))
+        richer_record['attached_media'][0]['caption'] = 'Prospectus 1985'
+        richer_record['attached_media'][0]['keywords'] = [{'label': 'Prospectus'}]
+        richer_record['attached_media'][0]['digital_assets'][0]['location_box'] = 'AU.AAD.20000'
+        richer_record['attached_media'][0]['digital_assets'][0]['rights_holders'] = 'Royal College of Art'
+
+        base_row = self.service.flatten_records_pdf_sources([base_record])[0]
+        richer_row = self.service.flatten_records_pdf_sources([richer_record])[0]
+        self.assertEqual(base_row['document_id'], richer_row['document_id'])
+        self.assertEqual(base_row['asset_id'], richer_row['asset_id'])
+
+    def test_normalize_use_for_ml_for_document_column(self):
+        self.assertEqual(self.service._normalize_use_for_ml(True), 1)
+        self.assertEqual(self.service._normalize_use_for_ml(False), 0)
+        self.assertEqual(self.service._normalize_use_for_ml(1), 1)
+        self.assertEqual(self.service._normalize_use_for_ml(0), 0)
+        self.assertIsNone(self.service._normalize_use_for_ml(None))
+
     def test_flatten_record_with_multiple_assets_keeps_one_row_per_pdf_master(self):
         record = {
             'id': '155',
