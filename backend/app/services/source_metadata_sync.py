@@ -104,11 +104,32 @@ class SourceMetadataSyncService:
             if key != 'digital_assets' and value is not None
         })
         snapshot.update({key: value for key, value in asset.items() if value is not None})
+        source_title = next(
+            (
+                value
+                for value in (
+                    next(
+                        (
+                            pdf_file.get('label')
+                            for pdf_file in media.get('pdf_files') or []
+                            if pdf_file.get('filename') == asset.get('filename') and pdf_file.get('label')
+                        ),
+                        None,
+                    ),
+                    asset.get('label'),
+                    media.get('title'),
+                    record.get('title'),
+                )
+                if value
+            ),
+            None,
+        )
         snapshot.update({
             'authority_id': media.get('id'),
             'record_id': record.get('id'),
             'record_pid': record.get('pid'),
             'record_title': record.get('title'),
+            'title': source_title,
             'record_public_uri': record.get('public_uri'),
             'asset_id': asset.get('assetId'),
             'asset_pid': asset.get('pid'),

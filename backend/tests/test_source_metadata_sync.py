@@ -110,6 +110,17 @@ class SourceMetadataSyncTests(unittest.TestCase):
         self.assertEqual(document.processing_status, 'completed')
         self.assertFalse(result['reingestion_required'])
 
+    def test_asset_label_is_the_source_title_over_parent_media_title(self):
+        document = make_document()
+        record = make_record(title='Parent media title')
+        record['attached_media'][0]['digital_assets'][0]['label'] = 'Asset source title'
+
+        result, _session = self.sync(document, record)
+
+        self.assertEqual(document.title, 'Asset source title')
+        self.assertEqual(document.authority_data['title'], 'Asset source title')
+        self.assertIn('title', result['changed_fields'])
+
     def test_rights_change_records_snapshot_provenance_without_mutating_evidence(self):
         document = make_document()
 
