@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from hashlib import sha256
 import json
 import logging
-from typing import Any, Dict, Mapping, Optional, Sequence
+from typing import Any, Dict, Mapping, Optional
 
 from app.core.database import LocalSessionLocal
 from app.models.document import Document
@@ -145,6 +145,152 @@ class SourceMetadataSyncService:
             'role': 'tiff_master' if file_type.endswith('tiff') else 'pdf_master',
         }
 
+    def _build_reconciliation_plan(self, document: Document) -> Dict[str, Any]:
+        """Fetch and compare current DDR metadata without changing the document."""
+        record_pid = document.archive_record_pid or document.pid
+        record = self.authority_service.fetch_record_by_pid(record_pid)
+        if not record:
+            raise ValueError(f'DDR GraphQL returned no record for PID {record_pid}')
+
+        media = self._matching_media(record, document)
+        if not media:
+            raise ValueError(f'DDR GraphQL record {record_pid} has no matching attached media')
+
+        asset = self._matching_asset(media, document)
+        if not asset:
+            raise ValueError(f'DDR GraphQL media {document.pid} has no matching source asset')
+
+        policy = evaluate_ml_policy(
+            asset_present=True,
+            asset_use_for_ml=asset.get('use_for_ml'),
+            ml_pages=asset.get('ml_pages'),
+        )
+        snapshot = self._build_snapshot(record, media, asset, policy)
+        prior_snapshot = dict(document.authority_data or {})
+        snapshot_hash = _snapshot_hash(snapshot)
+        upstream_asset_identity = _asset_identity(asset)
+        upstream_asset_identity_hash = _snapshot_hash(upstream_asset_identity)
+        local_asset_identity_hash = _snapshot_hash(self._current_asset_identity(document))
+        asset_changed = local_asset_identity_hash != upstream_asset_identity_hash
+        policy_changed = any(
+            getattr(document, field) != policy.get(field)
+            for field in ('use_for_ml', 'ml_page_scope', 'ml_policy_status', 'ml_exclusion_reason')
+        )
+        changed_fields = self._changed_fields(prior_snapshot, snapshot, policy_changed)
+        metadata_changed = snapshot_hash != document.archive_metadata_snapshot_hash if document.archive_metadata_snapshot_hash else bool(changed_fields)
+        return {
+            'record': record,
+            'media': media,
+            'asset': asset,
+            'policy': policy,
+            'snapshot': snapshot,
+            'snapshot_hash': snapshot_hash,
+            'asset_identity_hash': upstream_asset_identity_hash,
+            'asset_changed': asset_changed,
+            'policy_changed': policy_changed,
+            'changed_fields': changed_fields,
+            'metadata_changed': metadata_changed,
+        }
+
+    def compare_archive_metadata(self, document_id: str) -> Dict[str, Any]:
+        """Return a DDR reconciliation result without persisting any change."""
+        db = self.session_factory()
+        try:
+            document = db.query(Document).filter(Document.document_id == document_id).first()
+            if document is None:
+                raise LookupError(f'Document {document_id} was not found')
+            plan = self._build_reconciliation_plan(document)
+            snapshot = plan['snapshot']
+            previous = dict(document.authority_data or {})
+            return {
+                'document_id': document.document_id,
+                'archive_record_pid': document.archive_record_pid or document.pid,
+                'sync_status': 'source_asset_changed' if plan['asset_changed'] else ('updated' if plan['metadata_changed'] else 'current'),
+                'metadata_changed': plan['metadata_changed'],
+                'policy_changed': plan['policy_changed'],
+                'source_asset_changed': plan['asset_changed'],
+                'reingestion_required': plan['asset_changed'],
+                'changed_fields': plan['changed_fields'],
+                'field_differences': {
+                    field: {'previous': previous.get(field), 'current': snapshot.get(field)}
+                    for field in plan['changed_fields']
+                },
+                'errors': [],
+            }
+        finally:
+            db.close()
+
+    def sync_all_archive_metadata(
+        self,
+        *,
+        dry_run: bool = True,
+        eligible_statuses: Optional[set[str]] = None,
+        batch_size: int = 50,
+    ) -> Dict[str, Any]:
+        """Reconcile all existing documents through the canonical single-source flow."""
+        db = self.session_factory()
+        try:
+            query = db.query(Document).order_by(Document.id)
+            if eligible_statuses is not None:
+                query = query.filter(Document.ml_policy_status.in_(eligible_statuses))
+            document_ids = [document_id for (document_id,) in query.with_entities(Document.document_id).all()]
+        finally:
+            db.close()
+
+        summary: Dict[str, Any] = {
+            'dry_run': dry_run,
+            'batch_size': batch_size,
+            'documents_inspected': 0,
+            'documents_resolvable_to_ddr': 0,
+            'documents_current': 0,
+            'documents_with_metadata_differences': 0,
+            'documents_with_policy_differences': 0,
+            'documents_with_source_asset_identity_differences': 0,
+            'documents_unable_to_resolve': 0,
+            'graphql_api_errors': 0,
+            'changed_field_counts': {},
+            'results': [],
+        }
+        for document_id in document_ids:
+            summary['documents_inspected'] += 1
+            try:
+                result = (
+                    self.compare_archive_metadata(document_id)
+                    if dry_run else self.sync_archive_metadata(document_id)
+                )
+            except Exception as error:
+                result = {
+                    'document_id': document_id,
+                    'sync_status': 'error',
+                    'metadata_changed': False,
+                    'policy_changed': False,
+                    'source_asset_changed': False,
+                    'reingestion_required': False,
+                    'changed_fields': [],
+                    'errors': [str(error)],
+                }
+
+            summary['results'].append(result)
+            if result['sync_status'] == 'error':
+                summary['documents_unable_to_resolve'] += 1
+                if any('DDR GraphQL' in error for error in result['errors']):
+                    summary['graphql_api_errors'] += 1
+                continue
+
+            summary['documents_resolvable_to_ddr'] += 1
+            if result['metadata_changed']:
+                summary['documents_with_metadata_differences'] += 1
+            else:
+                summary['documents_current'] += 1
+            if result['policy_changed']:
+                summary['documents_with_policy_differences'] += 1
+            if result['source_asset_changed']:
+                summary['documents_with_source_asset_identity_differences'] += 1
+            for field in result['changed_fields']:
+                counts = summary['changed_field_counts']
+                counts[field] = counts.get(field, 0) + 1
+        return summary
+
     def _record_error(self, document: Document, error: str, db: Any) -> Dict[str, Any]:
         document.metadata_sync_status = 'error'
         document.metadata_sync_error = error
@@ -168,38 +314,19 @@ class SourceMetadataSyncService:
             if document is None:
                 raise LookupError(f'Document {document_id} was not found')
 
-            record_pid = document.archive_record_pid or document.pid
-            record = self.authority_service.fetch_record_by_pid(record_pid)
-            if not record:
-                return self._record_error(document, f'DDR GraphQL returned no record for PID {record_pid}', db)
-
-            media = self._matching_media(record, document)
-            if not media:
-                return self._record_error(document, f'DDR GraphQL record {record_pid} has no matching attached media', db)
-
-            asset = self._matching_asset(media, document)
-            if not asset:
-                return self._record_error(document, f'DDR GraphQL media {document.pid} has no matching source asset', db)
-
-            policy = evaluate_ml_policy(
-                asset_present=True,
-                asset_use_for_ml=asset.get('use_for_ml'),
-                ml_pages=asset.get('ml_pages'),
-            )
-            snapshot = self._build_snapshot(record, media, asset, policy)
-            prior_snapshot = dict(document.authority_data or {})
+            plan = self._build_reconciliation_plan(document)
+            record = plan['record']
+            media = plan['media']
+            asset = plan['asset']
+            policy = plan['policy']
+            snapshot = plan['snapshot']
             fetched_at = datetime.now(timezone.utc)
-            snapshot_hash = _snapshot_hash(snapshot)
-            upstream_asset_identity = _asset_identity(asset)
-            upstream_asset_identity_hash = _snapshot_hash(upstream_asset_identity)
-            local_asset_identity_hash = _snapshot_hash(self._current_asset_identity(document))
-            asset_changed = local_asset_identity_hash != upstream_asset_identity_hash
-            policy_changed = any(
-                getattr(document, field) != policy.get(field)
-                for field in ('use_for_ml', 'ml_page_scope', 'ml_policy_status', 'ml_exclusion_reason')
-            )
-            changed_fields = self._changed_fields(prior_snapshot, snapshot, policy_changed)
-            metadata_changed = snapshot_hash != document.archive_metadata_snapshot_hash if document.archive_metadata_snapshot_hash else bool(changed_fields)
+            snapshot_hash = plan['snapshot_hash']
+            upstream_asset_identity_hash = plan['asset_identity_hash']
+            asset_changed = plan['asset_changed']
+            policy_changed = plan['policy_changed']
+            changed_fields = plan['changed_fields']
+            metadata_changed = plan['metadata_changed']
 
             document.authority_data = snapshot
             document.authority_id = media.get('id') or document.authority_id

@@ -171,6 +171,19 @@ class SourceMetadataSyncTests(unittest.TestCase):
         self.assertEqual(document.authority_data, original_metadata)
         self.assertIsNotNone(document.metadata_sync_error)
 
+    def test_compare_reports_differences_without_persisting_them(self):
+        document = make_document()
+        session = FakeSession(document)
+        service = SourceMetadataSyncService(FakeAuthorityService(make_record()), session_factory=lambda: session)
+
+        result = service.compare_archive_metadata(document.document_id)
+
+        self.assertEqual(result['sync_status'], 'updated')
+        self.assertEqual(result['field_differences']['data_rights']['previous'], 'Old rights')
+        self.assertEqual(result['field_differences']['data_rights']['current'], 'DDR rights')
+        self.assertEqual(document.authority_data['data_rights'], 'Old rights')
+        self.assertEqual(session.commits, 0)
+
 
 if __name__ == '__main__':
     unittest.main()
