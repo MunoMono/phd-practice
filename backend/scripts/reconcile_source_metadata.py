@@ -9,8 +9,10 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from sqlalchemy import text
+
 from app.core.database import LocalSessionLocal
-from app.models.document import Document, DocumentChunk
+from app.models.document import Document
 from app.services.source_metadata_sync import SourceMetadataSyncService
 
 
@@ -19,7 +21,7 @@ def database_counts() -> dict[str, int]:
     try:
         return {
             'documents': db.query(Document).count(),
-            'document_chunks': db.query(DocumentChunk).count(),
+            'document_chunks': db.execute(text('SELECT count(*) FROM document_chunks')).scalar_one(),
         }
     finally:
         db.close()
