@@ -273,7 +273,7 @@ class SourceMetadataSyncService:
             summary['results'].append(result)
             if result['sync_status'] == 'error':
                 summary['documents_unable_to_resolve'] += 1
-                if any('DDR GraphQL' in error for error in result['errors']):
+                if any('GraphQL request failed' in error for error in result['errors']):
                     summary['graphql_api_errors'] += 1
                 continue
 
