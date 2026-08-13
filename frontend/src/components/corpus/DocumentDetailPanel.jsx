@@ -1,4 +1,5 @@
-import { Button, SkeletonText, Tag, Tile } from '@carbon/react'
+import { Button, InlineNotification, SkeletonText, Tab, TabList, TabPanel, TabPanels, Tabs, Tag, Tile } from '@carbon/react'
+import { useState } from 'react'
 import './CorpusPanels.scss'
 
 const hasValue = (value) => {
@@ -39,10 +40,23 @@ const renderTagValues = (values, emptyLabel = 'Not yet recorded') => {
     return <p className="corpus-panel__empty">{emptyLabel}</p>
   }
 
+  const tags = values
+    .map((value) => {
+      if (value && typeof value === 'object') {
+        return { key: value.id || value.label, label: value.label || value.id }
+      }
+      return { key: value, label: value }
+    })
+    .filter((tag) => hasValue(tag.label))
+
+  if (tags.length === 0) {
+    return <p className="corpus-panel__empty">{emptyLabel}</p>
+  }
+
   return (
     <div className="app-tag-row corpus-panel__tag-row corpus-panel__tag-row--wrap">
-      {values.map((value) => (
-        <Tag key={value} type="cool-gray">{value}</Tag>
+      {tags.map((tag) => (
+        <Tag key={tag.key} type="cool-gray">{tag.label}</Tag>
       ))}
     </div>
   )
@@ -113,19 +127,6 @@ const formatStatusLabel = (value) => {
   return value.replaceAll('_', ' ')
 }
 
-const formatAccessRestriction = (value) => {
-  if (!value) {
-    return null
-  }
-
-  const normalized = value.toLowerCase()
-  if (normalized === 'int') {
-    return 'Internal'
-  }
-
-  return value
-}
-
 const formatExtent = (number, unit) => {
   if (!hasValue(number) && !hasValue(unit)) {
     return null
@@ -148,9 +149,21 @@ const formatMetadataList = (metadata) => Object.entries(metadata || {}).filter((
 
 const buildFieldRows = (rows) => rows.filter((row) => hasValue(row.value))
 
+const pickFirstValue = (...values) => values.find((value) => hasValue(value))
+
 const formatFieldLabel = (value) => value.replaceAll('_', ' ')
 
 const formatAuthorityRole = (value) => value.replaceAll('_', ' ')
+
+const formatSyncDate = (value) => {
+  if (!value) {
+    return 'Not yet synchronised'
+  }
+
+  return new Intl.DateTimeFormat(undefined, {
+    day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
+  }).format(new Date(value))
+}
 
 const HUMAN_FIELD_LABELS = {
   title: 'Object title',
@@ -183,7 +196,10 @@ const copyCitation = async (detail) => {
   }
 }
 
-const DocumentDetailPanel = ({ detail, loading, onTraceEvidence, onViewAnalytics, onInspectMissingness, authoritySummary = null }) => {
+const DocumentDetailPanel = ({ detail, loading, onRefreshMetadata, onTraceEvidence, onViewAnalytics, onInspectMissingness, authoritySummary = null }) => {
+  const [refreshing, setRefreshing] = useState(false)
+  const [refreshResult, setRefreshResult] = useState(null)
+
   if (loading) {
     return (
       <Tile>
@@ -202,59 +218,48 @@ const DocumentDetailPanel = ({ detail, loading, onTraceEvidence, onViewAnalytics
   }
 
   const { document, annotations, similarDocuments, error } = detail
-  const catalogueMetadata = annotations?.catalogue_metadata || {}
-  const provenanceMetadata = annotations?.retrieval_provenance || {}
-  const rightsAccess = annotations?.rights_access || {}
+  const metadataDetail = annotations || document || {}
+  const catalogueMetadata = metadataDetail.catalogue_metadata || document?.catalogue_metadata || {}
+  const provenanceMetadata = metadataDetail.retrieval_provenance || document?.retrieval_provenance || {}
+  const rightsAccess = metadataDetail.rights_access || document?.rights_access || {}
   const policyReason = formatPolicyReason(annotations)
-  const recordPublicUrl = annotations?.record_public_uri || provenanceMetadata.record_public_uri || null
+  const recordPublicUrl = pickFirstValue(annotations?.record_public_uri, document?.record_public_uri, provenanceMetadata.record_public_uri) || null
   const policyStatusLabel = formatStatusLabel(annotations?.ml_policy_status)
   const policyExplanation = annotations?.ml_policy_status === 'policy_unresolved' || annotations?.used_for_ml === null || annotations?.used_for_ml === undefined
     ? policyReason || 'The current local record does not yet contain enough asset-level policy data to determine ML eligibility or page scope.'
     : null
   const retrievalRows = buildFieldRows([
     { label: 'Document ID', value: document.id, fallback: 'Not yet exposed by endpoint' },
-    { label: 'Archive record PID', value: annotations?.archive_record_pid },
-    { label: 'Attached-media PID', value: annotations?.attached_media_pid || document.attached_media_pid || document.pid },
-    { label: 'Asset PID', value: annotations?.asset_pid },
-    { label: 'Asset ID', value: annotations?.asset_id },
-    { label: 'Source filename', value: annotations?.source_filename || document.filename },
+    { label: 'Archive record PID', value: pickFirstValue(annotations?.archive_record_pid, document.archive_record_pid) },
+    { label: 'Attached-media PID', value: pickFirstValue(annotations?.attached_media_pid, document.attached_media_pid, document.pid) },
+    { label: 'Asset PID', value: pickFirstValue(annotations?.asset_pid, document.asset_pid) },
+    { label: 'Asset ID', value: pickFirstValue(annotations?.asset_id, document.asset_id) },
+    { label: 'Source filename', value: pickFirstValue(annotations?.source_filename, document.source_filename, document.filename) },
     { label: 'Repository', value: provenanceMetadata.repository },
     { label: 'Accession / shelfmark', value: provenanceMetadata.accession_shelfmark },
     { label: 'Box / container', value: provenanceMetadata.box_number },
-    { label: 'Container title', value: provenanceMetadata.container_title },
     { label: 'Location note', value: provenanceMetadata.location_note },
-    { label: 'Reference code', value: provenanceMetadata.reference_code || provenanceMetadata.archive_reference },
     { label: 'Page count', value: annotations?.page_count ?? document.page_count ?? provenanceMetadata.page_count ?? null, fallback: 'Not yet recorded' },
-    { label: 'Page-count source', value: annotations?.page_count_source || provenanceMetadata.page_count_source, fallback: 'Not yet recorded' },
-    { label: 'Source URI', value: annotations?.source_uri || document.source_uri },
+    { label: 'Source URI', value: pickFirstValue(annotations?.source_uri, document.source_uri) },
   ])
-  const rightsRows = [
-    { label: 'Copyright', value: rightsAccess.copyright },
+  const rightsRows = buildFieldRows([
     { label: 'Copyright holder', value: rightsAccess.copyright_holder },
-    { label: 'Copyright holder (other)', value: rightsAccess.copyright_holder_other },
-    { label: 'Data rights', value: rightsAccess.data_rights },
-    { label: 'Data rights holder', value: rightsAccess.data_rights_holder },
     { label: 'Image rights', value: rightsAccess.image_rights },
-    { label: 'Image rights holder', value: rightsAccess.image_rights_holder },
-    { label: 'Rights owner', value: rightsAccess.rights_owner },
-    { label: 'Rights holders', value: rightsAccess.rights_holders },
-    { label: 'Access restriction', value: formatAccessRestriction(rightsAccess.access_restriction) },
+    { label: 'Data rights', value: rightsAccess.data_rights },
     { label: 'Rights statement', value: rightsAccess.rights_statement_uri },
-    { label: 'Consent status', value: rightsAccess.consent_status },
-    { label: 'Consent scope', value: rightsAccess.consent_scope },
-    { label: 'Consent evidence URI', value: rightsAccess.consent_evidence_uri },
     { label: 'Takedown contact', value: rightsAccess.takedown_contact },
-  ]
+  ])
   const catalogueRows = buildFieldRows([
-    { label: 'Caption / asset title', value: catalogueMetadata.caption },
-    { label: 'Creator', value: catalogueMetadata.creator },
+    { label: 'Title', value: catalogueMetadata.title || document.title },
+    { label: 'Caption', value: catalogueMetadata.caption },
+    { label: 'Language', value: catalogueMetadata.language },
+    { label: 'Extent', value: formatExtent(catalogueMetadata.extent_number, catalogueMetadata.extent_unit) },
     { label: 'Date', value: catalogueMetadata.date },
     { label: 'Date qualifier', value: catalogueMetadata.date_qualifier },
-    { label: 'Language', value: catalogueMetadata.language },
-    { label: 'Document / publication type', value: catalogueMetadata.document_type },
-    { label: 'Extent', value: formatExtent(catalogueMetadata.extent_number, catalogueMetadata.extent_unit) },
+    { label: 'Date status', value: catalogueMetadata.date_unknown === true ? 'Unknown' : null },
   ])
   const extraCatalogueRows = formatMetadataList(catalogueMetadata).filter(([key]) => ![
+    'title',
     'caption',
     'creator',
     'date',
@@ -267,13 +272,30 @@ const DocumentDetailPanel = ({ detail, loading, onTraceEvidence, onViewAnalytics
     'normalized_date',
     'date_unknown',
   ].includes(key))
-  const persistence = annotations?.persistence || {}
+  const persistence = pickFirstValue(annotations?.persistence, document?.persistence) || {}
+  const archiveMetadataSync = persistence.archive_metadata_sync || {}
   const persistenceRows = [
-    { label: 'Local persistence status', value: document.processing_status || annotations?.processing_status, fallback: 'Unknown' },
-    { label: 'Metadata roles version', value: persistence.metadata_roles_version || annotations?.metadata_roles_version, fallback: 'Not yet recorded' },
-    { label: 'Ingestion version', value: persistence.ingestion_version || annotations?.ingestion_version, fallback: 'Not yet recorded' },
-    { label: 'Corpus version', value: persistence.corpus_version || annotations?.corpus_version, fallback: 'Not yet recorded' }
+    { label: 'Local persistence status', value: pickFirstValue(document.processing_status, annotations?.processing_status), fallback: 'Unknown' },
+    { label: 'Metadata roles version', value: pickFirstValue(persistence.metadata_roles_version, annotations?.metadata_roles_version, document?.metadata_roles_version), fallback: 'Not yet recorded' },
+    { label: 'Ingestion version', value: pickFirstValue(persistence.ingestion_version, annotations?.ingestion_version, document?.ingestion_version), fallback: 'Not yet recorded' },
+    { label: 'Corpus version', value: pickFirstValue(persistence.corpus_version, annotations?.corpus_version, document?.corpus_version), fallback: 'Not yet recorded' }
   ]
+
+  const handleRefreshMetadata = async () => {
+    if (!onRefreshMetadata) {
+      return
+    }
+
+    setRefreshing(true)
+    setRefreshResult(null)
+    try {
+      setRefreshResult(await onRefreshMetadata())
+    } catch (refreshError) {
+      setRefreshResult({ sync_status: 'error', errors: [refreshError.message || 'Archive metadata refresh failed.'] })
+    } finally {
+      setRefreshing(false)
+    }
+  }
 
   return (
     <Tile>
@@ -286,7 +308,15 @@ const DocumentDetailPanel = ({ detail, loading, onTraceEvidence, onViewAnalytics
 
       {error && <p>{error}</p>}
 
-      <div className="corpus-panel__stack">
+      <Tabs className="corpus-detail-tabs">
+        <TabList aria-label="Source detail sections" contained>
+          <Tab>Overview</Tab>
+          <Tab>Archive metadata</Tab>
+          <Tab>Provenance</Tab>
+        </TabList>
+        <TabPanels>
+          <TabPanel>
+            <div className="corpus-panel__stack">
         <div>
           <h4 className="corpus-panel__section-title">Corpus control</h4>
           <p className="corpus-panel__copy">ML eligibility: {formatMlEligibility(annotations)}</p>
@@ -298,27 +328,40 @@ const DocumentDetailPanel = ({ detail, loading, onTraceEvidence, onViewAnalytics
 
         <div>
           <h4 className="corpus-panel__section-title">Rights and access</h4>
-          <div className="corpus-panel__list">
-            {rightsRows.map((row) => (
-              <div key={row.label} className="corpus-panel__field-row">
-                <p className="corpus-panel__field-label">{row.label}</p>
-                <p className="corpus-panel__field-value">{renderValue(row.value, 'Not recorded')}</p>
-              </div>
-            ))}
-          </div>
+          {rightsRows.length > 0 ? (
+            <div className="corpus-panel__list">
+              {rightsRows.map((row) => (
+                <div key={row.label} className="corpus-panel__field-row">
+                  <p className="corpus-panel__field-label">{row.label}</p>
+                  <p className="corpus-panel__field-value">{renderValue(row.value, 'Not recorded')}</p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="corpus-panel__empty">No rights or access metadata is currently attached to this local corpus record.</p>
+          )}
         </div>
 
         <div>
           <h4 className="corpus-panel__section-title">Retrieval and provenance</h4>
-          <div className="corpus-panel__list">
-            {retrievalRows.map((row) => (
-              <div key={row.label} className="corpus-panel__field-row">
-                <p className="corpus-panel__field-label">{row.label}</p>
-                <p className="corpus-panel__field-value">{renderValue(row.value, row.fallback || 'Not yet recorded')}</p>
-              </div>
-            ))}
-          </div>
+          {retrievalRows.length > 0 ? (
+            <div className="corpus-panel__list">
+              {retrievalRows.map((row) => (
+                <div key={row.label} className="corpus-panel__field-row">
+                  <p className="corpus-panel__field-label">{row.label}</p>
+                  <p className="corpus-panel__field-value">{renderValue(row.value, row.fallback || 'Not yet recorded')}</p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="corpus-panel__empty">No archive provenance metadata is currently attached to this local corpus record.</p>
+          )}
         </div>
+
+            </div>
+          </TabPanel>
+          <TabPanel>
+            <div className="corpus-panel__stack">
 
         <div>
           <h4 className="corpus-panel__section-title">Archive / catalogue metadata</h4>
@@ -353,6 +396,55 @@ const DocumentDetailPanel = ({ detail, loading, onTraceEvidence, onViewAnalytics
             <p className="corpus-panel__empty">No archive/catalogue metadata is currently attached to this local corpus record.</p>
           )}
           <p className="corpus-panel__meta">Archive / catalogue metadata is descriptive context about the archived object, not a transcription of the PDF source text.</p>
+        </div>
+
+            </div>
+          </TabPanel>
+          <TabPanel>
+            <div className="corpus-panel__stack">
+
+        <div>
+          <h4 className="corpus-panel__section-title">Archive metadata / synchronisation provenance</h4>
+          <div className="corpus-panel__list">
+            <div className="corpus-panel__field-row">
+              <p className="corpus-panel__field-label">Last synchronised</p>
+              <p className="corpus-panel__field-value">{formatSyncDate(archiveMetadataSync.fetched_at)}</p>
+            </div>
+            <div className="corpus-panel__field-row">
+              <p className="corpus-panel__field-label">Source</p>
+              <p className="corpus-panel__field-value">{renderValue(archiveMetadataSync.source, 'DDR GraphQL')}</p>
+            </div>
+            <div className="corpus-panel__field-row">
+              <p className="corpus-panel__field-label">Sync status</p>
+              <p className="corpus-panel__field-value">{formatStatusLabel(archiveMetadataSync.status || 'needs_sync')}</p>
+            </div>
+            <div className="corpus-panel__field-row">
+              <p className="corpus-panel__field-label">Source asset</p>
+              <p className="corpus-panel__field-value">{archiveMetadataSync.source_asset_changed ? 'Changed' : 'Unchanged'}</p>
+            </div>
+            <div className="corpus-panel__field-row">
+              <p className="corpus-panel__field-label">Document extraction</p>
+              <p className="corpus-panel__field-value">{archiveMetadataSync.reingestion_required ? 'Out of date - re-ingestion required' : 'Current'}</p>
+            </div>
+          </div>
+          {archiveMetadataSync.snapshot_hash ? <p className="corpus-panel__meta">Metadata snapshot: {archiveMetadataSync.snapshot_hash}</p> : null}
+          {archiveMetadataSync.source_asset_checksum ? <p className="corpus-panel__meta">Source asset checksum: {archiveMetadataSync.source_asset_checksum}</p> : null}
+          {archiveMetadataSync.error ? <p className="corpus-panel__meta">Last sync error: {archiveMetadataSync.error}</p> : null}
+          <Button kind="ghost" size="sm" disabled={refreshing} onClick={handleRefreshMetadata}>
+            {refreshing ? 'Refreshing archive metadata...' : 'Refresh archive metadata'}
+          </Button>
+          {refreshResult?.sync_status === 'updated' ? (
+            <InlineNotification lowContrast kind="success" title="Archive metadata updated" subtitle={`${refreshResult.changed_fields.length} field${refreshResult.changed_fields.length === 1 ? '' : 's'} changed: ${refreshResult.changed_fields.join(', ')}. Source PDF unchanged. Document extraction remains current.`} />
+          ) : null}
+          {refreshResult?.sync_status === 'current' ? (
+            <InlineNotification lowContrast kind="info" title="Archive metadata is current" subtitle="No local metadata changes were required." />
+          ) : null}
+          {refreshResult?.sync_status === 'source_asset_changed' ? (
+            <InlineNotification lowContrast kind="warning" title="Source asset has changed" subtitle="Metadata was refreshed, but document extraction is out of date. Re-ingestion is required." />
+          ) : null}
+          {refreshResult?.sync_status === 'error' ? (
+            <InlineNotification lowContrast kind="error" title="Archive metadata refresh failed" subtitle={refreshResult.errors?.join(' ') || 'The previous local metadata was preserved.'} />
+          ) : null}
         </div>
 
         <div>
@@ -412,7 +504,10 @@ const DocumentDetailPanel = ({ detail, loading, onTraceEvidence, onViewAnalytics
           <Button kind="ghost" onClick={() => copyCitation(detail)}>Copy citation</Button>
           <Button kind="ghost" disabled={!recordPublicUrl} onClick={() => recordPublicUrl && window.open(recordPublicUrl, '_blank', 'noopener,noreferrer')}>Open DDR source</Button>
         </div>
-      </div>
+            </div>
+          </TabPanel>
+        </TabPanels>
+      </Tabs>
     </Tile>
   )
 }

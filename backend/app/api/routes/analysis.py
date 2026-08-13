@@ -131,6 +131,8 @@ async def analyze_query(request: AnalysisRequest):
                     FROM document_chunks dc
                     JOIN documents d ON d.document_id = dc.document_id
                     WHERE search_tsv @@ websearch_to_tsquery('english', :query)
+                        AND d.use_for_ml = 1
+                        AND d.ml_policy_status IN ('eligible_unrestricted', 'eligible_page_restricted')
                     ORDER BY rank DESC
                     LIMIT :limit
                     """

@@ -56,6 +56,15 @@ class Document(LocalBase):
     ml_page_scope = Column(Text)
     ml_policy_status = Column(String(64), index=True)
     ml_exclusion_reason = Column(Text)
+    archive_metadata_fetched_at = Column(DateTime)
+    archive_metadata_source = Column(String(255))
+    archive_metadata_snapshot_hash = Column(String(64), index=True)
+    metadata_sync_status = Column(String(64), index=True)
+    metadata_sync_error = Column(Text)
+    source_asset_checksum = Column(String(128))
+    source_asset_identity_hash = Column(String(64), index=True)
+    source_asset_changed = Column(Integer, default=0)
+    reingestion_required = Column(Integer, default=0)
     
     # Document metadata (renamed to avoid SQLAlchemy reserved word)
     doc_metadata = Column(JSONB)  # Author, journal, keywords, etc.

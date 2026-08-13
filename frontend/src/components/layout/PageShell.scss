@@ -274,3 +274,32 @@
 .app-table-wrap {
   overflow-x: auto;
 }
+
+.corpus-document-table {
+  min-width: 0;
+
+  .cds--data-table {
+    table-layout: fixed;
+    width: 100%;
+  }
+
+  .cds--data-table th:nth-child(1) {
+    width: 39%;
+  }
+
+  .cds--data-table th:nth-child(2) {
+    width: 11%;
+  }
+
+  .cds--data-table th:nth-child(3) {
+    width: 30%;
+  }
+
+  .cds--data-table th:nth-child(4) {
+    width: 20%;
+  }
+
+  .cds--data-table td:nth-child(4) {
+    overflow-wrap: anywhere;
+  }
+}

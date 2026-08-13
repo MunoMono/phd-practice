@@ -65,6 +65,10 @@ export const getDocumentAnnotations = async (documentId) => {
   }
 }
 
+export const syncDocumentMetadata = (documentId) => apiRequest(`/api/documents/${documentId}/sync-metadata`, {
+  method: 'POST'
+})
+
 export const uploadDocument = (payload) => apiRequest('/api/documents/upload', {
   method: 'POST',
   body: payload

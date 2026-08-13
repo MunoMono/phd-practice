@@ -1,6 +1,7 @@
 import {
   DataTable,
   Loading,
+  Pagination,
   Table,
   TableBody,
   TableCell,
@@ -11,6 +12,7 @@ import {
   Tag,
   Tile
 } from '@carbon/react'
+import { useEffect, useState } from 'react'
 
 const headers = [
   { key: 'title', header: 'Title' },
@@ -26,6 +28,13 @@ const statusTagType = {
 }
 
 const DocumentTable = ({ documents, loading, selectedDocumentId, onSelect }) => {
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
+
+  useEffect(() => {
+    setPage(1)
+  }, [documents])
+
   if (loading) {
     return (
       <Tile>
@@ -43,10 +52,13 @@ const DocumentTable = ({ documents, loading, selectedDocumentId, onSelect }) => 
     )
   }
 
+  const startIndex = (page - 1) * pageSize
+  const paginatedDocuments = documents.slice(startIndex, startIndex + pageSize)
+
   return (
     <Tile>
       <DataTable
-        rows={documents.map((document) => ({
+        rows={paginatedDocuments.map((document) => ({
           id: document.id,
           title: document.title,
           publication_year: document.publication_year || 'N/A',
@@ -55,7 +67,11 @@ const DocumentTable = ({ documents, loading, selectedDocumentId, onSelect }) => 
         headers={headers}
       >
         {({ rows, headers, getTableProps, getHeaderProps, getRowProps }) => (
-          <TableContainer title="Corpus documents" description="Select a document to inspect available annotation, PID, and similarity metadata.">
+            <TableContainer
+              className="corpus-document-table"
+              title="Corpus documents"
+              description="Select a document to inspect available annotation, PID, and similarity metadata."
+            >
             <Table {...getTableProps()}>
               <TableHead>
                 <TableRow>
@@ -71,7 +87,7 @@ const DocumentTable = ({ documents, loading, selectedDocumentId, onSelect }) => 
                   <TableRow
                     key={row.id}
                     {...getRowProps({ row })}
-                    onClick={() => onSelect(documents.find((document) => document.id === row.id))}
+                    onClick={() => onSelect(paginatedDocuments.find((document) => document.id === row.id))}
                     className={row.id === selectedDocumentId ? 'app-table-row--interactive app-table-row--selected' : 'app-table-row--interactive'}
                   >
                     {row.cells.map((cell) => (
@@ -87,6 +103,16 @@ const DocumentTable = ({ documents, loading, selectedDocumentId, onSelect }) => 
                 ))}
               </TableBody>
             </Table>
+            <Pagination
+              page={page}
+              pageSize={pageSize}
+              pageSizes={[10, 20, 50]}
+              totalItems={documents.length}
+              onChange={({ page: nextPage, pageSize: nextPageSize }) => {
+                setPage(nextPage)
+                setPageSize(nextPageSize)
+              }}
+            />
           </TableContainer>
         )}
       </DataTable>

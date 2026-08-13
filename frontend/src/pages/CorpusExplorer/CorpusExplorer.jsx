@@ -3,7 +3,7 @@ import { Search } from '@carbon/icons-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getAuthoritySummary } from '../../api/authorities'
-import { listDocuments, getDocument, getDocumentAnnotations } from '../../api/documents'
+import { listDocuments, getDocument, getDocumentAnnotations, syncDocumentMetadata } from '../../api/documents'
 import { getSimilarDocuments, autocompleteSearch } from '../../api/search'
 import CorpusSearchPanel from '../../components/corpus/CorpusSearchPanel'
 import DocumentTable from '../../components/corpus/DocumentTable'
@@ -196,6 +196,34 @@ const CorpusExplorer = () => {
     setSelectedDocumentId(document.id)
   }
 
+  const handleMetadataRefresh = async () => {
+    if (!selectedDocumentId) {
+      return null
+    }
+
+    const result = await syncDocumentMetadata(selectedDocumentId)
+    const [document, annotations] = await Promise.all([
+      getDocument(selectedDocumentId),
+      getDocumentAnnotations(selectedDocumentId)
+    ])
+
+    setSelectedDetail((current) => ({
+      ...(current || {}),
+      document: {
+        ...(current?.document || {}),
+        ...document,
+        pid: annotations.pid || document.pid || null,
+        page_count: annotations.page_count ?? document.page_count ?? null
+      },
+      annotations,
+      syncResult: result
+    }))
+    setDocuments((current) => current.map((item) => (
+      item.id === selectedDocumentId ? { ...item, ...document } : item
+    )))
+    return result
+  }
+
   return (
     <PageGrid className="corpus-explorer-page">
       <Column>
@@ -250,7 +278,7 @@ const CorpusExplorer = () => {
         />
       </Column>
 
-      <Column lg={6}>
+      <Column lg={7}>
         <DocumentTable
           documents={filteredDocuments}
           loading={loading}
@@ -264,6 +292,7 @@ const CorpusExplorer = () => {
           detail={selectedDetail}
           loading={detailLoading}
           authoritySummary={authoritySummary}
+          onRefreshMetadata={handleMetadataRefresh}
           onTraceEvidence={() => navigate('/source-interrogation')}
           onViewAnalytics={() => navigate('/semantic-atlas')}
           onInspectMissingness={() => navigate('/absences')}

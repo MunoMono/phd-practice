@@ -13,6 +13,7 @@ from app.services.embedding_service import EmbeddingService
 from app.core.database import LocalSessionLocal
 from app.models.document import Document, DocumentChunk
 from app.services.document_source_service import build_document_annotations_payload, build_document_detail_payload, build_document_list_payload, select_source_documents
+from app.services.source_metadata_sync import SourceMetadataSyncService
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -137,6 +138,15 @@ async def get_document(document_id: str):
         return build_document_detail_payload(doc)
     finally:
         db.close()
+
+
+@router.post("/{document_id}/sync-metadata")
+async def sync_document_metadata(document_id: str):
+    """Refresh one document's persisted DDR metadata without re-ingesting it."""
+    try:
+        return SourceMetadataSyncService().sync_archive_metadata(document_id)
+    except LookupError as error:
+        raise HTTPException(status_code=404, detail=str(error))
 
 
 @router.get("")

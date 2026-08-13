@@ -71,6 +71,8 @@ async def semantic_search(request: SemanticSearchRequest):
             END as similarity
         FROM documents
         WHERE pid IS NOT NULL
+            AND use_for_ml = 1
+            AND ml_policy_status IN ('eligible_unrestricted', 'eligible_page_restricted')
             AND (
                 LOWER(title) LIKE LOWER(:query_pattern)
                 OR LOWER(ml_summary) LIKE LOWER(:query_pattern)
@@ -153,7 +155,12 @@ async def find_similar_documents(
     
     try:
         # Check if document exists
-        check_query = "SELECT document_id, title FROM documents WHERE document_id = :doc_id"
+        check_query = """
+        SELECT document_id, title FROM documents
+        WHERE document_id = :doc_id
+            AND use_for_ml = 1
+            AND ml_policy_status IN ('eligible_unrestricted', 'eligible_page_restricted')
+        """
         check_result = db.execute(text(check_query), {"doc_id": document_id})
         source_doc = check_result.fetchone()
         
@@ -182,6 +189,8 @@ async def find_similar_documents(
         )
         WHERE (ds.document_id_a = :doc_id OR ds.document_id_b = :doc_id)
             AND ds.combined_score >= :threshold
+            AND d.use_for_ml = 1
+            AND d.ml_policy_status IN ('eligible_unrestricted', 'eligible_page_restricted')
         ORDER BY ds.combined_score DESC
         LIMIT :limit
         """
@@ -252,6 +261,8 @@ async def search_by_entity(
         JOIN entities e ON de.entity_id = e.id
         JOIN documents d ON de.document_id = d.document_id
         WHERE LOWER(e.entity_text) LIKE LOWER(:entity_pattern)
+            AND d.use_for_ml = 1
+            AND d.ml_policy_status IN ('eligible_unrestricted', 'eligible_page_restricted')
         """
         
         if entity_type:
@@ -314,6 +325,8 @@ async def search_autocomplete(
         FROM documents
         WHERE LOWER(title) LIKE LOWER(:pattern)
             AND pid IS NOT NULL
+            AND use_for_ml = 1
+            AND ml_policy_status IN ('eligible_unrestricted', 'eligible_page_restricted')
         ORDER BY title
         LIMIT 5
         """
@@ -329,6 +342,8 @@ async def search_autocomplete(
         SELECT DISTINCT unnest(ml_themes) as theme
         FROM documents
         WHERE ml_themes IS NOT NULL
+            AND use_for_ml = 1
+            AND ml_policy_status IN ('eligible_unrestricted', 'eligible_page_restricted')
             AND EXISTS (
                 SELECT 1 FROM unnest(ml_themes) AS t
                 WHERE LOWER(t) LIKE LOWER(:pattern)
