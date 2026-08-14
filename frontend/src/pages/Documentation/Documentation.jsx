@@ -135,7 +135,7 @@ const Documentation = () => {
                       <p>{entry.summary}</p>
                       <div className="documentation-page__catalogue-footer">
                         <span>{entry.sourceFormat}</span>
-                        <span>{entry.markdown ? `Version ${entry.version} · ${entry.date}` : `${entry.wordCount} words`}</span>
+                        <span>{entry.markdown ? `Version ${entry.version} · ${entry.date}` : entry.date}</span>
                       </div>
                     </button>
                   ))}
@@ -158,6 +158,7 @@ const Documentation = () => {
                       <span>Status</span><strong>{selectedEntry.status}</strong>
                       <span>Classification</span><strong>{selectedEntry.classification}</strong>
                       <span>Source</span><strong>{selectedEntry.sourceFormat}</strong>
+                      <span>Date</span><strong>{selectedEntry.date}</strong>
                       <span>{selectedEntry.markdown ? 'Version' : 'Words'}</span><strong>{selectedEntry.markdown ? '0.2' : selectedEntry.wordCount}</strong>
                       <span>Seed</span><strong>{selectedEntry.publishedLabel}</strong>
                     </div>
@@ -212,7 +213,7 @@ const Documentation = () => {
                       </div>
                     ) : (
                       <p className="documentation-page__document-meta">
-                        {selectedEntry.author} · {selectedEntry.documentLabel} · {selectedEntry.wordCount} words
+                        {selectedEntry.author} · {selectedEntry.documentLabel} · {selectedEntry.date} · {selectedEntry.wordCount} words
                       </p>
                     )}
                     <p className="documentation-page__document-summary">{selectedEntry.summary}</p>

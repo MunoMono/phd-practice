@@ -13,6 +13,7 @@ export const DOCUMENTATION_ENTRIES = [
     wordCount: 988,
     sourcePath: '/docs/expanded_abstract.docx',
     publishedLabel: 'Seeded from /docs',
+    date: '11 June 2026',
     tags: ['Expanded abstract', 'DDR archive', 'Practice-led research', 'Documentation'],
     researchQuestions: [
       {
@@ -94,6 +95,7 @@ export const DOCUMENTATION_ENTRIES = [
     wordCount: 1776,
     sourcePath: '/docs/five_research_instruments_archival_activation_clean_for_copilot.docx',
     publishedLabel: 'Seeded from /docs',
+    date: '13 June 2026',
     tags: ['Archival activation', 'Research instruments', 'Methodology', 'Documentation'],
     researchQuestions: [],
     sections: [
@@ -365,6 +367,6 @@ export const DOCUMENTATION_ENTRIES = [
     tags: ['Turin experiment', 'Retrieval-augmented archival interrogation', 'Working specification'],
     markdown: true,
   },
-]
+].sort((left, right) => new Date(right.date) - new Date(left.date))
 
 export const getDocumentationEntry = (slug) => DOCUMENTATION_ENTRIES.find((entry) => entry.slug === slug) ?? null
