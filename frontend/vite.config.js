@@ -1,10 +1,21 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import { viteStaticCopy } from 'vite-plugin-static-copy'
 
 // https://vite.dev/config/
 export default defineConfig({
   base: '/',
-  plugins: [react()],
+  plugins: [
+    react(),
+    viteStaticCopy({
+      targets: [
+        {
+          src: '../docs/turin_experiment/technology-statement-of-work-turin-experiment-v0.2.md',
+          dest: 'docs',
+        },
+      ],
+    }),
+  ],
   server: {
     port: 3000,
     proxy: {

@@ -1,14 +1,22 @@
-import React from 'react'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import './../../styles/components/Markdown.scss'
 
-/**
- * Markdown renderer component with Carbon styling
- * Wraps markdown content with proper Carbon-styled classes
- */
-const MarkdownRenderer = ({ children, className = '' }) => {
+const MarkdownRenderer = ({ content, className = '' }) => {
   return (
     <div className={`markdown-content ${className}`}>
-      {children}
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        components={{
+          table: ({ children }) => (
+            <div className="markdown-content__table-scroll">
+              <table>{children}</table>
+            </div>
+          ),
+        }}
+      >
+        {content}
+      </ReactMarkdown>
     </div>
   )
 }

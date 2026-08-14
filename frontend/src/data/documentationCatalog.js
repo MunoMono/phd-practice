@@ -346,6 +346,25 @@ export const DOCUMENTATION_ENTRIES = [
       },
     ],
   },
+  {
+    id: 'DOC-003',
+    slug: 'technology-statement-of-work',
+    title: 'Technology Statement of Work',
+    fullTitle: 'Technology Statement of Work',
+    summary: 'Technical scope, methods, controls, deliverables and acceptance criteria for the retrieval-augmented archival interrogation experiment.',
+    author: 'Graham Newman',
+    status: 'Working specification',
+    classification: 'Turin experiment',
+    documentLabel: 'Retrieval-Augmented Archival Interrogation Experiment',
+    sourceFormat: 'Markdown (.md)',
+    wordCount: 0,
+    sourcePath: '/docs/technology-statement-of-work-turin-experiment-v0.2.md',
+    publishedLabel: 'Canonical source: docs/turin_experiment',
+    version: '0.2',
+    date: '7 August 2026',
+    tags: ['Turin experiment', 'Retrieval-augmented archival interrogation', 'Working specification'],
+    markdown: true,
+  },
 ]
 
 export const getDocumentationEntry = (slug) => DOCUMENTATION_ENTRIES.find((entry) => entry.slug === slug) ?? null

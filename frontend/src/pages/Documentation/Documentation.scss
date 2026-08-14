@@ -211,6 +211,12 @@
   max-width: 44rem;
 }
 
+.documentation-page__document-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: $spacing-03;
+}
+
 .documentation-page__question-block,
 .documentation-page__section {
   display: grid;
@@ -229,6 +235,10 @@
     line-height: 1.7;
     max-width: 46rem;
   }
+}
+
+.documentation-page__markdown-reader {
+  min-width: 0;
 }
 
 .documentation-page__table-block {

@@ -35,7 +35,8 @@ export const SECONDARY_SECTIONS = {
     { key: 'provenance', label: 'Provenance', path: '/provenance', icon: Catalog, matches: ['/provenance', '/audit', '/sessions', '/experiments', '/ml-dashboard'] },
   ],
   documentation: [
-    { key: 'expanded-abstract', label: 'Expanded abstract', path: '/documentation/expanded-abstract', icon: Catalog, matches: ['/documentation', '/documentation/expanded-abstract'] },
+    { key: 'expanded-abstract', label: 'Expanded abstract', path: '/documentation/expanded-abstract', icon: Catalog, matches: ['/documentation/expanded-abstract'] },
+    { key: 'technology-statement-of-work', label: 'Technology Statement of Work', path: '/documentation/technology-statement-of-work', icon: Catalog, matches: ['/documentation/technology-statement-of-work'] },
   ],
 }
 

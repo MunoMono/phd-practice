@@ -1,8 +1,10 @@
-import { Button, Tag, Tile } from '@carbon/react'
+import { Button, InlineLoading, Tag, Tile } from '@carbon/react'
 import { ArrowRight, Download } from '@carbon/icons-react'
+import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import PageHeader from '../../components/layout/PageHeader'
 import { PageGrid, PageColumn as Column } from '../../components/layout/PageGrid'
+import MarkdownRenderer from '../../components/MarkdownRenderer/MarkdownRenderer'
 import { DOCUMENTATION_ENTRIES, getDocumentationEntry } from '../../data/documentationCatalog'
 import './Documentation.scss'
 
@@ -43,7 +45,39 @@ const Documentation = () => {
   const { docId } = useParams()
 
   const selectedEntry = docId ? getDocumentationEntry(docId) : DOCUMENTATION_ENTRIES[0]
+  const [markdownContent, setMarkdownContent] = useState('')
+  const [markdownError, setMarkdownError] = useState('')
   const tableOfContents = selectedEntry?.sections || []
+
+  useEffect(() => {
+    if (!selectedEntry?.markdown) {
+      setMarkdownContent('')
+      setMarkdownError('')
+      return undefined
+    }
+
+    const controller = new AbortController()
+
+    fetch(selectedEntry.sourcePath, { signal: controller.signal })
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error(`Unable to load ${selectedEntry.sourceFormat}`)
+        }
+        return response.text()
+      })
+      .then((content) => {
+        setMarkdownContent(content)
+        setMarkdownError('')
+      })
+      .catch((error) => {
+        if (error.name !== 'AbortError') {
+          setMarkdownContent('')
+          setMarkdownError(error.message)
+        }
+      })
+
+    return () => controller.abort()
+  }, [selectedEntry])
 
   const openEntry = (entry) => {
     navigate(`/documentation/${entry.slug}`)
@@ -56,10 +90,10 @@ const Documentation = () => {
           <PageHeader
             eyebrow="Documentation"
             title="Documentation"
-            description="A report-style documentation reader for thesis texts, archival notes, and durable research memory. Seeded first with the expanded abstract from the local docs directory."
+            description="A report-style documentation reader for thesis texts, archival notes, and durable research memory."
             actions={(
               <div className="documentation-page__header-actions">
-                <Tag type="blue" size="md">Word-backed</Tag>
+                <Tag type="blue" size="md">{selectedEntry?.markdown ? 'Markdown-backed' : 'Word-backed'}</Tag>
                 <Tag type="cool-gray" size="md">Read only</Tag>
               </div>
             )}
@@ -101,7 +135,7 @@ const Documentation = () => {
                       <p>{entry.summary}</p>
                       <div className="documentation-page__catalogue-footer">
                         <span>{entry.sourceFormat}</span>
-                        <span>{entry.wordCount} words</span>
+                        <span>{entry.markdown ? `Version ${entry.version} · ${entry.date}` : `${entry.wordCount} words`}</span>
                       </div>
                     </button>
                   ))}
@@ -124,7 +158,7 @@ const Documentation = () => {
                       <span>Status</span><strong>{selectedEntry.status}</strong>
                       <span>Classification</span><strong>{selectedEntry.classification}</strong>
                       <span>Source</span><strong>{selectedEntry.sourceFormat}</strong>
-                      <span>Words</span><strong>{selectedEntry.wordCount}</strong>
+                      <span>{selectedEntry.markdown ? 'Version' : 'Words'}</span><strong>{selectedEntry.markdown ? '0.2' : selectedEntry.wordCount}</strong>
                       <span>Seed</span><strong>{selectedEntry.publishedLabel}</strong>
                     </div>
 
@@ -170,11 +204,27 @@ const Documentation = () => {
                   <header className="documentation-page__document-header">
                     <p className="documentation-page__document-kicker">{selectedEntry.id}</p>
                     <h2 className="documentation-page__document-title">{selectedEntry.fullTitle}</h2>
-                    <p className="documentation-page__document-meta">
-                      {selectedEntry.author} · {selectedEntry.documentLabel} · {selectedEntry.wordCount} words
-                    </p>
+                    {selectedEntry.markdown ? (
+                      <div className="documentation-page__document-tags">
+                        <Tag type="blue" size="md">Version {selectedEntry.version}</Tag>
+                        <Tag type="cool-gray" size="md">{selectedEntry.date}</Tag>
+                        <Tag type="green" size="md">{selectedEntry.status}</Tag>
+                      </div>
+                    ) : (
+                      <p className="documentation-page__document-meta">
+                        {selectedEntry.author} · {selectedEntry.documentLabel} · {selectedEntry.wordCount} words
+                      </p>
+                    )}
                     <p className="documentation-page__document-summary">{selectedEntry.summary}</p>
                   </header>
+
+                  {selectedEntry.markdown ? (
+                    <section className="documentation-page__markdown-reader" aria-label="Technology Statement of Work">
+                      {markdownError ? <p>{markdownError}</p> : null}
+                      {!markdownContent && !markdownError ? <InlineLoading description="Loading canonical Markdown source" /> : null}
+                      {markdownContent ? <MarkdownRenderer content={markdownContent} /> : null}
+                    </section>
+                  ) : null}
 
                   {selectedEntry.researchQuestions?.length ? (
                     <section className="documentation-page__question-block" aria-label="Research questions">
@@ -188,7 +238,7 @@ const Documentation = () => {
                     </section>
                   ) : null}
 
-                  {selectedEntry.sections.map((section) => (
+                  {!selectedEntry.markdown && selectedEntry.sections.map((section) => (
                     <section key={section.id} id={section.id} className="documentation-page__section">
                       <h3>{section.heading}</h3>
                       {(section.blocks || section.paragraphs.map((paragraph) => ({ type: 'paragraph', text: paragraph }))).map(renderSectionBlock)}
