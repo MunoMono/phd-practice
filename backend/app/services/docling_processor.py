@@ -58,9 +58,21 @@ class DoclingProcessor:
         try:
             logger.info(f"Processing PDF with Docling: {pdf_path}")
 
-            from docling.document_converter import DocumentConverter
+            from docling.datamodel.base_models import InputFormat
+            from docling.datamodel.pipeline_options import AcceleratorOptions, PdfPipelineOptions
+            from docling.document_converter import DocumentConverter, PdfFormatOption
 
-            converter = DocumentConverter()
+            max_threads = int(os.getenv("DOCLING_MAX_THREADS", "1"))
+            pipeline_options = PdfPipelineOptions(
+                do_ocr=self.enable_ocr,
+                artifacts_path=os.getenv("DOCLING_ARTIFACTS_PATH") or None,
+                accelerator_options=AcceleratorOptions(num_threads=max_threads),
+            )
+            converter = DocumentConverter(
+                format_options={
+                    InputFormat.PDF: PdfFormatOption(pipeline_options=pipeline_options),
+                }
+            )
             conversion = converter.convert(pdf_path)
             document = conversion.document if conversion else None
 

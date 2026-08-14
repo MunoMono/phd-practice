@@ -88,7 +88,7 @@ docker exec phd-practice-backend python -c "from app.core.config import settings
 
 3. **Test database connectivity:**
 ```bash
-docker exec phd-practice-db psql -U postgres -d epistemic_drift -c "SELECT 1;"
+docker exec phd-practice-db psql -U postgres -d testamentary-traces -c "SELECT 1;"
 ```
 
 ## Best Practices Applied

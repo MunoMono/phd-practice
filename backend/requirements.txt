@@ -14,12 +14,13 @@ python-jose[cryptography]==3.3.0
 
 # AI/ML dependencies for embeddings and RAG
 transformers==4.46.2
-torch>=2.0.0
+torch==2.13.0
+torchvision==0.28.0
 sentence-transformers==3.3.0
 huggingface-hub==0.26.2
 docling==2.15.0
+pypdf==5.1.0
 accelerate==0.26.1
-bitsandbytes==0.42.0
 
 # S3 storage
 boto3==1.35.60

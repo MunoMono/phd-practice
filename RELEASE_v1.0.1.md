@@ -55,7 +55,7 @@ Data quality baseline with corrected PDF/TIFF counts and ML provenance tracking.
 ### Database
 - **Engine:** PostgreSQL 15 + pgvector
 - **Password:** `postgres/postgres` (stabilized after authentication issues)
-- **Backup:** `epistemic_drift_v1.0.1_20260130_140402.sql` (29KB)
+- **Backup:** `testamentary-traces_v1.0.1_20260130_140402.sql` (29KB)
 
 ### Code
 - **Backup:** `phd-practice_v1.0.1_code_20260130_140418.tar.gz` (7.6MB)
@@ -115,7 +115,7 @@ ssh root@innovationdesign.io "cd /root/phd-practice && docker compose -f docker-
 ssh root@innovationdesign.io "cd /root/phd-practice && docker compose -f docker-compose.prod.yml build --no-cache frontend && docker compose -f docker-compose.prod.yml up -d frontend"
 
 # Reset database password if needed
-ssh root@innovationdesign.io "docker exec phd-practice-db psql -U postgres -d epistemic_drift -c \"ALTER USER postgres WITH PASSWORD 'postgres';\""
+ssh root@innovationdesign.io "docker exec phd-practice-db psql -U postgres -d testamentary-traces -c \"ALTER USER postgres WITH PASSWORD 'postgres';\""
 ```
 
 ---
@@ -148,7 +148,7 @@ fe4e52c Add ML-approved TIFF counts (57 total): 4+17+20+16 across 4 PIDs
 
 ## Attribution
 
-**Research Context:** PhD research on epistemic drift in design methods, supervised at Royal College of Art. Uses DDR Archive (Design & Designers in Residence) as source repository via persistent identifiers (PIDs).
+**Research Context:** PhD research on testamentary traces in design methods, supervised at Royal College of Art. Uses DDR Archive (Design & Designers in Residence) as source repository via persistent identifiers (PIDs).
 
 **Lead Developer:** Graham (AI-assisted development)  
 **Institution:** Royal College of Art  

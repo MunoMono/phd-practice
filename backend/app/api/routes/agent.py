@@ -62,7 +62,7 @@ async def query_agent(request: QueryRequest):
         ]
         
         # TODO: Implement Granite model inference
-        agent_response = f"Based on the retrieved documents, the query '{request.query}' reveals patterns of epistemic drift characterized by..."
+        agent_response = f"Based on the retrieved documents, the query '{request.query}' reveals patterns of testamentary traces characterized by..."
         
         reasoning_steps = [
             "Retrieved 2 relevant document chunks from vector database",

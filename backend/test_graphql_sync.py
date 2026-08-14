@@ -278,6 +278,6 @@ Currently: 2 confirmed (PDFs), 1 needs TIFF metadata added to GraphQL.
     """)
     
     print("\n🎯 Next Steps:")
-    print("  1. Run migration: psql -d epistemic_drift -f backend/migrations/001_add_pid_to_documents.sql")
+    print("  1. Run migration: psql -d testamentary-traces -f backend/migrations/001_add_pid_to_documents.sql")
     print("  2. Test actual sync: python -c 'from app.services.graphql_sync import GraphQLSyncService; ...'")
     print("  3. Query training corpus: SELECT pid, title FROM documents WHERE pid IS NOT NULL;")

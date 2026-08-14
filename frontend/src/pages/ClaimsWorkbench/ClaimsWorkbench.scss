@@ -2,6 +2,19 @@
 @use '@carbon/react/scss/theme' as *;
 
 .claims-workbench {
+  .claims-workbench__claim-col {
+    width: 58%;
+  }
+
+  .claims-workbench__support-col,
+  .claims-workbench__evidence-col {
+    width: 12%;
+  }
+
+  .claims-workbench__reviewer-col {
+    width: 18%;
+  }
+
   .claims-workbench__table-wrap {
     overflow-x: auto;
   }
@@ -17,6 +30,16 @@
   .claims-workbench__updated {
     overflow-wrap: anywhere;
     word-break: break-word;
+  }
+
+  .claims-workbench__claim-summary,
+  .claims-workbench__detail-head {
+    display: grid;
+    gap: $spacing-03;
+  }
+
+  .claims-workbench__compact-cell {
+    white-space: nowrap;
   }
 
   .claims-workbench__detail-copy {

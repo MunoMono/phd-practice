@@ -216,7 +216,7 @@ tail -f /var/log/authority-sync.log
 docker compose -f docker-compose.prod.yml logs -f backend | grep sync
 
 # Database sync log
-psql -d epistemic_drift -c "SELECT * FROM sync_log ORDER BY sync_started_at DESC LIMIT 10;"
+psql -d testamentary-traces -c "SELECT * FROM sync_log ORDER BY sync_started_at DESC LIMIT 10;"
 ```
 
 ## Production Deployment

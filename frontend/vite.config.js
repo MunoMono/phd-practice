@@ -17,7 +17,11 @@ export default defineConfig({
   css: {
     preprocessorOptions: {
       scss: {
+        api: 'modern-compiler',
         additionalData: `
+          @use '@carbon/styles/scss/config' with (
+            $font-path: 'https://1.www.s81c.com/common/carbon/plex/fonts'
+          );
           @use '@carbon/react/scss/spacing' as *;
           @use '@carbon/react/scss/theme' as *;
           @use '@carbon/react/scss/colors' as *;

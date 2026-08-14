@@ -1,0 +1,25 @@
+{
+  "classification": "TURIN CONTROLLED-INGESTION FULL CORPUS",
+  "corpus_version": "corpus_f40d78dbce52",
+  "ingestion_version": "turin-controlled-pilot-v1",
+  "chunking_version": "turin-page-heading-v1",
+  "documents": [
+    {
+      "document_id": "doc_321843234637_3dafa63de05f",
+      "asset_id": "491fdbf612455d205b8c3d5fbff488cdc69b256e2fd5095d8317917683b874fc",
+      "asset_pid": "359001684832",
+      "source_uri": "https://archive-media.lon1.digitaloceanspaces.com/ddr-archive/records/321843234637/master/491fdbf612455d205b8c3d5fbff488cdc69b256e2fd5095d8317917683b874fc__pdf_master__v1.pdf",
+      "ml_policy_status": "eligible_unrestricted",
+      "ml_page_scope": "all_pages",
+      "status": "failed",
+      "extraction_issues": [
+        "Stream has ended unexpectedly"
+      ],
+      "started_at": "2026-08-14T06:38:55.338428+00:00",
+      "completed_at": "2026-08-14T06:38:55.448942+00:00",
+      "duration_seconds": 0.111,
+      "peak_memory_kib": 101180,
+      "worker_exit_status": 1
+    }
+  ]
+}

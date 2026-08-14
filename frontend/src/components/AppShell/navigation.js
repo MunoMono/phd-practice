@@ -31,6 +31,7 @@ export const SECONDARY_SECTIONS = {
   ],
   evidence: [
     { key: 'claims-evidence', label: 'Claims and evidence', path: '/claims-evidence', icon: CheckmarkOutline, matches: ['/claims-evidence', '/claims'] },
+    { key: 'research-runs', label: 'Research runs', path: '/research-runs', icon: Catalog, matches: ['/research-runs', '/experiments'] },
     { key: 'provenance', label: 'Provenance', path: '/provenance', icon: Catalog, matches: ['/provenance', '/audit', '/sessions', '/experiments', '/ml-dashboard'] },
   ],
   documentation: [
@@ -42,7 +43,7 @@ const PRIMARY_ROUTE_MATCHERS = [
   { key: 'workbench', matches: ['/', '/workbench', '/dashboard'] },
   { key: 'sources', matches: ['/sources', '/corpus'] },
   { key: 'analysis', matches: ['/source-interrogation', '/ask', '/tracer', '/absences', '/missingness', '/cross-readings', '/cross-read', '/semantic-atlas', '/clusters', '/visual-analytics'] },
-  { key: 'evidence', matches: ['/claims-evidence', '/claims', '/provenance', '/audit', '/sessions', '/experiments', '/ml-dashboard'] },
+  { key: 'evidence', matches: ['/claims-evidence', '/claims', '/research-runs', '/experiments', '/provenance', '/audit', '/sessions', '/ml-dashboard'] },
   { key: 'documentation', matches: ['/documentation'] },
 ]
 

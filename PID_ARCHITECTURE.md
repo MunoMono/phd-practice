@@ -234,7 +234,7 @@ AND d.authority_data IS NULL;  -- Not enriched with GraphQL data
 To add PID columns to existing database:
 
 ```bash
-psql -d epistemic_drift -f backend/migrations/001_add_pid_to_documents.sql
+psql -d testamentary-traces -f backend/migrations/001_add_pid_to_documents.sql
 ```
 
 Or run via SQLAlchemy:

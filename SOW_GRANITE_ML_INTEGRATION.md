@@ -1,4 +1,4 @@
-# Statement of Work: Granite ML Model Integration for Epistemic Drift Analysis
+# Statement of Work: Granite ML Model Integration for Testamentary Traces Analysis
 
 **Project Title:** Multimodal Document Processing and Granite LLM Integration for PhD Research  
 **Principal Investigator:** Graham Newman, RCA PhD Candidate  
@@ -11,7 +11,7 @@
 
 ## 1. Executive Summary
 
-This Statement of Work defines the scope, deliverables, and implementation approach for integrating IBM Granite language model capabilities into the existing Epistemic Drift Research Platform. The project will establish a complete pipeline from raw archival documents (PDF/TIFF) through automated processing, vector embedding generation, semantic analysis, and culminate in user acceptance testing of the Granite-powered analytical interface.
+This Statement of Work defines the scope, deliverables, and implementation approach for integrating IBM Granite language model capabilities into the existing Testamentary Traces Research Platform. The project will establish a complete pipeline from raw archival documents (PDF/TIFF) through automated processing, vector embedding generation, semantic analysis, and culminate in user acceptance testing of the Granite-powered analytical interface.
 
 **Core Objective:** Enable automated semantic analysis of design methods literature (1965-1985) using IBM Granite LLM, with full provenance tracking and explainable AI outputs suitable for doctoral research standards.
 
@@ -32,7 +32,7 @@ This Statement of Work defines the scope, deliverables, and implementation appro
 
 **Granite Model Integration:**
 - IBM Granite-4.0-H-Small-Instruct model deployment
-- Inference pipeline for epistemic drift analysis
+- Inference pipeline for testamentary traces analysis
 - Prompt engineering for domain-specific analytical tasks
 - Citation generation linking AI outputs to source documents
 - Session logging for cybernetic research methodology
@@ -252,7 +252,7 @@ For a beta proof-of-concept and PhD research budget, **local deployment on the D
 - Test inference latency on target hardware
 
 **Story 3.2: Inference Pipeline** (5 points)
-- Build prompt templates for epistemic drift analysis
+- Build prompt templates for testamentary traces analysis
 - Implement context injection (retrieved chunks → prompt)
 - Create streaming response handler for real-time feedback
 - Add error handling and timeout management
@@ -350,7 +350,7 @@ For a beta proof-of-concept and PhD research budget, **local deployment on the D
 **Tasks:**
 
 **Story 6.1: Research Query Testing** (5 points)
-- Prepare 20 representative research questions about epistemic drift
+- Prepare 20 representative research questions about testamentary traces
 - Execute queries through frontend interface
 - Manually validate AI outputs against source PDFs
 - Measure accuracy: Do citations match claimed content?
@@ -657,7 +657,7 @@ Date: _______________________
 ### Appendix A: Glossary
 
 - **PID:** Persistent Identifier - unique code linking research materials to archival records
-- **Epistemic Drift:** Changes in knowledge assumptions and research priorities over time
+- **Testamentary Traces:** Changes in knowledge assumptions and research priorities over time
 - **Docling:** IBM's document processing library for PDF/TIFF extraction
 - **pgvector:** PostgreSQL extension for vector similarity search
 - **IVFFlat:** Indexing algorithm for approximate nearest neighbor search

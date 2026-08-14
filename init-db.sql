@@ -71,6 +71,14 @@ CREATE TABLE IF NOT EXISTS digital_assets (
 CREATE TABLE IF NOT EXISTS documents (
     id SERIAL PRIMARY KEY,
     document_id VARCHAR(255) UNIQUE NOT NULL,
+    pid VARCHAR(255) NOT NULL,
+    authority_id VARCHAR(255),
+    authority_data JSONB,
+    archive_record_id VARCHAR(255),
+    archive_record_pid VARCHAR(255),
+    asset_id VARCHAR(255),
+    asset_pid VARCHAR(255),
+    asset_id_or_asset_pid VARCHAR(255),
     title VARCHAR(500),
     publication_year INTEGER NOT NULL,
     publication_date TIMESTAMP,
@@ -79,7 +87,12 @@ CREATE TABLE IF NOT EXISTS documents (
     filename VARCHAR(255) NOT NULL,
     file_type VARCHAR(50),
     s3_key VARCHAR(500),
+    source_uri TEXT UNIQUE,
+    source_path TEXT,
     file_size_bytes INTEGER,
+    checksum_sha256 VARCHAR(64),
+    page_count INTEGER,
+    ocr_status VARCHAR(64) DEFAULT 'unknown',
     
     -- Extracted content
     extracted_text TEXT,
@@ -90,6 +103,13 @@ CREATE TABLE IF NOT EXISTS documents (
     processed_at TIMESTAMP,
     processing_status VARCHAR(50) DEFAULT 'pending',
     processing_error TEXT,
+    ingestion_version VARCHAR(255),
+    corpus_version VARCHAR(255),
+    metadata_source VARCHAR(255),
+    use_for_ml INTEGER,
+    ml_page_scope TEXT,
+    ml_policy_status VARCHAR(64),
+    ml_exclusion_reason TEXT,
     
     -- Metadata (renamed column)
     doc_metadata JSONB,
@@ -100,6 +120,24 @@ CREATE TABLE IF NOT EXISTS documents (
 -- Index on publication year for temporal queries
 CREATE INDEX IF NOT EXISTS documents_publication_year_idx 
 ON documents(publication_year);
+
+CREATE INDEX IF NOT EXISTS documents_pid_idx
+ON documents(pid);
+
+CREATE INDEX IF NOT EXISTS documents_checksum_sha256_idx
+ON documents(checksum_sha256);
+
+CREATE INDEX IF NOT EXISTS documents_asset_id_idx
+ON documents(asset_id);
+
+CREATE INDEX IF NOT EXISTS documents_asset_pid_idx
+ON documents(asset_pid);
+
+CREATE INDEX IF NOT EXISTS documents_asset_identifier_idx
+ON documents(asset_id_or_asset_pid);
+
+CREATE INDEX IF NOT EXISTS documents_ml_policy_status_idx
+ON documents(ml_policy_status);
 
 -- Document Chunks Table (for embeddings)
 CREATE TABLE IF NOT EXISTS document_chunks (

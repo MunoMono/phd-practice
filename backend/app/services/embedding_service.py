@@ -126,7 +126,7 @@ class EmbeddingService:
         embeddings_period2: List[List[float]]
     ) -> float:
         """
-        Calculate epistemic drift between two time periods
+        Calculate testamentary traces between two time periods
         
         Args:
             embeddings_period1: Embeddings from earlier period

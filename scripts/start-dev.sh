@@ -1,11 +1,11 @@
 #!/bin/bash
 
-# Development Startup Script for Epistemic Drift Research Platform
+# Development Startup Script for Testamentary Traces Research Platform
 # This script starts both frontend and backend in development mode
 
 set -e
 
-echo "🔬 Epistemic Drift Research Platform - Development Mode"
+echo "🔬 Testamentary Traces Research Platform - Development Mode"
 echo "========================================================"
 
 # Colors for output
@@ -33,6 +33,25 @@ check_port() {
     else
         return 1
     fi
+}
+
+wait_for_port() {
+    local port=$1
+    local label=$2
+    local timeout=${3:-30}
+    local elapsed=0
+
+    while [ $elapsed -lt $timeout ]; do
+        if check_port "$port"; then
+            return 0
+        fi
+
+        sleep 1
+        elapsed=$((elapsed + 1))
+    done
+
+    echo -e "${RED}❌ ${label} failed to start within ${timeout}s. Check logs for details.${NC}"
+    return 1
 }
 
 # Check if ports are available
@@ -122,15 +141,18 @@ trap cleanup SIGINT SIGTERM
 echo -e "\n${YELLOW}🚀 Starting backend server...${NC}"
 cd backend
 source venv/bin/activate
-uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload > ../$BACKEND_LOG 2>&1 &
+GRANITE_AUTO_LOAD=${GRANITE_AUTO_LOAD:-false} uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload > ../$BACKEND_LOG 2>&1 &
 BACKEND_PID=$!
 cd ..
 
 echo -e "${GREEN}✅ Backend starting on http://localhost:8000${NC}"
 echo -e "   API Docs: http://localhost:8000/docs"
 
-# Wait a moment for backend to start
-sleep 2
+# Wait for backend to bind before starting frontend
+if ! wait_for_port 8000 "Backend server" 30; then
+    cleanup
+    exit 1
+fi
 
 # Start frontend
 echo -e "\n${YELLOW}🚀 Starting frontend server...${NC}"
@@ -143,17 +165,7 @@ echo -e "${GREEN}✅ Frontend starting on http://localhost:3000${NC}"
 
 # Wait for services to start
 echo -e "\n${YELLOW}⏳ Waiting for services to be ready...${NC}"
-sleep 3
-
-# Check if services are running
-if ! check_port 8000; then
-    echo -e "${RED}❌ Backend failed to start. Check logs/backend-dev.log${NC}"
-    cleanup
-    exit 1
-fi
-
-if ! check_port 3000; then
-    echo -e "${RED}❌ Frontend failed to start. Check logs/frontend-dev.log${NC}"
+if ! wait_for_port 3000 "Frontend server" 30; then
     cleanup
     exit 1
 fi
@@ -161,7 +173,7 @@ fi
 echo -e "\n${GREEN}✅ All services running!${NC}"
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo -e "${GREEN}🎉 Epistemic Drift Research Platform is ready!${NC}"
+echo -e "${GREEN}🎉 Testamentary Traces Research Platform is ready!${NC}"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 echo "Access points:"

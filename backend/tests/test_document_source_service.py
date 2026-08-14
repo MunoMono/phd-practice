@@ -129,6 +129,8 @@ class DocumentPayloadTests(unittest.TestCase):
             page_count=23,
             ingestion_version='turin-phase2a-archive-inventory-v1',
             corpus_version='corpus_123',
+            archive_metadata_source='ddr_graphql.record_v1',
+            metadata_sync_status='current',
             processing_status='excluded_use_for_ml_false',
             ml_policy_status='excluded_use_for_ml_false',
             ml_exclusion_reason='asset_marked_use_for_ml_false',
@@ -173,6 +175,7 @@ class DocumentPayloadTests(unittest.TestCase):
         list_item = build_document_list_payload(document)
 
         self.assertEqual(annotations['attached_media_pid'], '287080879712')
+        self.assertEqual(annotations['archive_resolution_status'], 'archive_resolved_current')
         self.assertEqual(annotations['asset_pid'], '942396101474')
         self.assertEqual(annotations['ml_policy_status'], 'excluded_use_for_ml_false')
         self.assertEqual(annotations['corpus_control']['ml_exclusion_reason'], 'asset_marked_use_for_ml_false')
@@ -186,12 +189,14 @@ class DocumentPayloadTests(unittest.TestCase):
         self.assertEqual(annotations['catalogue_metadata']['caption'], 'Signed memo')
         self.assertEqual(annotations['persistence']['metadata_roles_version'], 'turin-phase2-metadata-v1')
         self.assertEqual(detail['attached_media_pid'], '287080879712')
+        self.assertEqual(detail['archive_resolution_status'], 'archive_resolved_current')
         self.assertEqual(detail['rights_access'], annotations['rights_access'])
         self.assertEqual(detail['retrieval_provenance'], annotations['retrieval_provenance'])
         self.assertEqual(detail['catalogue_metadata'], annotations['catalogue_metadata'])
         self.assertEqual(detail['corpus_control'], annotations['corpus_control'])
         self.assertEqual(detail['page_count_source'], 'persisted_document')
         self.assertEqual(list_item['used_for_ml'], False)
+        self.assertEqual(list_item['archive_resolution_status'], 'archive_resolved_current')
         self.assertEqual(list_item['metadata_roles_version'], 'turin-phase2-metadata-v1')
 
     def test_detail_preserves_accession_box_null_semantics(self):

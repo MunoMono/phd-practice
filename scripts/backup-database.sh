@@ -12,9 +12,12 @@
 
 set -e
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+
 # Configuration
-BACKUP_DIR="${BACKUP_DIR:-/Users/graham/Documents/repos/phd-practice/backups}"
-LOG_DIR="${LOG_DIR:-/Users/graham/Documents/repos/phd-practice/logs}"
+BACKUP_DIR="${BACKUP_DIR:-${REPO_ROOT}/backups}"
+LOG_DIR="${LOG_DIR:-${REPO_ROOT}/logs}"
 RETENTION_DAYS="${RETENTION_DAYS:-30}"
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
 DATE=$(date +"%Y-%m-%d")
@@ -24,8 +27,8 @@ LOG_FILE="${LOG_DIR}/backup_${DATE}.log"
 # Database credentials (from .env or defaults)
 POSTGRES_USER="${POSTGRES_USER:-postgres}"
 POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-postgres}"
-POSTGRES_DB="${POSTGRES_DB:-epistemic_drift}"
-CONTAINER_NAME="${CONTAINER_NAME:-phd-practice-db}"
+POSTGRES_DB="${POSTGRES_DB:-testamentary-traces}"
+CONTAINER_NAME="${CONTAINER_NAME:-phd-practice-db-dev}"
 
 # Create directories if they don't exist
 mkdir -p "${BACKUP_DIR}"
@@ -83,7 +86,7 @@ log "Cleanup complete. ${REMAINING} backup(s) remaining."
 
 # Optional: Backup volumes
 log "Creating volume backup info..."
-docker volume inspect phd-practice-db_postgres_data > "${BACKUP_DIR}/volume_info_${TIMESTAMP}.json" 2>/dev/null || true
+docker volume inspect innovation-design_postgres_data_dev > "${BACKUP_DIR}/volume_info_${TIMESTAMP}.json" 2>/dev/null || true
 
 log "=== Backup completed successfully ==="
 log ""

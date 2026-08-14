@@ -12,6 +12,7 @@ import re
 import numpy as np
 
 from app.core.database import LocalSessionLocal
+from app.services.corpus_status_service import get_corpus_status
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -1150,6 +1151,7 @@ async def get_dashboard_stats():
         stats_query = "SELECT * FROM ml_dashboard_stats"
         result = db.execute(text(stats_query))
         stats = result.fetchone()
+        corpus_status = get_corpus_status(db)
 
         # Count files that are actually indexed in chunked corpus.
         ingested_pdf_query = """
@@ -1179,6 +1181,7 @@ async def get_dashboard_stats():
         return {
             "overview": {
                 "totalDocuments": stats.total_documents,
+                "corpusStatus": corpus_status,
                 # UI uses this as model-ingested source PDF count.
                 "totalPdfs": ingested_pdf_files,
                 "totalPdfAssets": stats.total_pdfs,
@@ -1202,6 +1205,86 @@ async def get_dashboard_stats():
             "lastUpdated": stats.last_updated.isoformat() if stats.last_updated else None
         }
         
+    finally:
+        db.close()
+
+
+@router.get("/dashboard-analytical-surface")
+async def get_dashboard_analytical_surface():
+    """Return current frozen-corpus measures for the landing-page analytical surface."""
+    corpus_version = "corpus_f40d78dbce52"
+    db = LocalSessionLocal()
+
+    try:
+        composition = db.execute(text("""
+            WITH current_documents AS (
+                SELECT document_id, use_for_ml
+                FROM documents
+                WHERE corpus_version = :corpus_version
+            ), chunked_documents AS (
+                SELECT DISTINCT document_id
+                FROM document_chunks
+                WHERE corpus_version = :corpus_version
+            )
+            SELECT
+                (SELECT COUNT(*) FROM current_documents) AS current_assets,
+                (SELECT COUNT(*) FROM current_documents WHERE use_for_ml = 1) AS ml_eligible_assets,
+                (SELECT COUNT(*) FROM current_documents WHERE use_for_ml = 0) AS ml_excluded_assets,
+                (SELECT COUNT(*) FROM chunked_documents) AS controlled_ingestible_sources,
+                (SELECT COUNT(*) FROM document_chunks WHERE corpus_version = :corpus_version) AS current_chunks
+        """), {"corpus_version": corpus_version}).mappings().one()
+
+        density = db.execute(text("""
+            SELECT d.document_id, d.title, COUNT(*) AS chunk_count
+            FROM document_chunks dc
+            JOIN documents d ON d.document_id = dc.document_id
+            WHERE dc.corpus_version = :corpus_version
+            GROUP BY d.document_id, d.title
+            ORDER BY chunk_count DESC, d.title
+            LIMIT 12
+        """), {"corpus_version": corpus_version}).mappings().all()
+
+        temporal = db.execute(text("""
+            SELECT publication_year, COUNT(*) AS document_count
+            FROM documents
+            WHERE corpus_version = :corpus_version
+                AND publication_year IS NOT NULL
+            GROUP BY publication_year
+            ORDER BY publication_year
+        """), {"corpus_version": corpus_version}).mappings().all()
+        undated = db.execute(text("""
+            SELECT COUNT(*) AS document_count
+            FROM documents
+            WHERE corpus_version = :corpus_version
+                AND publication_year IS NULL
+        """), {"corpus_version": corpus_version}).scalar_one()
+
+        runs = db.execute(text("""
+            SELECT
+                COUNT(*) AS total_runs,
+                COUNT(*) FILTER (WHERE status = 'completed') AS completed_runs,
+                COUNT(*) FILTER (WHERE status = 'failed') AS bounded_failures,
+                COUNT(assessment.run_id) AS assessed_runs
+            FROM experiment_runs run
+            LEFT JOIN experiment_run_assessments assessment ON assessment.run_id = run.run_id
+        """)).mappings().one()
+
+        return {
+            "corpus_version": corpus_version,
+            "composition": {
+                "current_assets": int(composition["current_assets"] or 0),
+                "controlled_ingestible_sources": int(composition["controlled_ingestible_sources"] or 0),
+                "source_format_anomalies": max(0, int(composition["ml_eligible_assets"] or 0) - int(composition["controlled_ingestible_sources"] or 0)),
+                "ml_excluded_assets": int(composition["ml_excluded_assets"] or 0),
+                "current_chunks": int(composition["current_chunks"] or 0),
+            },
+            "density": [{"document_id": row["document_id"], "title": row["title"] or "Untitled document", "chunk_count": int(row["chunk_count"])} for row in density],
+            "temporal": {
+                "bins": [{"year": int(row["publication_year"]), "document_count": int(row["document_count"])} for row in temporal],
+                "undated_documents": int(undated or 0),
+            },
+            "runs": {key: int(value or 0) for key, value in runs.items()},
+        }
     finally:
         db.close()
 

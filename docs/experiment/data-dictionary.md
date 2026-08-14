@@ -37,6 +37,12 @@ Current role version: `turin-phase2-metadata-v1`.
 
 - `ingestion_version`: implementation/configuration version of the inventory or ingestion pipeline. Phase 2A default is `turin-phase2a-archive-inventory-v1`.
 - `corpus_version`: deterministic SHA-derived identifier based on sorted corpus membership and `ingestion_version`.
+- `context_builder_version`: `turin-context-budget-v2` for future runs using deterministic full-input budgeting; earlier budgeted runs retain their recorded version.
+- `input_budget_chars`, `fixed_prompt_chars`, `available_evidence_chars`, `assembled_input_chars`: immutable final-input budget accounting persisted in `experiment_runs.context_budget_json`.
+- `included_in_context`: whether a retrieved chunk was actually supplied to Granite.
+- `original_chars`, `supplied_chars`, `supplied_excerpt`, `excerpted`, `exclusion_reason`: per-retrieved-chunk packing provenance; `excerpt` remains the full retrieved passage.
+- `authority_context_json`: separately labelled authority source/type/role/fields/version and supplied-state information; never source-document evidence.
+- `ExperimentRunAssessment`: mutable researcher assessment separate from immutable run/evidence snapshots.
 
 ## Pending later Phase 2 fields
 

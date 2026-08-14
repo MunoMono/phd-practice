@@ -1,87 +1,80 @@
-from fastapi import APIRouter
-from pydantic import BaseModel
-from typing import List, Optional
-import logging
+"""Immutable archival experiment API; distinct from mutable training experiments."""
+
+from fastapi import APIRouter, HTTPException
+from fastapi.responses import JSONResponse, PlainTextResponse
+
+from app.core.database import LocalSessionLocal
+from app.models.research_outputs import ExperimentRun
+from app.services.experiment_run_service import ExperimentRunRequest, ExperimentRunService, ResearcherAssessmentInput, render_run_report, serialize_run
 
 router = APIRouter()
-logger = logging.getLogger(__name__)
+service = ExperimentRunService()
 
 
-class ExperimentMetrics(BaseModel):
-    epoch: int
-    loss: float
-    accuracy: Optional[float] = None
-    eval_metrics: Optional[dict] = None
+def _get_run(db, run_id: str) -> ExperimentRun:
+    run = db.query(ExperimentRun).filter(ExperimentRun.run_id == run_id).first()
+    if run is None:
+        raise HTTPException(status_code=404, detail="Experiment run not found")
+    return run
 
 
-class Experiment(BaseModel):
-    experiment_id: str
-    name: str
-    description: str
-    model: str
-    hyperparameters: dict
-    metrics: List[ExperimentMetrics]
-    notes: Optional[str] = None
+@router.post("", status_code=201)
+@router.post("/", status_code=201)
+async def create_experiment_run(request: ExperimentRunRequest):
+    db = LocalSessionLocal()
+    try:
+        return serialize_run(await service.run_archival_experiment(db, request))
+    except ValueError as exc:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    finally:
+        db.close()
 
 
-@router.get("/list")
-async def list_experiments():
-    """
-    List fine-tuning experiments and training runs.
-    
-    This endpoint integrates with Python notebooks documenting:
-    - Model fine-tuning configurations
-    - Training metrics (loss curves, accuracy)
-    - Qualitative evaluations of agent performance
-    """
-    # TODO: Integrate with actual experiment tracking system
-    mock_experiments = [
-        {
-            "experiment_id": "exp_001",
-            "name": "Granite Fine-tune v1",
-            "description": "Initial fine-tuning on 50 epistemic drift examples",
-            "model": "granite-4.0-h-small-instruct",
-            "hyperparameters": {
-                "learning_rate": 2e-5,
-                "batch_size": 4,
-                "epochs": 7,
-                "warmup_steps": 100
-            },
-            "metrics": [
-                {"epoch": i, "loss": 2.4 - (i * 0.3)}
-                for i in range(1, 8)
-            ],
-            "notes": "Agent began correctly identifying shifts in methodological terminology after epoch 3"
-        }
-    ]
-    
-    return {"experiments": mock_experiments}
+@router.get("")
+@router.get("/")
+async def list_experiment_runs():
+    db = LocalSessionLocal()
+    try:
+        runs = db.query(ExperimentRun).order_by(ExperimentRun.created_at.desc()).limit(50).all()
+        return {"count": len(runs), "experiment_runs": [serialize_run(run, include_evidence=False) for run in runs]}
+    finally:
+        db.close()
 
 
-@router.get("/{experiment_id}")
-async def get_experiment_detail(experiment_id: str):
-    """Get detailed metrics and notes for a specific experiment"""
-    # TODO: Implement actual retrieval
-    return {
-        "experiment_id": experiment_id,
-        "status": "completed",
-        "message": "Experiment details will be integrated with notebook tracking system"
-    }
+@router.get("/{run_id}/export")
+async def export_experiment_run(run_id: str):
+    db = LocalSessionLocal()
+    try:
+        return JSONResponse(content=serialize_run(_get_run(db, run_id)))
+    finally:
+        db.close()
 
 
-@router.get("/{experiment_id}/metrics")
-async def get_experiment_metrics(experiment_id: str):
-    """Get training metrics for visualization (loss curves, etc.)"""
-    # Mock data for D3 visualization
-    return {
-        "experiment_id": experiment_id,
-        "metrics": [
-            {"epoch": 1, "loss": 2.4, "eval_loss": 2.6},
-            {"epoch": 2, "loss": 1.8, "eval_loss": 2.1},
-            {"epoch": 3, "loss": 1.3, "eval_loss": 1.7},
-            {"epoch": 4, "loss": 0.9, "eval_loss": 1.4},
-            {"epoch": 5, "loss": 0.6, "eval_loss": 1.2},
-            {"epoch": 6, "loss": 0.45, "eval_loss": 1.1},
-            {"epoch": 7, "loss": 0.38, "eval_loss": 1.0}
-        ]
-    }
+@router.get("/{run_id}/report")
+async def report_experiment_run(run_id: str):
+    db = LocalSessionLocal()
+    try:
+        return PlainTextResponse(render_run_report(_get_run(db, run_id)), media_type="text/markdown")
+    finally:
+        db.close()
+
+
+@router.post("/{run_id}/assessment")
+async def save_researcher_assessment(run_id: str, request: ResearcherAssessmentInput):
+    db = LocalSessionLocal()
+    try:
+        run = _get_run(db, run_id)
+        service.save_assessment(db, run, request)
+        return {"run_id": run_id, "assessment": serialize_run(run, include_evidence=False)["assessment"]}
+    finally:
+        db.close()
+
+
+@router.get("/{run_id}")
+async def get_experiment_run(run_id: str):
+    db = LocalSessionLocal()
+    try:
+        return serialize_run(_get_run(db, run_id))
+    finally:
+        db.close()

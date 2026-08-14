@@ -1,7 +1,7 @@
 # DDR Archive GraphQL API Update Required
 
 ## Overview
-The epistemic drift system needs access to page-level ML annotation data from the DDR Archive GraphQL API. The UI already captures this data (`ml_pages` field visible in screenshots), but it's not exposed via the GraphQL API yet.
+The testamentary traces system needs access to page-level ML annotation data from the DDR Archive GraphQL API. The UI already captures this data (`ml_pages` field visible in screenshots), but it's not exposed via the GraphQL API yet.
 
 ## Required Schema Changes
 
@@ -174,7 +174,7 @@ curl -X POST https://api.ddrarchive.org/graphql \
   }' | python3 -m json.tool
 ```
 
-## Impact on Epistemic Drift System
+## Impact on Testamentary Traces System
 
 Once these fields are exposed:
 1. ✅ Scheduled sync will automatically capture them (code already updated)

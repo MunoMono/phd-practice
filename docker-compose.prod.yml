@@ -8,7 +8,7 @@ services:
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      POSTGRES_DB: ${POSTGRES_DB:-epistemic_drift}
+      POSTGRES_DB: ${POSTGRES_DB:-testamentary-traces}
     # SECURITY: Do NOT expose database port to internet - only accessible within Docker network
     # ports:
     #   - "5432:5432"
@@ -47,7 +47,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       POSTGRES_HOST: db
       POSTGRES_PORT: 5432
-      POSTGRES_DB: ${POSTGRES_DB:-epistemic_drift}
+      POSTGRES_DB: ${POSTGRES_DB:-testamentary-traces}
       GRANITE_MODEL_PATH: ${GRANITE_MODEL_PATH:-ibm-granite/granite-3.1-2b-instruct}
       GRANITE_DEVICE: ${GRANITE_DEVICE:-cpu}
       GRANITE_MAX_TOKENS: ${GRANITE_MAX_TOKENS:-384}
@@ -89,7 +89,7 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        VITE_API_URL: ${VITE_API_URL:-http://localhost:8000}
+        VITE_API_URL: ${VITE_API_URL:-}
     container_name: phd-practice-frontend
     ports:
       - "8080:80"

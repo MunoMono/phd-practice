@@ -24,7 +24,7 @@ ON document_chunks
 USING ivfflat (embedding_vector vector_cosine_ops)
 WITH (lists = 100);
 
--- Index for temporal queries (epistemic drift analysis)
+-- Index for temporal queries (testamentary traces analysis)
 CREATE INDEX IF NOT EXISTS idx_document_chunks_publication_year 
 ON document_chunks(publication_year);
 

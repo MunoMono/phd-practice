@@ -105,6 +105,99 @@ class QueryRunExport(LocalBase):
     query_run = relationship("QueryRun", back_populates="exports")
 
 
+class ExperimentRun(LocalBase):
+    """Write-once archival experiment snapshot; assessments live separately."""
+    __tablename__ = "experiment_runs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    run_id = Column(String(255), unique=True, nullable=False, index=True)
+    research_case = Column(String(64), nullable=False, index=True)
+    prompt_name = Column(String(255), nullable=False)
+    prompt_version = Column(String(64), nullable=False)
+    system_prompt_version = Column(String(64), nullable=False)
+    exact_research_question = Column(Text, nullable=False)
+    corpus_version = Column(String(255))
+    git_commit = Column(String(64))
+    retrieval_method = Column(String(128), nullable=False)
+    retrieval_config_json = Column(JSONB, nullable=False)
+    retrieval_diagnostics_json = Column(JSONB, nullable=False)
+    context_mode = Column(String(64), nullable=False)
+    context_character_count = Column(Integer, nullable=False)
+    context_chunk_count = Column(Integer, nullable=False)
+    omitted_chunk_ids_json = Column(JSONB, nullable=False)
+    context_budget_json = Column(JSONB)
+    authority_context_json = Column(JSONB, nullable=False)
+    model_name = Column(String(255))
+    model_runtime = Column(String(64))
+    model_quantisation = Column(String(128))
+    model_parameters_json = Column(JSONB, nullable=False)
+    model_seed_if_actual = Column(String(64))
+    inference_duration_ms = Column(Float)
+    raw_model_response = Column(Text)
+    repair_attempted = Column(Boolean, nullable=False, default=False)
+    raw_repair_response = Column(Text)
+    parse_status = Column(String(64), nullable=False)
+    structured_response_json = Column(JSONB)
+    provenance_validation_json = Column(JSONB)
+    status = Column(String(64), nullable=False, index=True)
+    error_code = Column(String(128))
+    error_message = Column(Text)
+    fixture_only = Column(Boolean, nullable=False, default=False, index=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    locked_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+    evidence = relationship("ExperimentRunEvidence", back_populates="experiment_run", cascade="all, delete-orphan")
+    assessment = relationship("ExperimentRunAssessment", back_populates="experiment_run", uselist=False, cascade="all, delete-orphan")
+
+
+class ExperimentRunEvidence(LocalBase):
+    """Frozen retrieved-evidence snapshot, including exact source text supplied."""
+    __tablename__ = "experiment_run_evidence"
+
+    id = Column(Integer, primary_key=True, index=True)
+    run_id = Column(String(255), ForeignKey("experiment_runs.run_id", ondelete="RESTRICT"), nullable=False, index=True)
+    rank = Column(Integer, nullable=False)
+    score = Column(Float)
+    document_id = Column(String(255), nullable=False, index=True)
+    pid = Column(String(255))
+    archive_record_pid = Column(String(255))
+    archive_resolution_status = Column(String(64), nullable=False)
+    page_start = Column(Integer)
+    page_end = Column(Integer)
+    chunk_id = Column(String(255), nullable=False, index=True)
+    chunk_sequence = Column(Integer)
+    excerpt = Column(Text, nullable=False)
+    supplied_excerpt = Column(Text)
+    included_in_context = Column(Boolean, nullable=False)
+    original_chars = Column(Integer)
+    supplied_chars = Column(Integer)
+    excerpted = Column(Boolean)
+    exclusion_reason = Column(String(128))
+    snapshot_json = Column(JSONB, nullable=False)
+
+    experiment_run = relationship("ExperimentRun", back_populates="evidence")
+
+
+class ExperimentRunAssessment(LocalBase):
+    """Researcher-authored evaluation, intentionally mutable and separate."""
+    __tablename__ = "experiment_run_assessments"
+
+    id = Column(Integer, primary_key=True, index=True)
+    run_id = Column(String(255), ForeignKey("experiment_runs.run_id", ondelete="RESTRICT"), unique=True, nullable=False, index=True)
+    retrieval_relevance = Column(Integer)
+    provenance_accuracy = Column(Integer)
+    interpretative_restraint = Column(Integer)
+    preservation_of_contestation = Column(Integer)
+    missingness_handling = Column(Integer)
+    failure_categories_json = Column(JSONB, nullable=False, default=list)
+    notes = Column(Text)
+    authority_influence_note = Column(Text)
+    assessed_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    experiment_run = relationship("ExperimentRun", back_populates="assessment")
+
+
 class CrossReadPassage(LocalBase):
     __tablename__ = "cross_read_passages"
 

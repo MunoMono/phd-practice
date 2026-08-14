@@ -75,7 +75,7 @@ The database password issue is fixed by:
 ## Verification
 ```bash
 # Check database has PIDs
-ssh root@104.248.170.26 "docker exec phd-practice-db psql -U postgres -d epistemic_drift -c 'SELECT pid, title, pdf_count FROM documents WHERE pid IS NOT NULL;'"
+ssh root@104.248.170.26 "docker exec phd-practice-db psql -U postgres -d testamentary-traces -c 'SELECT pid, title, pdf_count FROM documents WHERE pid IS NOT NULL;'"
 
 # Expected output:
 #      pid       |              title              | pdf_count 

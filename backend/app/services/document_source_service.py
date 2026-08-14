@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, Iterable, List, Mapping, Set
 
+from app.services.corpus_status_service import archive_resolution_status
 from app.services.metadata_roles import extract_metadata_roles
 
 
@@ -106,6 +107,7 @@ def _build_shared_document_payload(document: Any, metadata: Mapping[str, Any]) -
 
     return {
         'document_id': document.document_id,
+        'archive_resolution_status': archive_resolution_status(document),
         'pid': document.pid,
         'attached_media_pid': document.pid,
         'authority_id': getattr(document, 'authority_id', None),
@@ -143,6 +145,7 @@ def build_document_list_payload(document: Any) -> Dict[str, Any]:
     roles = extract_metadata_roles(authority_data)
     return {
         'document_id': document.document_id,
+        'archive_resolution_status': archive_resolution_status(document),
         'pid': document.pid,
         'attached_media_pid': document.pid,
         'archive_record_pid': document.archive_record_pid or roles['retrieval_provenance'].get('archive_record_pid'),

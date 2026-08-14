@@ -37,7 +37,7 @@
   - [x] Creates indexes and constraints
 - [ ] **ACTION REQUIRED**: Run migration after deployment
   ```bash
-  psql -h localhost -U postgres -d epistemic_drift -f backend/migrations/001_add_pid_to_documents.sql
+  psql -h localhost -U postgres -d testamentary-traces -f backend/migrations/001_add_pid_to_documents.sql
   ```
 
 ### Documentation
@@ -59,7 +59,7 @@ Create `.env` file on production server with:
 # Database
 POSTGRES_USER=postgres
 POSTGRES_PASSWORD=<SECURE_PASSWORD>
-POSTGRES_DB=epistemic_drift
+POSTGRES_DB=testamentary-traces
 
 # S3/DO Spaces
 S3_BUCKET=<your-bucket>
@@ -111,10 +111,10 @@ cd /path/to/phd-practice
 ### 3. Run Database Migration
 ```bash
 # Connect to database container
-docker exec -it phd-practice-db psql -U postgres -d epistemic_drift
+docker exec -it phd-practice-db psql -U postgres -d testamentary-traces
 
 # Or from host
-psql -h localhost -U postgres -d epistemic_drift -f backend/migrations/001_add_pid_to_documents.sql
+psql -h localhost -U postgres -d testamentary-traces -f backend/migrations/001_add_pid_to_documents.sql
 ```
 
 ### 4. Verify Deployment

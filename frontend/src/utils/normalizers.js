@@ -158,6 +158,12 @@ export const normalizeEntityNetwork = (raw = {}) => ({
 export const normalizeDashboardStats = (raw = {}) => ({
   overview: {
     totalDocuments: toNumber(raw.overview?.totalDocuments),
+    corpusStatus: {
+      persistedDocumentCount: toNumber(raw.overview?.corpusStatus?.persistedDocumentCount),
+      archiveResolvedDocumentCount: toNumber(raw.overview?.corpusStatus?.archiveResolvedDocumentCount),
+      unresolvedLegacyDocumentCount: toNumber(raw.overview?.corpusStatus?.unresolvedLegacyDocumentCount),
+      invariantSatisfied: raw.overview?.corpusStatus?.invariantSatisfied === true
+    },
     totalPdfs: toNumber(raw.overview?.totalPdfs),
     totalPdfAssets: toNumber(raw.overview?.totalPdfAssets),
     totalPages: toNumber(raw.overview?.totalPages),

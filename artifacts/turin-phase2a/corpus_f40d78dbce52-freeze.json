@@ -1,0 +1,108 @@
+{
+  "classification": "TURIN AUTHORITATIVE CORPUS FREEZE",
+  "corpus_version": "corpus_f40d78dbce52",
+  "timestamp": "2026-08-14T07:53:21.619400+00:00",
+  "manifest_path": "artifacts/turin-phase2a/authoritative-turin-ingestion-manifest.json",
+  "manifest_sha256": "aed395d090aa16a1a6b435746b1e36410374428e261a80287fa587c8a5818a76",
+  "eligible_asset_count": 97,
+  "excluded_asset_count": 12,
+  "checkpoint_status_counts": {
+    "pilot_completed": 3,
+    "completed": 92,
+    "failed": 2
+  },
+  "successful_ingestion_count": 95,
+  "failure_count": 2,
+  "bounded_failures": [
+    {
+      "document_id": "doc_321843234637_3dafa63de05f",
+      "error": [
+        "Stream has ended unexpectedly"
+      ],
+      "classification": "authoritative_source_representation_mismatch",
+      "source_content_type": "image/jpeg",
+      "source_checksum_sha256": "8269a3bbb0235890294e1650254960a1830915197e43ff7b8207ce6ee352016b",
+      "source_size_bytes": 9244,
+      "reason": "Fresh authoritative materialisation exactly matched the local JPEG response; pypdf correctly rejected it before Docling because the published pdf_master URI is not PDF bytes."
+    },
+    {
+      "document_id": "doc_321843234637_b514872d126c",
+      "error": [
+        "Stream has ended unexpectedly"
+      ],
+      "classification": "authoritative_source_representation_mismatch",
+      "source_content_type": "image/jpeg",
+      "source_checksum_sha256": "c48e359d2efaaa4d47f276cd2d53e61e422827948e86c8e1fa0ae5896ff1ff02",
+      "source_size_bytes": 9714,
+      "reason": "Fresh authoritative materialisation exactly matched the local JPEG response; pypdf correctly rejected it before Docling because the published pdf_master URI is not PDF bytes."
+    }
+  ],
+  "current_chunks": 12884,
+  "chunked_document_count": 95,
+  "current_orphans": 0,
+  "ingestion_version": "turin-controlled-pilot-v1",
+  "chunking_version": "turin-page-heading-v1",
+  "docling_configuration": {
+    "corpus_version": "corpus_f40d78dbce52",
+    "ingestion_version": "turin-controlled-pilot-v1",
+    "chunking_version": "turin-page-heading-v1",
+    "docling_version": "2.15.0",
+    "ocr_enabled": false,
+    "worker_memory_limit": "6g",
+    "worker_memory_reservation": "4g",
+    "worker_cpus": 2,
+    "docling_threads": 1,
+    "blas_threads": 1,
+    "model_cache": "/root/.cache/docling",
+    "source_materialisation_path": "artifacts/turin-controlled-corpus-sources",
+    "deterministic_chunk_id_algorithm": "sha256(document_id, corpus_version, chunking_version, page_start, sequence, heading_path, text)",
+    "ml_page_scope_interpretation": "all pages only for eligible_unrestricted; parsed inclusive numeric pages/ranges for eligible_page_restricted",
+    "manifest_sha256": "aed395d090aa16a1a6b435746b1e36410374428e261a80287fa587c8a5818a76"
+  },
+  "restricted_eligible_assets": 35,
+  "restricted_assets_processed": 35,
+  "restricted_scope_violations": [],
+  "determinism": {
+    "passed": true,
+    "path": "artifacts/turin-phase2a/determinism-spot-check.json",
+    "documents": [
+      {
+        "document_id": "doc_230440137378_063f52d0a4b3",
+        "ml_policy_status": "eligible_unrestricted",
+        "ml_page_scope": "all_pages",
+        "stored_chunk_count": 114,
+        "regenerated_chunk_count": 114,
+        "mismatch_indexes": [],
+        "result": "match"
+      },
+      {
+        "document_id": "doc_521129471965_ac7a965d232a",
+        "ml_policy_status": "eligible_page_restricted",
+        "ml_page_scope": "19-20, 22-23",
+        "stored_chunk_count": 27,
+        "regenerated_chunk_count": 27,
+        "mismatch_indexes": [],
+        "result": "match"
+      },
+      {
+        "document_id": "doc_546216480663_5ad91481fad1",
+        "ml_policy_status": "eligible_unrestricted",
+        "ml_page_scope": "all_pages",
+        "stored_chunk_count": 888,
+        "regenerated_chunk_count": 888,
+        "mismatch_indexes": [],
+        "result": "match"
+      }
+    ]
+  },
+  "fts": {
+    "search_tsv_non_null": 12884,
+    "search_tsv_null": 0,
+    "gin_index": true
+  },
+  "legacy_apr": {
+    "chunks_retained": 606,
+    "included_in_current_namespace": false
+  },
+  "git_commit": "cc067f84a8b8d85f187b14a874cba1c8f217d0a2"
+}

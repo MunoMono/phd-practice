@@ -1,0 +1,43 @@
+{
+  "classification": "TURIN CONTROLLED-INGESTION FULL CORPUS",
+  "corpus_version": "corpus_f40d78dbce52",
+  "ingestion_version": "turin-controlled-pilot-v1",
+  "chunking_version": "turin-page-heading-v1",
+  "documents": [
+    {
+      "document_id": "doc_404613335296_2ccc52ae1737",
+      "asset_id": "657023d4f2860af7121535360c24456daf58d79834cc13e02c6faacc5d1c8cac",
+      "asset_pid": "309955698309",
+      "source_uri": "https://archive-media.lon1.digitaloceanspaces.com/ddr-archive/records/581013835776/master/657023d4f2860af7121535360c24456daf58d79834cc13e02c6faacc5d1c8cac__pdf_master__v1.pdf",
+      "ml_policy_status": "eligible_unrestricted",
+      "ml_page_scope": "all_pages",
+      "status": "completed",
+      "extraction_issues": [],
+      "started_at": "2026-08-14T06:52:08.902696+00:00",
+      "source_path": "/artifacts/turin-controlled-corpus-sources/doc_404613335296_2ccc52ae1737.pdf",
+      "source_checksum_sha256": "657023d4f2860af7121535360c24456daf58d79834cc13e02c6faacc5d1c8cac",
+      "file_size_bytes": 2926248,
+      "available_page_count": 8,
+      "permitted_pages": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8
+      ],
+      "processed_page_count": 8,
+      "excluded_page_count": 0,
+      "chunk_count": 68,
+      "inserted_chunk_count": 68,
+      "duplicate_chunk_count": 0,
+      "fts_ready": true,
+      "completed_at": "2026-08-14T06:52:27.892111+00:00",
+      "duration_seconds": 18.99,
+      "peak_memory_kib": 2011868,
+      "worker_exit_status": 0
+    }
+  ]
+}

@@ -22,6 +22,7 @@ import PageHeader from '../../components/layout/PageHeader'
 import PanelHeader from '../../components/layout/PanelHeader'
 import { PageGrid, PageColumn as Column } from '../../components/layout/PageGrid'
 import { getMissingnessEvents, getMissingnessSummary, updateMissingnessEvent } from '../../api/missingness'
+import { getResearchStateTag } from '../../utils/researchState'
 import { downloadCsv } from '../../utils/workbenchExport'
 import './MissingnessWorkbench.scss'
 
@@ -224,6 +225,7 @@ const MissingnessWorkbench = () => {
             {negativeRetrievalLog.length > 0 ? negativeRetrievalLog.map((entry) => (
               <div key={entry.id} className="app-list-item">
                 <strong className="app-list-item__title">{entry.query}</strong>
+                {getResearchStateTag(events.find((event) => event.event_id === entry.id)) ? <Tag type={getResearchStateTag(events.find((event) => event.event_id === entry.id)).type} size="sm">{getResearchStateTag(events.find((event) => event.event_id === entry.id)).label}</Tag> : null}
                 <p className="app-list-item__body">{entry.outcome}</p>
                 <p className="app-list-item__note">{entry.note}</p>
               </div>
@@ -237,6 +239,7 @@ const MissingnessWorkbench = () => {
           <PanelHeader title="Selected event review" description="Persist reviewer status and notes for the selected missingness event." />
           {selectedEvent ? (
             <>
+              {getResearchStateTag(selectedEvent) ? <Tag type={getResearchStateTag(selectedEvent).type}>{getResearchStateTag(selectedEvent).label}</Tag> : null}
               <p><strong>{selectedEvent.query_or_entity_or_field}</strong></p>
               {selectedEvent.query_id && <p className="app-list-item__meta">Source run: {selectedEvent.query_id}</p>}
               <p className="app-text-muted">{selectedEvent.evidence}</p>
@@ -290,9 +293,23 @@ const MissingnessWorkbench = () => {
                         onClick={() => setSelectedEventId(row.id)}
                         className={row.id === selectedEventId ? 'app-table-row--interactive app-table-row--selected' : 'app-table-row--interactive'}
                       >
-                        {row.cells.map((cell) => (
-                          <TableCell key={cell.id}>{cell.value}</TableCell>
-                        ))}
+                        {row.cells.map((cell) => {
+                          if (cell.info.header === 'event_id') {
+                            const event = events.find((item) => item.event_id === row.id)
+                            const stateTag = getResearchStateTag(event)
+
+                            return (
+                              <TableCell key={cell.id}>
+                                <div className="app-tag-row">
+                                  <span>{cell.value}</span>
+                                  {stateTag ? <Tag type={stateTag.type} size="sm">{stateTag.label}</Tag> : null}
+                                </div>
+                              </TableCell>
+                            )
+                          }
+
+                          return <TableCell key={cell.id}>{cell.value}</TableCell>
+                        })}
                       </TableRow>
                     )
                   })}

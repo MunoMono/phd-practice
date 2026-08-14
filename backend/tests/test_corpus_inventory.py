@@ -198,6 +198,118 @@ class CorpusInventoryServiceTests(unittest.TestCase):
         self.assertEqual(row['title'], 'Overhead transparency of Bruce Archer’s Fig. 5 taxonomy diagram')
         self.assertEqual(row['caption'], 'Overhead transparency of Bruce Archer’s Fig. 5 taxonomy diagram')
 
+    def test_asset_location_box_does_not_serialize_as_accession(self):
+        record = {
+            'id': '127',
+            'pid': '873981573030',
+            'title': 'Bruce Archer collection',
+            'public_uri': 'https://ddrarchive.org/id/record/873981573030',
+            'location_repository': 'RCA Special Collections',
+            'location_accession': '',
+            'location_box': '',
+            'location_note': '',
+            'attached_media': [
+                {
+                    'id': '120',
+                    'pid': '338541406157',
+                    'title': 'Bruce Archer papers',
+                    'rights_owner': 'RCA',
+                    'copyright_holder': 'Copyright © Royal College of Art',
+                    'data_rights': 'Royal College of Art',
+                    'image_rights': 'Royal College of Art',
+                    'pdf_files': [
+                        {
+                            'filename': 'cf66faa2.pdf',
+                            'role': 'pdf_master',
+                            'url': 'https://archive.test/cf66faa2.pdf',
+                            'label': 'Overhead transparency of Bruce Archer’s Fig. 5 taxonomy diagram',
+                        }
+                    ],
+                    'digital_assets': [
+                        {
+                            'role': 'pdf_master',
+                            'filename': 'cf66faa2.pdf',
+                            'assetId': 'asset-target',
+                            'pid': '987235129265',
+                            'label': 'Overhead transparency of Bruce Archer’s Fig. 5 taxonomy diagram',
+                            'use_for_ml': True,
+                            'ml_pages': '',
+                            'location_repository': 'V&A East Storehouse Art and Design Archives',
+                            'location_accession': None,
+                            'location_box': 'AU.AAD.20718',
+                            'location_note': "AAD/1989/9 Part 2 of 3 Incomplete collection of students' theses, conference proceedings, policy papers & Bruce Archer's Lecture Notes (1961-1982)",
+                        },
+                    ],
+                }
+            ],
+        }
+
+        row = self.service.flatten_records_pdf_sources([record])[0]
+        self.assertEqual(row['location_repository'], 'V&A East Storehouse Art and Design Archives')
+        self.assertIsNone(row['location_accession'])
+        self.assertEqual(row['location_box'], 'AU.AAD.20718')
+
+    def test_rights_owner_comes_from_media_when_asset_lacks_it(self):
+        record = {
+            'id': '127',
+            'pid': '873981573030',
+            'title': 'Bruce Archer collection',
+            'public_uri': 'https://ddrarchive.org/id/record/873981573030',
+            'rights_owner': 'V&A',
+            'rights_holders': 'The Board and Trustees of the Victoria and Albert Museum',
+            'data_rights': 'The Board and Trustees of the Victoria and Albert Museum',
+            'image_rights': 'The Board and Trustees of the Victoria and Albert Museum',
+            'rights_statement_uri': 'https://rightsstatements.org/vocab/InC-EDU/1.0/',
+            'takedown_contact': 'graham.newman@network.rca.ac.uk',
+            'attached_media': [
+                {
+                    'id': '120',
+                    'pid': '338541406157',
+                    'title': 'Bruce Archer papers',
+                    'rights_owner': 'RCA',
+                    'rights_holders': 'Royal College of Art',
+                    'copyright_holder': 'Copyright © Royal College of Art',
+                    'data_rights': 'Royal College of Art',
+                    'image_rights': 'Royal College of Art',
+                    'rights_statement_uri': None,
+                    'takedown_contact': None,
+                    'pdf_files': [
+                        {
+                            'filename': 'cf66faa2.pdf',
+                            'role': 'pdf_master',
+                            'url': 'https://archive.test/cf66faa2.pdf',
+                            'label': 'Overhead transparency of Bruce Archer’s Fig. 5 taxonomy diagram',
+                        }
+                    ],
+                    'digital_assets': [
+                        {
+                            'role': 'pdf_master',
+                            'filename': 'cf66faa2.pdf',
+                            'assetId': 'asset-target',
+                            'pid': '987235129265',
+                            'label': 'Overhead transparency of Bruce Archer’s Fig. 5 taxonomy diagram',
+                            'use_for_ml': True,
+                            'ml_pages': '',
+                            'copyright_holder': 'Copyright © Royal College of Art',
+                            'rights_holders': 'Royal College of Art',
+                            'data_rights': 'Royal College of Art',
+                            'data_rights_holder': 'Royal College of Art',
+                            'image_rights': 'Royal College of Art',
+                            'image_rights_holder': 'Royal College of Art',
+                        },
+                    ],
+                }
+            ],
+        }
+
+        row = self.service.flatten_records_pdf_sources([record])[0]
+        self.assertEqual(row['rights_owner'], 'RCA')
+        self.assertEqual(row['copyright_holder'], 'Copyright © Royal College of Art')
+        self.assertEqual(row['data_rights'], 'Royal College of Art')
+        self.assertEqual(row['image_rights'], 'Royal College of Art')
+        self.assertEqual(row['rights_statement_uri'], 'https://rightsstatements.org/vocab/InC-EDU/1.0/')
+        self.assertEqual(row['takedown_contact'], 'graham.newman@network.rca.ac.uk')
+
     def test_richer_metadata_does_not_change_stable_document_id(self):
         base_record = {
             'id': '125',

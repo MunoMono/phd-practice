@@ -5,7 +5,7 @@ import os
 
 class Settings(BaseSettings):
     # Application
-    APP_NAME: str = "Epistemic Drift Research"
+    APP_NAME: str = "Testamentary Traces Research"
     ENVIRONMENT: str = "development"
     DEBUG: bool = True
     
@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     POSTGRES_PASSWORD: str = os.getenv("POSTGRES_PASSWORD", "postgres")
     POSTGRES_HOST: str = os.getenv("POSTGRES_HOST", "localhost")
     POSTGRES_PORT: int = int(os.getenv("POSTGRES_PORT", "5432"))
-    POSTGRES_DB: str = os.getenv("POSTGRES_DB", "epistemic_drift")
+    POSTGRES_DB: str = os.getenv("POSTGRES_DB", "testamentary-traces")
     
     @property
     def DATABASE_URL(self) -> str:
@@ -57,7 +57,7 @@ class Settings(BaseSettings):
     VECTOR_DIMENSION: int = 384
     
     # S3 Storage
-    S3_BUCKET: str = "epistemic-drift-research"
+    S3_BUCKET: str = "testamentary-traces-research"
     S3_ENDPOINT: str = ""
     S3_ACCESS_KEY: str = ""
     S3_SECRET_KEY: str = ""

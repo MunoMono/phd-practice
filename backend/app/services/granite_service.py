@@ -128,9 +128,12 @@ class GraniteService:
         prompt: str,
         max_tokens: Optional[int] = None,
         temperature: Optional[float] = None,
+        top_p: Optional[float] = None,
+        do_sample: Optional[bool] = None,
+        response_format: Optional[str] = None,
     ) -> str:
         """Generate text via Ollama local HTTP API."""
-        generation_max_tokens = min(max_tokens or self.max_new_tokens, 384)
+        generation_max_tokens = min(max_tokens or self.max_new_tokens, 512)
         generation_temperature = self.temperature if temperature is None else temperature
 
         payload = {
@@ -140,8 +143,12 @@ class GraniteService:
             "options": {
                 "num_predict": generation_max_tokens,
                 "temperature": generation_temperature,
+                "top_p": top_p if top_p is not None else 1.0,
+                "seed": 0 if do_sample is False else None,
             },
         }
+        if response_format:
+            payload["format"] = response_format
 
         timeout = httpx.Timeout(self.timeout_seconds)
         async with httpx.AsyncClient(timeout=timeout) as client:
@@ -153,6 +160,26 @@ class GraniteService:
         if not generated:
             raise RuntimeError("Empty response from Ollama /api/generate")
         return generated.strip()
+
+    async def generate_experiment(
+        self, prompt: str, max_tokens: int = 512, temperature: float = 0.0,
+        top_p: float = 1.0, do_sample: bool = False,
+    ) -> Dict[str, Any]:
+        """Generate one bounded local experiment response without rebuilding context."""
+        if not self.get_load_status()["model_ready"]:
+            raise RuntimeError("Granite model is not ready.")
+        if len(prompt) > self.max_input_chars:
+            raise RuntimeError(f"Experiment prompt exceeds Granite input budget ({self.max_input_chars} chars).")
+        started = time.monotonic()
+        async with self._lock:
+            raw_response = await asyncio.wait_for(
+                self._generate_via_ollama(prompt, max_tokens, temperature, top_p, do_sample),
+                timeout=self.timeout_seconds,
+            )
+        return {
+            "raw_response": raw_response,
+            "generation": {"temperature": temperature, "top_p": top_p, "max_tokens": min(max_tokens, 512), "do_sample": do_sample, "input_characters": len(prompt), "duration_seconds": time.monotonic() - started},
+        }
 
     async def generate_analysis(
         self,

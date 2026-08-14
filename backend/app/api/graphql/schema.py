@@ -1,5 +1,5 @@
 """
-GraphQL schema for metrics and statistics including epistemic drift analysis
+GraphQL schema for metrics and statistics including testamentary traces analysis
 """
 import strawberry
 from typing import Optional, List
@@ -11,6 +11,7 @@ import logging
 from app.core.database import LocalSessionLocal
 from app.core.config import settings
 from app.models.document import Document, DocumentChunk, DriftAnalysis
+from app.services.corpus_status_service import get_corpus_status
 from app.services.drift_analyzer import DriftAnalyzer
 
 logger = logging.getLogger(__name__)
@@ -93,6 +94,14 @@ class DatabaseStats:
 
 
 @strawberry.type
+class CorpusStatus:
+    persisted_document_count: int
+    archive_resolved_document_count: int
+    unresolved_legacy_document_count: int
+    invariant_satisfied: bool
+
+
+@strawberry.type
 class S3Stats:
     total_assets: int
     total_size_bytes: int
@@ -126,6 +135,7 @@ class PidAuthority:
 @strawberry.type
 class SystemMetrics:
     local_db: DatabaseStats
+    corpus_status: CorpusStatus
     s3_storage: S3Stats
     total_items: int
     pid_count: int
@@ -145,6 +155,7 @@ class Query:
         # Get database counts
         db = LocalSessionLocal()
         try:
+            corpus_status = get_corpus_status(db)
             # Core database tables (not counting digital_assets which are file references)
             tables = ['document_embeddings', 'research_sessions', 'experiments']
             counts = {}
@@ -333,6 +344,12 @@ class Query:
         
         return SystemMetrics(
             local_db=db_stats,
+            corpus_status=CorpusStatus(
+                persisted_document_count=corpus_status['persistedDocumentCount'],
+                archive_resolved_document_count=corpus_status['archiveResolvedDocumentCount'],
+                unresolved_legacy_document_count=corpus_status['unresolvedLegacyDocumentCount'],
+                invariant_satisfied=corpus_status['invariantSatisfied'],
+            ),
             s3_storage=s3_stats,
             total_items=total_items,
             pid_count=pid_count,
@@ -488,13 +505,13 @@ class Query:
             db.close()
     
     @strawberry.field
-    async def epistemic_drift(
+    async def testamentary_traces(
         self,
         start_year: int,
         end_year: int,
         window_size: int = 5
     ) -> 'DriftAnalysisResult':
-        """Analyze epistemic drift between time periods"""
+        """Analyze testamentary traces between time periods"""
         result = await drift_analyzer.analyze_temporal_drift(
             start_year, end_year, window_size
         )

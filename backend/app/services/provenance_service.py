@@ -95,7 +95,11 @@ class ProvenanceService:
 
         pid = self._extract_pid(chunk.get('chunk_id')) or self._extract_pid(document_id)
         if pid:
-            return db.query(Document).filter(Document.pid == pid).first()
+            matches = db.query(Document).filter(Document.pid == pid).all()
+            if len(matches) == 1:
+                return matches[0]
+            if len(matches) > 1:
+                logger.warning("Chunk provenance fallback for PID %s is ambiguous across %s documents", pid, len(matches))
 
         return None
     
@@ -134,6 +138,7 @@ class ProvenanceService:
             # Build citation from authority data + chunk metadata
             authority = doc.authority_data or {}
             
+            record_public_uri = authority.get('record_public_uri') or authority.get('public_uri')
             citation = {
                 "chunk_id": chunk_id,
                 "pid": doc.pid,
@@ -143,7 +148,7 @@ class ProvenanceService:
                 "institution": authority.get('rights_holders', 'Royal College of Art'),
                 "page": chunk.get('source_page'),
                 "section": chunk.get('source_section'),
-                "public_url": authority.get('public_uri', f"https://ddrarchive.org/id/record/{doc.pid}"),
+                "public_url": record_public_uri,
                 "rights": authority.get('copyright_holder', 'Copyright © Royal College of Art'),
                 "excerpt": chunk['chunk_text'][:200] + "..." if len(chunk['chunk_text']) > 200 else chunk['chunk_text'],
                 "extraction_date": chunk.get('extraction_timestamp').isoformat() if chunk.get('extraction_timestamp') else None

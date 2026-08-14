@@ -6,6 +6,38 @@ import { PageGrid, PageColumn as Column } from '../../components/layout/PageGrid
 import { DOCUMENTATION_ENTRIES, getDocumentationEntry } from '../../data/documentationCatalog'
 import './Documentation.scss'
 
+const renderSectionBlock = (block) => {
+  if (block.type === 'table') {
+    return (
+      <div key={block.caption || block.headers.join('-')} className="documentation-page__table-block">
+        {block.caption ? <p className="documentation-page__table-caption">{block.caption}</p> : null}
+        <div className="documentation-page__table-scroll">
+          <table className="documentation-page__table">
+            <thead>
+              <tr>
+                {block.headers.map((header) => (
+                  <th key={header} scope="col">{header}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {block.rows.map((row) => (
+                <tr key={row.join('-')}>
+                  {row.map((cell) => (
+                    <td key={cell}>{cell}</td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    )
+  }
+
+  return <p key={block.text}>{block.text}</p>
+}
+
 const Documentation = () => {
   const navigate = useNavigate()
   const { docId } = useParams()
@@ -139,27 +171,27 @@ const Documentation = () => {
                     <p className="documentation-page__document-kicker">{selectedEntry.id}</p>
                     <h2 className="documentation-page__document-title">{selectedEntry.fullTitle}</h2>
                     <p className="documentation-page__document-meta">
-                      {selectedEntry.author} · Expanded abstract · {selectedEntry.wordCount} words
+                      {selectedEntry.author} · {selectedEntry.documentLabel} · {selectedEntry.wordCount} words
                     </p>
                     <p className="documentation-page__document-summary">{selectedEntry.summary}</p>
                   </header>
 
-                  <section className="documentation-page__question-block" aria-label="Research questions">
-                    <h3>Research questions</h3>
-                    {selectedEntry.researchQuestions.map((question) => (
-                      <div key={question.label} className="documentation-page__question-item">
-                        <span>{question.label}</span>
-                        <p>{question.text}</p>
-                      </div>
-                    ))}
-                  </section>
+                  {selectedEntry.researchQuestions?.length ? (
+                    <section className="documentation-page__question-block" aria-label="Research questions">
+                      <h3>Research questions</h3>
+                      {selectedEntry.researchQuestions.map((question) => (
+                        <div key={question.label} className="documentation-page__question-item">
+                          <span>{question.label}</span>
+                          <p>{question.text}</p>
+                        </div>
+                      ))}
+                    </section>
+                  ) : null}
 
                   {selectedEntry.sections.map((section) => (
                     <section key={section.id} id={section.id} className="documentation-page__section">
                       <h3>{section.heading}</h3>
-                      {section.paragraphs.map((paragraph) => (
-                        <p key={paragraph}>{paragraph}</p>
-                      ))}
+                      {(section.blocks || section.paragraphs.map((paragraph) => ({ type: 'paragraph', text: paragraph }))).map(renderSectionBlock)}
                     </section>
                   ))}
                 </article>
@@ -173,9 +205,9 @@ const Documentation = () => {
               )}
 
               <div className="documentation-page__related-note">
-                <span>Next document slot</span>
+                <span>Documentation continuity</span>
                 <button type="button" className="documentation-page__related-link" onClick={() => openEntry(DOCUMENTATION_ENTRIES[0])}>
-                  Keep expanded abstract as the first durable documentation record
+                  Return to the expanded abstract as the foundational documentation record
                   <ArrowRight size={16} />
                 </button>
               </div>

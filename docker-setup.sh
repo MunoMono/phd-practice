@@ -1,10 +1,10 @@
 #!/bin/bash
 
-# Docker Setup and Management Script for Epistemic Drift Research Platform
+# Docker Setup and Management Script for Testamentary Traces Research Platform
 
 set -e
 
-echo "🔬 Epistemic Drift Research Platform - Docker Setup"
+echo "🔬 Testamentary Traces Research Platform - Docker Setup"
 echo "=================================================="
 
 # Check if Docker is installed
@@ -129,7 +129,7 @@ backend_shell() {
 # Database shell
 db_shell() {
     echo "🗄️  Opening PostgreSQL shell..."
-    docker-compose exec db psql -U postgres -d epistemic_drift
+    docker-compose exec db psql -U postgres -d testamentary-traces
 }
 
 # Rebuild containers

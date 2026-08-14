@@ -18,10 +18,9 @@ Simply run:
 ```
 
 This will:
-- SSH into your droplet (104.248.170.26)
-- Install Docker and prerequisites
-- Clone/update the repository
-- Build and start the application
+- Sync your local source to the droplet
+- Preserve the production `.env` and Auth0 credentials already on the droplet
+- Rebuild only the app services that need to change
 - Display deployment status
 
 ### Option 2: Manual Deployment

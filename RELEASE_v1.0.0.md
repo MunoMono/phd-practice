@@ -1,4 +1,4 @@
-# EPISTEMIC DRIFT RESEARCH - Release v1.0.0
+# TESTAMENTARY TRACES RESEARCH - Release v1.0.0
 
 **Release Date:** January 30, 2026  
 **Deployed:** https://innovationdesign.io  
@@ -51,7 +51,7 @@ All backups stored on production server at `/root/backups/` and `/root/phd-pract
 
 ### Database Backup
 ```
-epistemic_drift_v1.0_20260130_132839.sql (29KB)
+testamentary-traces_v1.0_20260130_132839.sql (29KB)
 Location: /root/phd-practice/backups/
 ```
 
@@ -127,12 +127,12 @@ docker compose -f docker-compose.prod.yml up -d frontend
 
 ### Database Backup
 ```bash
-docker exec phd-practice-db pg_dump -U postgres epistemic_drift > backup_$(date +%Y%m%d).sql
+docker exec phd-practice-db pg_dump -U postgres testamentary-traces > backup_$(date +%Y%m%d).sql
 ```
 
 ### Database Restore
 ```bash
-docker exec -i phd-practice-db psql -U postgres epistemic_drift < backup_20260130.sql
+docker exec -i phd-practice-db psql -U postgres testamentary-traces < backup_20260130.sql
 ```
 
 ---
@@ -199,7 +199,7 @@ VITE_GRAPHQL_ENDPOINT=https://ddrarchive.org/graphql
 ```bash
 POSTGRES_USER=postgres
 POSTGRES_PASSWORD=postgres
-POSTGRES_DB=epistemic_drift
+POSTGRES_DB=testamentary-traces
 POSTGRES_HOST=db
 POSTGRES_PORT=5432
 AUTH0_DOMAIN=dev-i4m880asz7y6j5sk.us.auth0.com

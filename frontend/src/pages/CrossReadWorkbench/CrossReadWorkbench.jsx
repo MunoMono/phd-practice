@@ -25,6 +25,7 @@ import PageHeader from '../../components/layout/PageHeader'
 import PanelHeader from '../../components/layout/PanelHeader'
 import { PageGrid, PageColumn as Column } from '../../components/layout/PageGrid'
 import { downloadFile } from '../../utils/workbenchExport'
+import { getResearchStateTag } from '../../utils/researchState'
 import './CrossReadWorkbench.scss'
 
 const relationOptions = ['supports', 'complicates', 'contradicts', 'no-documentary-trace']
@@ -352,11 +353,12 @@ const CrossReadWorkbench = () => {
         <Tile>
           <PanelHeader title="Passage input or list" description="Start from a persisted testimony passage or draft a new interpretive probe text." />
           <Select id="cross-read-passage" labelText="Passage list" value={selectedPassageId} onChange={(event) => setSelectedPassageId(event.target.value)}>
-            <SelectItem value="" text={loading ? 'Loading passages...' : passages.length > 0 ? 'Select a passage' : 'No passages yet'} />
+            <SelectItem value="" text={loading ? 'Loading passages...' : passages.length > 0 ? 'Select a passage' : 'No persisted testimony passages are available yet'} />
             {passages.map((passage) => (
               <SelectItem key={passage.passage_id} value={passage.passage_id} text={`${passage.speaker_or_source || 'Unlabelled source'} (${passage.passage_id})`} />
             ))}
           </Select>
+          {!loading && passages.length === 0 ? <InlineNotification lowContrast kind="info" title="No passages yet" subtitle="No persisted testimony passages are available yet. This surface remains intentionally empty until passages are created or ingested." /> : null}
           <TextInput
             id="cross-read-passage-label"
             labelText="Passage label"
@@ -428,6 +430,7 @@ const CrossReadWorkbench = () => {
                   className={mapping.mapping_id === selectedMappingId ? 'app-list-item app-list-item--interactive app-list-item--selected' : 'app-list-item app-list-item--interactive'}
                 >
                   <strong className="app-list-item__title cross-read-workbench__mapping-title">{title}</strong>
+                  {getResearchStateTag({ ...mapping, ...metadata }) ? <Tag type={getResearchStateTag({ ...mapping, ...metadata }).type} size="sm">{getResearchStateTag({ ...mapping, ...metadata }).label}</Tag> : null}
                   <p className="app-list-item__body">{excerpt}</p>
                   <div className="app-tag-row">
                     <Tag type="blue">{metadata.pid || 'PID unavailable'}</Tag>
@@ -439,7 +442,7 @@ const CrossReadWorkbench = () => {
                   </p>
                 </div>
               )
-            }) : <p className="app-copy-reset">{loading ? 'Loading persisted mappings...' : 'No persisted mappings yet. Run the selected passage as a retrieval probe.'}</p>}
+            }) : <p className="app-copy-reset">{loading ? 'Loading persisted mappings...' : 'No persisted testimony-record mappings are available yet. Run the selected passage as a retrieval probe.'}</p>}
           </div>
         </Tile>
       </Column>
@@ -467,6 +470,7 @@ const CrossReadWorkbench = () => {
             placeholder="Record how this passage sits in testimony, interpretation, contradiction, or documentary absence."
           />
           <div className="app-tag-row cross-read-workbench__action-group">
+            {getResearchStateTag(selectedPassage) ? <Tag type={getResearchStateTag(selectedPassage).type}>{getResearchStateTag(selectedPassage).label}</Tag> : null}
             <Tag type="green">Passage status: {selectedPassage?.status || 'draft'}</Tag>
             <Tag type="purple">Candidate mappings: {candidateMappings.length}</Tag>
             {selectedMapping?.query_id && <Tag type="cyan">Run: {selectedMapping.query_id}</Tag>}

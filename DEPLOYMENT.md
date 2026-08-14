@@ -5,6 +5,8 @@ This guide covers deploying the phd-practice repository to Digital Ocean droplet
 
 **Source of truth & deploy model**: The GitHub repo (`git@github.com:MunoMono/phd-practice.git`) is the source of truth. No GitHub Actions are used. Deployments run directly from your local machine to the droplet using the provided scripts.
 
+**Current deployment safety rule**: deploy from your local workspace by syncing source to the droplet. Do not rely on `git pull` inside `/root/phd-practice`, and do not overwrite the droplet `.env`; production Auth0 and runtime credentials are already stored there.
+
 ## Prerequisites
 - Digital Ocean droplet: 104.248.170.26
 - Domain: innovationdesign.io (add to Auth0 allowed callbacks)
@@ -60,41 +62,30 @@ apt-get install docker-compose-plugin -y
 apt-get install git -y
 ```
 
-### 3. Clone Repository
+### 3. Prepare the Droplet Once
 ```bash
-cd /root
-rm -rf phd-practice  # Remove old version if exists
-git clone git@github.com:MunoMono/phd-practice.git
-cd phd-practice
+ssh root@104.248.170.26
+cd /root/phd-practice
+test -f .env && echo ".env present"
+docker compose -f docker-compose.prod.yml ps
 ```
 
-### 4. Create Environment File
+### 4. Deploy From Local
 ```bash
-cat > .env << 'EOF'
-# Auth0 Configuration for innovationdesign.io
-VITE_AUTH0_DOMAIN=dev-i4m880asz7y6j5sk.us.auth0.com
-VITE_AUTH0_CLIENT_ID=1tKb110HavDT3KsqC5P894JEOZ3fQXMm
-VITE_AUTH0_AUDIENCE=https://api.ddrarchive.org
-VITE_AUTH0_REDIRECT_URI=https://innovationdesign.io
+# Full app deploy: sync local source, preserve droplet .env, rebuild backend/frontend only
+./deploy-to-droplet.sh
 
-# Environment
-VITE_DDR_ENV=production
-
-# GraphQL API Endpoint
-VITE_GRAPHQL_ENDPOINT=https://ddrarchive.org/graphql
-EOF
+# Frontend-only deploy: sync only frontend source and recreate only the frontend service
+./deploy-frontend-only.sh
 ```
 
-### 5. Deploy
-```bash
-# Make deploy script executable
-chmod +x deploy.sh
+These scripts:
+- sync source from your local workspace to `/root/phd-practice`
+- preserve `/root/phd-practice/.env`
+- avoid `git reset --hard` and avoid regenerating production Auth0 credentials
+- avoid touching unrelated containers on the droplet
 
-# Run deployment
-./deploy.sh
-```
-
-### 6. Verify Deployment
+### 5. Verify Deployment
 ```bash
 # Check container status
 docker-compose -f docker-compose.prod.yml ps
@@ -106,10 +97,10 @@ docker-compose -f docker-compose.prod.yml logs -f
 curl http://localhost/health
 ```
 
-### 7. Configure DNS
+### 6. Configure DNS
 Point `innovationdesign.io` A record to `104.248.170.26`
 
-### 8. (Optional) Set up SSL with Let's Encrypt
+### 7. (Optional) Set up SSL with Let's Encrypt
 ```bash
 # Install certbot
 apt-get install certbot python3-certbot-nginx -y
@@ -136,9 +127,7 @@ docker-compose -f docker-compose.prod.yml up -d
 
 ### Update Deployment
 ```bash
-cd /root/phd-practice
-git pull origin main
-./deploy.sh
+./deploy-to-droplet.sh
 ```
 
 ### View Logs

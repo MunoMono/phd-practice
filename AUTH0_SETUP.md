@@ -4,7 +4,7 @@
 
 Go to your Auth0 dashboard: https://manage.auth0.com/
 
-Navigate to: **Applications** → **Applications** → **Epistemic Drift Research** (or your app name)
+Navigate to: **Applications** → **Applications** → **Testamentary Traces Research** (or your app name)
 
 ### Application URIs
 
@@ -37,7 +37,7 @@ Click **Save Changes** at the bottom of the page.
 For backend JWT validation, create an Auth0 API:
 
 1. Go to **Applications** → **APIs** → **Create API**
-2. Name: `Epistemic Drift Research API`
+2. Name: `Testamentary Traces Research API`
 3. Identifier: `https://innovationdesign.io/api` (or any unique identifier)
 4. Signing Algorithm: `RS256`
 5. Click **Create**

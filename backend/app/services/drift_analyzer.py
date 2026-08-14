@@ -1,5 +1,5 @@
 """
-Epistemic drift analysis service
+Testamentary traces analysis service
 Measures conceptual change over time using embeddings and Granite
 """
 import logging
@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 class DriftAnalyzer:
-    """Analyze epistemic drift between time periods"""
+    """Analyze testamentary traces between time periods"""
     
     def __init__(self):
         self.embedding_service = EmbeddingService()

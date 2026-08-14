@@ -13,11 +13,12 @@ RUN apt-get update && apt-get install -y \
 # Copy requirements
 COPY requirements.txt .
 
-# Install Python dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+# Install CPU-only PyTorch first so Linux builds do not resolve the larger CUDA distribution.
+RUN pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cpu \
+    torch==2.13.0 torchvision==0.28.0
 
-# Keep docling explicitly pinned in the image for ingestion scripts.
-RUN pip install --no-cache-dir --prefer-binary docling==2.15.0
+# Install remaining Python dependencies.
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
 COPY . .

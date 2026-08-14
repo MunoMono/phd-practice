@@ -1,15 +1,15 @@
 # Multimodal NLP ML for PhD Year 1 - Architecture Baseline
 
-**Date:** January 2026  
-**Project:** Epistemic Drift in Design Methods (1965-1985)  
-**Researcher:** Graham  
+**Date:** January 2026
+**Project:** Testamentary Traces in Design Methods (1965-1985)
+**Researcher:** Graham
 **Status:** Architecture Complete, Implementation Phase
 
 ---
 
 ## Executive Summary
 
-This document provides a comprehensive baseline of the current machine learning infrastructure for my PhD research on epistemic drift in design methods literature. The system implements a **PID-gated ingestion pipeline** with **full provenance tracking** to ensure academic rigor, reproducibility, and explainable AI outputs suitable for doctoral examination.
+This document provides a comprehensive baseline of the current machine learning infrastructure for my PhD research on testamentary traces in design methods literature. The system implements a **PID-gated ingestion pipeline** with **full provenance tracking** to ensure academic rigor, reproducibility, and explainable AI outputs suitable for doctoral examination.
 
 ### Core Architecture Principles
 1. **Quality Control**: Only curated archival materials (linked to Persistent Identifiers) enter the training corpus
@@ -48,7 +48,7 @@ This document provides a comprehensive baseline of the current machine learning 
 - **Visual Content**: Treated as documentation/context, not analytical targets
 - **Rationale**: 90% of content value is textual; images are "eye candy" for human readers
 
-**Why Not CLIP?**  
+**Why Not CLIP?**
 CLIP (multi-modal vision-language) would be used for image-text alignment tasks like:
 - Matching diagrams to captions
 - Visual similarity search
@@ -63,16 +63,16 @@ Backend:
   - FastAPI 0.115.0 (REST + GraphQL)
   - PostgreSQL 14+ with pgvector 0.3.5
   - Python 3.11+
-  
+
 NLP Pipeline:
   - Docling 2.15.0 (PDF extraction, TIFF OCR)
   - sentence-transformers 3.3.0 (embeddings)
   - IBM Granite (planned fine-tuning)
-  
+
 Storage:
   - DigitalOcean Spaces (master files)
   - PostgreSQL (structured metadata + vectors)
-  
+
 Infrastructure:
   - Docker + docker-compose
   - nginx reverse proxy
@@ -149,8 +149,8 @@ Infrastructure:
 1. **Chunk Citations** (`build_chunk_citation()`):
    ```python
    # Generates formal academic citations:
-   # "Design Methods in Architecture (1965), Chapter 2, Page 47, 
-   #  para. 3. DDR Archive PID: 001808484369. 
+   # "Design Methods in Architecture (1965), Chapter 2, Page 47,
+   #  para. 3. DDR Archive PID: 001808484369.
    #  Source: https://ddr.archive.example/items/001808484369"
    ```
 
@@ -269,19 +269,19 @@ POST /api/provenance/snapshot/create              # Version dataset
 
 ### 8.1 Corpus Design Decisions
 
-**Question 1: Corpus Size**  
+**Question 1: Corpus Size**
 - Current: 3 PIDs (proof of concept)
 - Proposal: 50-100 PIDs for Year 1
 - Trade-off: Quality (manual curation) vs. Quantity (statistical power)
 - **Ask supervisors**: Is 50 adequate for meaningful drift analysis?
 
-**Question 2: Temporal Granularity**  
+**Question 2: Temporal Granularity**
 - Option A: Year-by-year analysis (1965, 1966, 1967...)
 - Option B: 5-year periods (1965-1969, 1970-1974, 1975-1979, 1980-1985)
 - Option C: Decade-level (1960s vs. 1970s vs. 1980s)
 - **Ask supervisors**: What temporal resolution supports the research question?
 
-**Question 3: Drift Metrics**  
+**Question 3: Drift Metrics**
 - Semantic distance (cosine similarity between time periods)
 - Topic modeling (LDA/NMF topic evolution)
 - Concept extraction (tracking specific terms/ideas)
@@ -365,10 +365,10 @@ POST /api/provenance/snapshot/create              # Version dataset
 
 The current architecture provides a **solid foundation for academically rigorous ML research**:
 
-✅ **Quality Control**: PID-gated ingestion prevents data contamination  
-✅ **Provenance**: Full lineage tracking for XAI and peer review  
-✅ **Text-Focused**: BERT embeddings for semantic analysis (not CLIP)  
-✅ **Reproducibility**: Corpus snapshots enable exact experiment replication  
+✅ **Quality Control**: PID-gated ingestion prevents data contamination
+✅ **Provenance**: Full lineage tracking for XAI and peer review
+✅ **Text-Focused**: BERT embeddings for semantic analysis (not CLIP)
+✅ **Reproducibility**: Corpus snapshots enable exact experiment replication
 
 **Next Milestone**: Complete Docling integration → Enable full corpus ingestion → Generate first training dataset
 
@@ -380,7 +380,7 @@ The current architecture provides a **solid foundation for academically rigorous
 
 ---
 
-**Document Version**: 1.0  
-**Last Updated**: January 18, 2026  
-**Contact**: graham@example.edu  
+**Document Version**: 1.0
+**Last Updated**: January 18, 2026
+**Contact**: graham@example.edu
 **Repository**: https://github.com/graham/phd-practice (private)

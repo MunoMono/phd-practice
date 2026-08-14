@@ -1,4 +1,4 @@
-# Epistemic Drift Research Platform
+# Testamentary Traces Research Platform
 
 **🌐 [View Live Site](https://munomono.github.io/phd-practice/)**
 
@@ -6,7 +6,7 @@
 - Code lives in `git@github.com:MunoMono/phd-practice.git` (no GitHub Actions).
 - Work locally on any machine, push to GitHub, and deploy directly from your machine to the droplet via the deploy scripts; GitHub does not touch the droplet.
 
-A cybernetic research platform for analyzing epistemic drift in academic literature using human-AI collaboration with IBM's Granite LLM.
+A cybernetic research platform for analyzing testamentary traces in academic literature using human-AI collaboration with IBM's Granite LLM.
 
 ## Architecture
 
@@ -96,14 +96,14 @@ POSTGRES_USER=postgres
 POSTGRES_PASSWORD=your_password
 POSTGRES_HOST=localhost
 POSTGRES_PORT=5432
-POSTGRES_DB=epistemic_drift
+POSTGRES_DB=testamentary-traces
 
 # Granite Model
 GRANITE_MODEL_PATH=ibm-granite/granite-4.0-h-small-instruct
 GRANITE_DEVICE=cuda  # or cpu
 
 # S3 Storage
-S3_BUCKET=epistemic-drift-research
+S3_BUCKET=testamentary-traces-research
 S3_ENDPOINT=your_s3_endpoint
 S3_ACCESS_KEY=your_access_key
 S3_SECRET_KEY=your_secret_key
@@ -148,6 +148,22 @@ Multi-line charts showing evolution of key terms over time:
 - Agent confidence over successive fine-tuning runs
 
 ## Development Workflow
+
+### Normal Daily Workflow
+
+```bash
+git checkout main
+git pull origin main
+./pull-from-production.sh --yes
+```
+
+Rules for the daily refresh flow:
+
+- Git is the source of truth for code.
+- Production is the source of truth for runtime data.
+- Normal mode starts the code-driven local Docker Compose stack.
+- Offline or image-only workflows are fallback-only and must stay explicit.
+- Do not start development unless the command ends with `READY FOR DEVELOPMENT`.
 
 ### Frontend Development
 ```bash
@@ -216,18 +232,18 @@ phd-practice/
 
 ### PhD Methodology Integration
 1. Create Jupyter notebooks for experimental logs
-2. Document baseline epistemic drift hypothesis
+2. Document baseline testamentary traces hypothesis
 3. Build first synthetic training examples
 4. Validate document processing pipeline with sample PDFs
 5. Design evaluation metrics for agent performance
 
 ## Research Context
 
-This platform enables a novel methodological approach to studying epistemic drift:
+This platform enables a novel methodological approach to studying testamentary traces:
 
 - **Input**: 500 PDFs + 300 images (~1000 pages of academic literature)
 - **Process**: Human-researcher + Granite agent collaborative analysis
-- **Output**: Documented cybernetic research process + findings on epistemic drift
+- **Output**: Documented cybernetic research process + findings on testamentary traces
 - **Contribution**: Both the findings AND the methodology are research contributions
 
 ## License

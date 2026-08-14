@@ -1,6 +1,6 @@
 """
 S3 Spaces sync service - pulls PDFs from DigitalOcean Spaces
-Automatically processes documents for epistemic drift analysis
+Automatically processes documents for testamentary traces analysis
 """
 import logging
 import re

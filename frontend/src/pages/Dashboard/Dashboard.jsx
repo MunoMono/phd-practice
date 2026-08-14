@@ -7,37 +7,11 @@ import { getDocumentInventorySummary } from '../../api/documents'
 import PageHeader from '../../components/layout/PageHeader'
 import { PageGrid, PageColumn as Column } from '../../components/layout/PageGrid'
 import SectionHeading from '../../components/layout/SectionHeading'
-import { fetchDashboardStats } from '../../api/viz'
+import { getClaims } from '../../api/claims'
+import { fetchDashboardAnalyticalSurface, fetchDashboardStats } from '../../api/viz'
 import { getGraniteModelInfo } from '../../api/granite'
+import DashboardAnalyticalSurface from './DashboardAnalyticalSurface'
 import '../../styles/pages/Dashboard.scss'
-
-const readinessDefinitions = [
-  {
-    key: 'source-interrogation',
-    title: 'Retrieval-augmented archival interrogation',
-    description: 'RAG becomes a method of archival interrogation when retrieval is treated as a traceable interpretive act rather than as automated answer production.'
-  },
-  {
-    key: 'absences',
-    title: 'Retrieval-augmented missingness',
-    description: 'Missingness becomes legible when failed retrieval, sparse metadata, absent entities, access restrictions and oral-history contradictions are recorded as analytical evidence.'
-  },
-  {
-    key: 'cross-readings',
-    title: 'Oral-historical / testimony-archive cross-reading',
-    description: 'Oral history activates the archive not by filling gaps with facts, but by creating interpretive cross-readings between recollection, documentary trace and institutional memory.'
-  },
-  {
-    key: 'semantic-atlas',
-    title: 'Embedding-based visual analytics',
-    description: 'Embedding-based visual analytics creates new legibilities by allowing contested design knowledge to be read as semantic proximity, cluster formation, anomaly and drift.'
-  },
-  {
-    key: 'claims-evidence',
-    title: 'Corroborative checking and interpretive control',
-    description: 'Computational outputs become research evidence only when they are checked against provenance, metadata distribution, oral-historical interpretation and human judgement.'
-  }
-]
 
 const formatMetricValue = (value, fallback = 'Not yet recorded') => (value === null || value === undefined ? fallback : value)
 
@@ -47,6 +21,8 @@ const Dashboard = () => {
   const [stats, setStats] = useState(null)
   const [authoritySummary, setAuthoritySummary] = useState(null)
   const [inventorySummary, setInventorySummary] = useState(null)
+  const [analyticalSurface, setAnalyticalSurface] = useState(null)
+  const [claims, setClaims] = useState([])
   const [loadError, setLoadError] = useState('')
 
   useEffect(() => {
@@ -54,11 +30,13 @@ const Dashboard = () => {
 
     const loadDashboard = async () => {
       try {
-        const [granitePayload, statsPayload, authorityPayload, inventoryPayload] = await Promise.all([
+        const [granitePayload, statsPayload, authorityPayload, inventoryPayload, analyticalPayload, claimsPayload] = await Promise.all([
           getGraniteModelInfo().catch(() => null),
           fetchDashboardStats().catch(() => null),
           getAuthoritySummary().catch(() => null),
-          getDocumentInventorySummary().catch(() => null)
+          getDocumentInventorySummary().catch(() => null),
+          fetchDashboardAnalyticalSurface().catch(() => null),
+          getClaims().catch(() => null),
         ])
 
         if (isCancelled) {
@@ -69,6 +47,8 @@ const Dashboard = () => {
         setStats(statsPayload)
         setAuthoritySummary(authorityPayload)
         setInventorySummary(inventoryPayload)
+        setAnalyticalSurface(analyticalPayload)
+        setClaims(claimsPayload?.claims || [])
       } catch (error) {
         if (!isCancelled) {
           setLoadError(error.message || 'Failed to load dashboard metrics.')
@@ -86,9 +66,12 @@ const Dashboard = () => {
   const corpusStatus = useMemo(() => {
     const overview = stats?.overview || {}
     const mlProcessing = stats?.mlProcessing || {}
+    const corpusCounts = overview.corpusStatus || {}
     return [
-      { label: 'Local corpus documents', value: formatMetricValue(overview.totalDocuments, 0) },
-      { label: 'Local persisted pages', value: formatMetricValue(overview.totalPages) },
+      { label: 'Frozen corpus version', value: analyticalSurface?.corpus_version || 'Loading' },
+      { label: 'Searchable evidence', value: analyticalSurface?.composition?.current_chunks ?? formatMetricValue(overview.totalPages, 0) },
+      { label: 'Archive-resolved/current records', value: formatMetricValue(corpusCounts.archiveResolvedDocumentCount, 0) },
+      { label: 'Unresolved legacy records', value: formatMetricValue(corpusCounts.unresolvedLegacyDocumentCount, 0) },
       { label: 'Documents with embeddings', value: formatMetricValue(mlProcessing.documentsWithEmbeddings, 0) },
       { label: 'Archive-linked PDF assets', value: formatMetricValue(overview.totalPdfAssets ?? overview.totalPdfs, 0) }
     ]
@@ -100,8 +83,8 @@ const Dashboard = () => {
     }
 
     return [
-      { label: 'Active archive assets', value: inventorySummary.count },
-      { label: 'ML eligible', value: inventorySummary.eligibleUnrestricted + inventorySummary.eligibleRestricted },
+      { label: 'Authoritative archive assets', value: inventorySummary.count },
+      { label: 'ML-eligible assets', value: inventorySummary.eligibleUnrestricted + inventorySummary.eligibleRestricted },
       { label: 'ML excluded', value: inventorySummary.excluded },
       { label: 'Archive authorities', value: authoritySummary ? `${authoritySummary.totalRecords} records / ${authoritySummary.count} types` : 'Unavailable' },
     ]
@@ -113,22 +96,16 @@ const Dashboard = () => {
         detail: `${item.count} recent event${item.count === 1 ? '' : 's'}`
       }))
     : [
-        { label: 'Granite retrieval path', detail: 'Healthy on the local small Granite model.' },
-        { label: 'Docling-ingested corpus', detail: 'Only four PDFs currently support retrieval and clustering.' },
-        { label: 'Workbench refactor', detail: 'Primary workflow now centers Ask, Missingness, Cross-read, Clusters, and Claims.' }
+        { label: 'Granite retrieval path', detail: 'Healthy on the local Granite model.' },
+        { label: 'Frozen corpus', detail: '95 controlled-ingestible source documents and 12,884 current chunks are available for retrieval.' },
+        { label: 'Immutable experiments', detail: 'Saved runs preserve retrieval, supplied evidence, model configuration, and export history.' }
       ]
 
   const limitations = [
-    'Dashboard corpus counts describe the local persisted corpus, not the broader remote archive inventory discovered during Turin Phase 2.',
-    'Only a small number of locally materialized PDFs currently have extracted text, so outputs remain case-study scale.',
-    'Missingness, Cross-read, and Claims still use mocked first-wave data contracts while backend tables stabilize.',
-    'Clusters reflect the current embedded evidence surface, not the full archive, and must not be treated as proof.'
-  ]
-
-  const priorities = [
-    'Replace mocked missingness events with a lightweight backend event log.',
-    'Persist Ask retrieval trails and Claims evidence attachments through stable endpoints.',
-    'Tighten document and chunk handoff from Corpus into Ask and Clusters.'
+    'Retrieval is PostgreSQL full-text search over a versioned, frozen corpus.',
+    'Missingness is scoped to the current query, supplied evidence, or ingested corpus.',
+    'Authority data provides context; it is not documentary evidence.',
+    'Researcher assessment remains human-authored and separate from model output.'
   ]
 
   return (
@@ -136,9 +113,8 @@ const Dashboard = () => {
       <div className="dashboard__hero">
         <div className="dashboard__hero-inner">
           <PageHeader
-            eyebrow="90-day statement of work"
             title="Archival activation workbench"
-            description="A provenance-aware research apparatus for source interrogation, absences, cross-readings, semantic patterning, and claim-evidence control."
+            description="Interrogate sources, trace provenance, surface absences and test interpretations across a computational research corpus."
           />
         </div>
       </div>
@@ -158,9 +134,7 @@ const Dashboard = () => {
               )}
             </div>
             <h2 className="dashboard__granite-hero-title">Research apparatus status</h2>
-            <p className="dashboard__granite-hero-description">
-              The current workbench is organized around five analytical outputs: source interrogation, absences, cross-readings, semantic patterning, and claims and evidence. Each view exists to produce a thesis artefact, provenance trail, or research decision surface.
-            </p>
+            <p className="dashboard__granite-hero-description">Live retrieval is available alongside frozen corpus controls, immutable research runs, provenance tracing, and human-authored assessment.</p>
             {graniteInfo && (
               <div className="dashboard__granite-hero-specs">
                 <div className="dashboard__granite-hero-spec">
@@ -191,8 +165,8 @@ const Dashboard = () => {
         )}
 
         <Column>
-          <SectionHeading title="Local experimental corpus" />
-          <p className="app-copy-tight">These figures describe the local persisted experimental corpus and runtime state, not the full remote archive inventory.</p>
+          <SectionHeading title="Research instrument status" />
+          <p className="app-copy-tight">Live values distinguish the frozen retrieval corpus from the broader archive inventory.</p>
         </Column>
 
         {corpusStatus.map((item) => (
@@ -207,8 +181,8 @@ const Dashboard = () => {
         {archiveInventoryStatus.length > 0 && (
           <>
             <Column>
-              <SectionHeading title="Remote archive inventory" />
-              <p className="app-copy-tight">These figures describe the live archive-backed source inventory exposed in Sources. They do not refer to the raw `documents` table total.</p>
+              <SectionHeading title="Archive inventory" />
+              <p className="app-copy-tight">Live archive-backed source inventory exposed in Sources, separate from the frozen retrieval corpus.</p>
             </Column>
 
             {archiveInventoryStatus.map((item) => (
@@ -223,21 +197,12 @@ const Dashboard = () => {
         )}
 
         <Column>
-          <SectionHeading title="Five-bucket readiness" />
+          <SectionHeading title="Analytical surface" />
         </Column>
 
-        {readinessDefinitions.map((item) => (
-          <Column key={item.key} lg={4} md={4} sm={4}>
-            <ClickableTile onClick={() => navigate(`/${item.key}`)} className="dashboard__tile">
-              <div className="dashboard__tile-icon">
-                <ArrowRight size={24} />
-              </div>
-              <h3>{item.title}</h3>
-              <p>{item.description}</p>
-              {item.priority ? <p className="dashboard__priority-copy">{item.priority}</p> : null}
-            </ClickableTile>
-          </Column>
-        ))}
+        <Column>
+          <DashboardAnalyticalSurface data={analyticalSurface} claims={claims} />
+        </Column>
 
         <Column>
           <SectionHeading title="Supporting views" />
@@ -249,7 +214,17 @@ const Dashboard = () => {
               <Search size={32} />
             </div>
             <h3>Sources</h3>
-            <p>Source inspection before interrogation: document metadata, ingestion status, annotation detail, and workflow handoff.</p>
+            <p>Inspect corpus records, policy, page scope, and provenance before interrogation.</p>
+          </ClickableTile>
+        </Column>
+
+        <Column lg={5} md={4} sm={4}>
+          <ClickableTile onClick={() => navigate('/research-runs')} className="dashboard__tile">
+            <div className="dashboard__tile-icon">
+              <ArrowRight size={32} />
+            </div>
+            <h3>Research runs</h3>
+            <p>Review immutable retrieval and inference experiments with supplied evidence and exportable records.</p>
           </ClickableTile>
         </Column>
 
@@ -259,7 +234,17 @@ const Dashboard = () => {
               <WarningAlt size={32} />
             </div>
             <h3>Provenance</h3>
-            <p>Exports, session traces, and training provenance kept available as audit instruments rather than top-level research destinations.</p>
+            <p>Trace query, evidence, authority, and export histories across the research apparatus.</p>
+          </ClickableTile>
+        </Column>
+
+        <Column lg={5} md={4} sm={4}>
+          <ClickableTile onClick={() => navigate('/claims-evidence')} className="dashboard__tile">
+            <div className="dashboard__tile-icon">
+              <Checkmark size={32} />
+            </div>
+            <h3>Claims and evidence</h3>
+            <p>Review claims against supporting archival evidence and their researcher-held interpretive status.</p>
           </ClickableTile>
         </Column>
 
@@ -279,7 +264,7 @@ const Dashboard = () => {
 
         <Column lg={5} md={8} sm={4}>
           <Tile className="dashboard__info-tile">
-            <SectionHeading title="Current known limitations" />
+            <SectionHeading title="Methodological boundaries" />
             <div className="app-card-grid app-card-grid--dense">
               {limitations.map((item) => (
                 <p key={item} className="app-copy-reset">{item}</p>
@@ -288,16 +273,6 @@ const Dashboard = () => {
           </Tile>
         </Column>
 
-        <Column lg={6} md={8} sm={4}>
-          <Tile className="dashboard__info-tile">
-            <SectionHeading title="Next build priority" />
-            <div className="app-card-grid app-card-grid--dense">
-              {priorities.map((item) => (
-                <p key={item} className="app-copy-reset">{item}</p>
-              ))}
-            </div>
-          </Tile>
-        </Column>
       </PageGrid>
     </div>
   )

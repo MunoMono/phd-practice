@@ -458,4 +458,266 @@
   &__priority-copy {
     color: $text-secondary;
   }
+
+  &__analytical-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: $spacing-05;
+    margin-bottom: $spacing-05;
+
+    @include breakpoint-down(md) {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  &__chart-panel {
+    min-height: 25rem;
+    padding: $spacing-06;
+    background: $layer-01;
+    border: 1px solid $border-subtle-01;
+    border-top: 2px solid $border-interactive;
+    overflow: hidden;
+  }
+
+  &__chart-panel-header {
+    margin-bottom: $spacing-05;
+
+    h3 {
+      @include type-style('heading-03');
+      margin: 0 0 $spacing-02;
+      color: $text-primary;
+    }
+
+    p {
+      @include type-style('label-01');
+      margin: 0;
+      color: $text-secondary;
+      line-height: 1.4;
+    }
+  }
+
+  &__composition {
+    display: grid;
+    grid-template-columns: minmax(9rem, 11rem) 1fr;
+    align-items: center;
+    gap: $spacing-05;
+    min-height: 17rem;
+
+    svg {
+      width: 100%;
+      max-width: 11rem;
+    }
+  }
+
+  &__donut-value {
+    fill: $text-primary;
+    font-size: 1.65rem;
+    font-weight: 600;
+  }
+
+  &__donut-label {
+    fill: $text-secondary;
+    font-size: 0.67rem;
+  }
+
+  &__chart-key {
+    display: grid;
+    gap: $spacing-04;
+    padding: 0;
+    margin: 0;
+    list-style: none;
+
+    li {
+      display: grid;
+      grid-template-columns: 0.65rem minmax(0, 1fr) auto;
+      gap: $spacing-03;
+      align-items: center;
+      @include type-style('label-01');
+      color: $text-secondary;
+    }
+
+    li > span:first-child {
+      width: 0.65rem;
+      height: 0.65rem;
+    }
+
+    strong {
+      color: $text-primary;
+      font-weight: 600;
+    }
+  }
+
+  &__density-total,
+  &__timeline-summary {
+    display: flex;
+    align-items: baseline;
+    gap: $spacing-03;
+    margin-bottom: $spacing-05;
+
+    strong {
+      @include type-style('heading-04');
+      color: $text-primary;
+    }
+
+    span, em {
+      @include type-style('label-01');
+      color: $text-secondary;
+      font-style: normal;
+    }
+  }
+
+  &__density-list {
+    display: grid;
+    gap: $spacing-03;
+  }
+
+  &__density-row {
+    display: grid;
+    grid-template-columns: minmax(6rem, 1.45fr) minmax(5rem, 2fr) 3rem;
+    align-items: center;
+    gap: $spacing-03;
+    min-width: 0;
+
+    strong {
+      @include type-style('label-01');
+      color: $text-primary;
+      text-align: right;
+    }
+  }
+
+  &__density-label {
+    @include type-style('label-01');
+    overflow: hidden;
+    color: $text-secondary;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__density-track {
+    height: 0.55rem;
+    background: $layer-accent-01;
+    overflow: hidden;
+
+    span {
+      display: block;
+      height: 100%;
+      background: $teal-40;
+    }
+  }
+
+  &__timeline {
+    display: block;
+    width: 100%;
+    height: auto;
+    overflow: visible;
+  }
+
+  &__timeline-axis {
+    stroke: $border-subtle-01;
+  }
+
+  &__timeline-bar {
+    fill: $cyan-40;
+
+    &:hover {
+      fill: $teal-30;
+    }
+  }
+
+  &__timeline-label {
+    fill: $text-secondary;
+    font-size: 0.62rem;
+  }
+
+  &__run-states {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: $spacing-03;
+    margin-bottom: $spacing-06;
+  }
+
+  &__run-state {
+    display: grid;
+    gap: $spacing-02;
+    min-height: 8rem;
+    padding: $spacing-04;
+    background: $layer-accent-01;
+    border-top: 2px solid $border-subtle-01;
+
+    svg { color: $icon-secondary; }
+
+    strong {
+      @include type-style('heading-04');
+      color: $text-primary;
+    }
+
+    span {
+      @include type-style('label-01');
+      color: $text-secondary;
+      line-height: 1.25;
+    }
+
+    &--complete { border-top-color: $green-40; }
+    &--bounded { border-top-color: $yellow-30; }
+    &--assessed { border-top-color: $blue-40; }
+  }
+
+  &__claim-states {
+    display: grid;
+    grid-template-columns: 1fr repeat(3, auto);
+    align-items: center;
+    gap: $spacing-03;
+    padding-top: $spacing-05;
+    border-top: 1px solid $border-subtle-01;
+
+    p {
+      @include type-style('label-01');
+      margin: 0;
+      color: $text-secondary;
+    }
+
+    div {
+      display: grid;
+      gap: $spacing-02;
+      justify-items: end;
+    }
+
+    strong {
+      @include type-style('heading-01');
+      color: $text-primary;
+    }
+  }
+
+  &__claim-state {
+    @include type-style('label-01');
+    text-transform: capitalize;
+    white-space: nowrap;
+
+    &--supported { color: $green-30; }
+    &--partially_supported { color: $cyan-30; }
+    &--unresolved { color: $yellow-30; }
+  }
+
+  &__state-note {
+    @include type-style('label-01');
+    margin: $spacing-06 0 0;
+    color: $text-secondary;
+    line-height: 1.45;
+  }
+
+  @include breakpoint-down(md) {
+    &__chart-panel { min-height: 0; }
+
+    &__composition { grid-template-columns: 8rem 1fr; }
+
+    &__density-row { grid-template-columns: minmax(5rem, 1fr) minmax(4rem, 1.5fr) 2.75rem; }
+
+    &__claim-states {
+      grid-template-columns: repeat(3, 1fr);
+
+      p { grid-column: 1 / -1; }
+
+      div { justify-items: start; }
+    }
+  }
 }

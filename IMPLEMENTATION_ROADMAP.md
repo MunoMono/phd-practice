@@ -19,7 +19,7 @@
 - Load model from HuggingFace
 - Initialize tokenizer
 - Create inference pipeline
-- Implement prompt templates for epistemic drift analysis
+- Implement prompt templates for testamentary traces analysis
 - Add streaming support for real-time responses
 ```
 
@@ -85,7 +85,7 @@
 **Implementation needed**:
 ```python
 # notebooks/01_training_data_generation.ipynb
-- Create epistemic drift examples
+- Create testamentary traces examples
 - Prompt engineering for annotation
 - Quality control workflow
 
@@ -158,7 +158,7 @@
 ### Research Documentation Needs
 - [ ] Notebook template for experiment documentation
 - [ ] Prompt templates that embody your theoretical framework
-- [ ] Evaluation rubric for "epistemic drift" detection quality
+- [ ] Evaluation rubric for "testamentary traces" detection quality
 - [ ] Citation extraction from retrieved chunks
 - [ ] Temporal metadata tracking (publication year)
 

@@ -1,0 +1,35 @@
+{
+  "classification": "TURIN DETERMINISM SPOT CHECK",
+  "corpus_version": "corpus_f40d78dbce52",
+  "ingestion_version": "turin-controlled-pilot-v1",
+  "chunking_version": "turin-page-heading-v1",
+  "documents": [
+    {
+      "document_id": "doc_230440137378_063f52d0a4b3",
+      "ml_policy_status": "eligible_unrestricted",
+      "ml_page_scope": "all_pages",
+      "stored_chunk_count": 114,
+      "regenerated_chunk_count": 114,
+      "mismatch_indexes": [],
+      "result": "match"
+    },
+    {
+      "document_id": "doc_521129471965_ac7a965d232a",
+      "ml_policy_status": "eligible_page_restricted",
+      "ml_page_scope": "19-20, 22-23",
+      "stored_chunk_count": 27,
+      "regenerated_chunk_count": 27,
+      "mismatch_indexes": [],
+      "result": "match"
+    },
+    {
+      "document_id": "doc_546216480663_5ad91481fad1",
+      "ml_policy_status": "eligible_unrestricted",
+      "ml_page_scope": "all_pages",
+      "stored_chunk_count": 888,
+      "regenerated_chunk_count": 888,
+      "mismatch_indexes": [],
+      "result": "match"
+    }
+  ]
+}

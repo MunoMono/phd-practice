@@ -1,7 +1,6 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { Auth0Provider, Auth0Context } from '@auth0/auth0-react'
-import '@carbon/styles/css/styles.css'
 import App from './App.jsx'
 import './styles/index.scss'
 

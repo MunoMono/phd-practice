@@ -22,7 +22,7 @@ SET row_security = off;
 -- Data for Name: digital_assets; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-INSERT INTO public.digital_assets VALUES (1, 'phd-diagram.png', 'image/png', 's3://epistemic-drift/diagrams/phd-diagram.png', 245000, '{"desc": "diagram"}', '2026-01-18 10:21:04.304719');
+INSERT INTO public.digital_assets VALUES (1, 'phd-diagram.png', 'image/png', 's3://testamentary-traces/diagrams/phd-diagram.png', 245000, '{"desc": "diagram"}', '2026-01-18 10:21:04.304719');
 INSERT INTO public.digital_assets VALUES (2, 'cybernetic-loops.png', 'image/png', 's3://diagrams/cybernetic-loops.png', 189000, '{}', '2026-01-18 10:23:47.764391');
 INSERT INTO public.digital_assets VALUES (3, 'evidence-graph.png', 'image/png', 's3://visualizations/evidence-graph.png', 312000, '{}', '2026-01-18 10:23:47.764391');
 INSERT INTO public.digital_assets VALUES (4, 'temporal-drift.png', 'image/png', 's3://charts/temporal-drift.png', 156000, '{}', '2026-01-18 10:23:47.764391');
@@ -35,7 +35,7 @@ INSERT INTO public.digital_assets VALUES (7, 'analysis.pdf', 'application/pdf', 
 -- Data for Name: document_embeddings; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-INSERT INTO public.document_embeddings VALUES (1, 'chunk-001', 'Sample document content about epistemic drift', 'research-paper-1.pdf', '{"type": "research"}', '2026-01-18 10:05:53.186708');
+INSERT INTO public.document_embeddings VALUES (1, 'chunk-001', 'Sample document content about testamentary traces', 'research-paper-1.pdf', '{"type": "research"}', '2026-01-18 10:05:53.186708');
 
 
 --
@@ -49,7 +49,7 @@ INSERT INTO public.experiments VALUES (1, 'exp-001', 'Baseline RAG', 'Initial ba
 -- Data for Name: research_sessions; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-INSERT INTO public.research_sessions VALUES (1, 'session-001', 'What is epistemic drift?', 'Epistemic drift refers to...', '{"duration": 45}', '2026-01-18 10:06:14.705238');
+INSERT INTO public.research_sessions VALUES (1, 'session-001', 'What are testamentary traces?', 'Testamentary traces refer to archival residues, evidential chains, and interpretive traces that can be surfaced across the corpus.', '{"duration": 45}', '2026-01-18 10:06:14.705238');
 
 
 --

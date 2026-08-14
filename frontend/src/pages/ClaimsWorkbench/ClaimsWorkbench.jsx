@@ -21,6 +21,7 @@ import PageHeader from '../../components/layout/PageHeader'
 import PanelHeader from '../../components/layout/PanelHeader'
 import { PageGrid, PageColumn as Column } from '../../components/layout/PageGrid'
 import { exportClaimsCsv, exportClaimsMarkdown, getClaimDetail, getClaims, updateClaim } from '../../api/claims'
+import { getResearchStateTag } from '../../utils/researchState'
 import { downloadFile } from '../../utils/workbenchExport'
 import './ClaimsWorkbench.scss'
 
@@ -213,6 +214,12 @@ const ClaimsWorkbench = () => {
           <div className="claims-workbench__table-wrap">
             <TableContainer title="Claims">
               <Table>
+              <colgroup>
+                <col className="claims-workbench__claim-col" />
+                <col className="claims-workbench__support-col" />
+                <col className="claims-workbench__evidence-col" />
+                <col className="claims-workbench__reviewer-col" />
+              </colgroup>
               <TableHead>
                 <TableRow>
                   <TableHeader>Claim</TableHeader>
@@ -222,14 +229,23 @@ const ClaimsWorkbench = () => {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {claims.map((claim) => (
-                  <TableRow key={claim.claim_id} onClick={() => setSelectedClaimId(claim.claim_id)} className={claim.claim_id === selectedClaimId ? 'app-table-row--interactive app-table-row--selected' : 'app-table-row--interactive'}>
-                    <TableCell className="claims-workbench__claim-cell">{claim.claim_text}</TableCell>
-                    <TableCell>{claim.support_level}</TableCell>
-                    <TableCell>{claim.evidence_chunk_ids.length}</TableCell>
-                    <TableCell>{claim.reviewer_status}</TableCell>
-                  </TableRow>
-                ))}
+                {claims.map((claim) => {
+                  const stateTag = getResearchStateTag(claim)
+
+                  return (
+                    <TableRow key={claim.claim_id} onClick={() => setSelectedClaimId(claim.claim_id)} className={claim.claim_id === selectedClaimId ? 'app-table-row--interactive app-table-row--selected' : 'app-table-row--interactive'}>
+                      <TableCell className="claims-workbench__claim-cell">
+                        <div className="claims-workbench__claim-summary">
+                          {stateTag ? <Tag type={stateTag.type} size="sm">{stateTag.label}</Tag> : null}
+                          <span>{claim.claim_text}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="claims-workbench__compact-cell">{claim.support_level}</TableCell>
+                      <TableCell className="claims-workbench__compact-cell">{claim.evidence_chunk_ids.length}</TableCell>
+                      <TableCell className="claims-workbench__compact-cell">{claim.reviewer_status}</TableCell>
+                    </TableRow>
+                  )
+                })}
               </TableBody>
               </Table>
             </TableContainer>
@@ -243,7 +259,10 @@ const ClaimsWorkbench = () => {
           <PanelHeader title="Claim detail" description="Update support level, caveats, and reviewer status while keeping evidence-chunk gating explicit." />
           {selectedClaim && (
             <>
-              <p className="claims-workbench__detail-copy"><strong>{selectedClaim.claim_text}</strong></p>
+              <div className="claims-workbench__detail-head">
+                {getResearchStateTag(selectedClaim) ? <Tag type={getResearchStateTag(selectedClaim).type}>{getResearchStateTag(selectedClaim).label}</Tag> : null}
+                <p className="claims-workbench__detail-copy"><strong>{selectedClaim.claim_text}</strong></p>
+              </div>
               <div className="claims-workbench__tag-row">
                 {selectedClaim.evidence_chunk_ids.length > 0 ? selectedClaim.evidence_chunk_ids.map((chunkId) => (
                   <Tag key={chunkId} type="blue">{chunkId}</Tag>

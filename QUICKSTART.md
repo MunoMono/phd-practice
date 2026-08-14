@@ -110,7 +110,7 @@ Visit `http://localhost:3000` to see:
 
 ### ✅ Complete Frontend
 - IBM Carbon Design System fully integrated
-- D3.js visualizations for epistemic drift analysis
+- D3.js visualizations for testamentary traces analysis
 - 4 main pages with routing
 - Dark theme (g100) optimized for research
 
@@ -131,7 +131,7 @@ Visit `http://localhost:3000` to see:
 2. **Granite Model**: Download and configure Granite-4.0-H-Small-Instruct
 3. **Document Processing**: Integrate Granite-Docling for PDF/image processing
 4. **Vector Database**: Implement embedding and retrieval pipeline
-5. **Fine-tuning**: Create training data for epistemic drift analysis
+5. **Fine-tuning**: Create training data for testamentary traces analysis
 
 ## 📚 Key URLs
 
@@ -157,4 +157,4 @@ This platform embodies second-order cybernetics:
 - Every interaction is logged for methodological transparency
 - Human-AI collaboration creates knowledge dialectically
 
-Ready to analyze epistemic drift! 🔬
+Ready to analyze testamentary traces! 🔬

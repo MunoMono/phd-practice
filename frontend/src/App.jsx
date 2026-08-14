@@ -13,6 +13,7 @@ const MissingnessWorkbench = lazy(() => import('./pages/MissingnessWorkbench/Mis
 const CrossReadWorkbench = lazy(() => import('./pages/CrossReadWorkbench/CrossReadWorkbench'))
 const ClaimsWorkbench = lazy(() => import('./pages/ClaimsWorkbench/ClaimsWorkbench'))
 const AuditWorkbench = lazy(() => import('./pages/AuditWorkbench/AuditWorkbench'))
+const ResearchRuns = lazy(() => import('./pages/ResearchRuns/ResearchRuns'))
 const Documentation = lazy(() => import('./pages/Documentation/Documentation'))
 const LoginPage = lazy(() => import('./components/Auth/LoginPage'))
 
@@ -68,6 +69,7 @@ function App() {
                   <Route path="/semantic-atlas" element={<VisualAnalytics />} />
                   <Route path="/claims-evidence" element={<ClaimsWorkbench />} />
                   <Route path="/provenance" element={<AuditWorkbench />} />
+                  <Route path="/research-runs" element={<ResearchRuns />} />
                   <Route path="/documentation" element={<Documentation />} />
                   <Route path="/documentation/:docId" element={<Documentation />} />
                   <Route path="/corpus" element={<Navigate to="/sources" replace />} />
@@ -80,7 +82,7 @@ function App() {
                   <Route path="/tracer" element={<Navigate to="/source-interrogation" replace />} />
                   <Route path="/visual-analytics" element={<Navigate to="/semantic-atlas" replace />} />
                   <Route path="/sessions" element={<Navigate to="/provenance" replace />} />
-                  <Route path="/experiments" element={<Navigate to="/provenance" replace />} />
+                  <Route path="/experiments" element={<Navigate to="/research-runs" replace />} />
                   <Route path="/ml-dashboard" element={<Navigate to="/provenance" replace />} />
                 </Routes>
               </Suspense>

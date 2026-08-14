@@ -1,7 +1,9 @@
 import apiRequest from './client'
 
-export const listExperiments = (params = {}) => apiRequest('/api/experiments/list', { params })
+export const listExperimentRuns = () => apiRequest('/api/experiments')
 
-export const getExperiment = (experimentId) => apiRequest(`/api/experiments/${experimentId}`)
+export const getExperimentRun = (runId) => apiRequest(`/api/experiments/${runId}`)
 
-export const getExperimentMetrics = (experimentId) => apiRequest(`/api/experiments/${experimentId}/metrics`)
+export const saveExperimentAssessment = (runId, assessment) => apiRequest(`/api/experiments/${runId}/assessment`, { method: 'POST', body: assessment })
+
+export const exportExperimentRunJson = (runId) => apiRequest(`/api/experiments/${runId}/export`)

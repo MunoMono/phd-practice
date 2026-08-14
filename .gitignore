@@ -50,6 +50,10 @@ temp/
 *.tmp
 .phase2-samples/
 artifacts/turin-phase2b-sample-pdfs/
+artifacts/turin-controlled-corpus-sources/
+artifacts/turin-controlled-pilot-sources/
+backups/
+docs/turin_experiment/old_and_ignore/
 
 # Wealth management app (now independent repo)
 wealth-management/

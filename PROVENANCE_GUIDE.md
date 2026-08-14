@@ -300,7 +300,7 @@ provenance_chain = prov.get_chunk_provenance("chunk_42")
 Add provenance tables:
 
 ```bash
-psql -d epistemic_drift -f backend/migrations/001_add_pid_to_documents.sql
+psql -d testamentary-traces -f backend/migrations/001_add_pid_to_documents.sql
 ```
 
 This creates:

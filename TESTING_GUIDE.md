@@ -20,7 +20,7 @@ From your GraphQL response, you have **3 authority records**:
 cd /Users/graham/Documents/repos/phd-practice
 
 # Option A: Via psql
-psql -d epistemic_drift -f backend/migrations/001_add_pid_to_documents.sql
+psql -d testamentary-traces -f backend/migrations/001_add_pid_to_documents.sql
 
 # Option B: Via Python
 python -c "

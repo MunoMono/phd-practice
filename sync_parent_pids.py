@@ -23,7 +23,7 @@ GRAPHQL_ENDPOINT = "https://api.ddrarchive.org/graphql"
 DB_CONFIG = {
     'host': '104.248.170.26',
     'port': 5432,
-    'database': 'epistemic_drift',
+    'database': 'testamentary-traces',
     'user': 'postgres',
     'password': 'postgres'
 }
@@ -281,7 +281,7 @@ with open('/tmp/parent_pids_data.json', 'r') as f:
 conn = psycopg2.connect(
     host='db',
     port=5432,
-    database='epistemic_drift',
+    database='testamentary-traces',
     user='postgres',
     password='postgres',
     cursor_factory=RealDictCursor

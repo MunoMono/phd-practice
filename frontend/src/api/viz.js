@@ -33,6 +33,8 @@ export const fetchDashboardStats = async () => {
   return normalizeDashboardStats(payload)
 }
 
+export const fetchDashboardAnalyticalSurface = () => apiRequest('/api/viz/dashboard-analytical-surface')
+
 export const refreshDashboardStats = () => apiRequest('/api/viz/refresh-stats', {
   method: 'POST'
 })

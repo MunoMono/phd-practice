@@ -3,13 +3,56 @@
 # Quick deployment script for innovationdesign.io
 # This script SSHs into the DO droplet and deploys the application
 
-set -e
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/scripts/lib/git_deploy_guard.sh"
 
 DROPLET_IP="104.248.170.26"
 DROPLET_USER="root"
-REPO_URL="git@github.com:MunoMono/phd-practice.git"
+REMOTE_APP_DIR="/root/phd-practice"
+ALLOW_DIRTY=false
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --allow-dirty)
+            ALLOW_DIRTY=true
+            shift
+            ;;
+        *)
+            echo "ERROR: Unknown option '$1'" >&2
+            echo "Usage: ./deploy-to-droplet.sh [--allow-dirty]" >&2
+            exit 1
+            ;;
+    esac
+done
+
+git_require_clean_worktree "${ALLOW_DIRTY}"
 
 echo "🚀 Deploying to innovationdesign.io (${DROPLET_IP})..."
+
+if [[ "${GIT_DEPLOY_TREE_DIRTY}" == "true" ]]; then
+    echo "⚠️  Deploying a dirty tree because --allow-dirty was used."
+fi
+
+echo "📤 Syncing local application source to droplet..."
+rsync -avz --delete \
+    --exclude '.git' \
+    --exclude '.env' \
+    --exclude '.env.*' \
+    --exclude '.venv' \
+    --exclude 'venv' \
+    --exclude 'node_modules' \
+    --exclude 'dist' \
+    --exclude '__pycache__' \
+    --exclude '.pytest_cache' \
+    --exclude '.mypy_cache' \
+    --exclude '.DS_Store' \
+    --exclude '.prod-sync' \
+    --exclude 'backups' \
+    --exclude 'logs' \
+    --exclude 'frontend/test-results' \
+    ./ ${DROPLET_USER}@${DROPLET_IP}:${REMOTE_APP_DIR}/
 
 # SSH into droplet and execute deployment commands
 ssh ${DROPLET_USER}@${DROPLET_IP} << 'ENDSSH'
@@ -32,77 +75,19 @@ if ! docker compose version &> /dev/null; then
     apt-get install -y docker-compose-plugin
 fi
 
-# Install Git if not present
-if ! command -v git &> /dev/null; then
-    echo "Installing Git..."
-    apt-get install -y git
-fi
-
-echo "📂 Setting up repository..."
-
 # Navigate to deployment directory
-cd /root
+cd /root/phd-practice
 
-# Clone or update repository
-if [ -d "phd-practice" ]; then
-    echo "Updating existing repository..."
-    cd phd-practice
-    git fetch origin
-    git reset --hard origin/main
-    git pull origin main
-else
-    echo "Cloning repository..."
-    git clone ${REPO_URL}
-    cd phd-practice
+if [ ! -f ".env" ]; then
+    echo "❌ Missing /root/phd-practice/.env on droplet. Aborting to avoid overwriting production config."
+    exit 1
 fi
-
-# Create .env file with Auth0 credentials and database configuration
-echo "🔐 Creating environment configuration..."
-cat > .env << 'EOF'
-# Auth0 Configuration for innovationdesign.io
-VITE_AUTH0_DOMAIN=dev-i4m880asz7y6j5sk.us.auth0.com
-VITE_AUTH0_CLIENT_ID=1tKb110HavDT3KsqC5P894JEOZ3fQXMm
-VITE_AUTH0_AUDIENCE=https://api.ddrarchive.org
-VITE_AUTH0_REDIRECT_URI=https://innovationdesign.io
-
-# Environment
-VITE_DDR_ENV=production
-
-# GraphQL API Endpoint
-VITE_GRAPHQL_ENDPOINT=https://ddrarchive.org/graphql
-
-# PostgreSQL Configuration
-POSTGRES_USER=postgres
-POSTGRES_PASSWORD=postgres
-POSTGRES_DB=epistemic_drift
-
-# Backend Configuration
-GRANITE_MODEL_PATH=ibm-granite/granite-3.1-2b-instruct
-GRANITE_DEVICE=cpu
-GRANITE_MAX_TOKENS=384
-GRANITE_TEMPERATURE=0.2
-GRANITE_MAX_INPUT_CHARS=6000
-GRANITE_TIMEOUT_SECONDS=45
-
-# S3/Storage Configuration (optional)
-S3_BUCKET=
-S3_ENDPOINT=
-S3_ACCESS_KEY=
-S3_SECRET_KEY=
-EOF
-
-echo "🛑 Stopping existing containers..."
-docker compose -f docker-compose.prod.yml down || true
 
 echo "🏗️  Building application..."
-docker compose -f docker-compose.prod.yml build --no-cache
+docker compose -f docker-compose.prod.yml build frontend backend
 
 echo "▶️  Starting application..."
-docker compose -f docker-compose.prod.yml up -d
-
-echo "🔒 Ensuring database password is synced..."
-sleep 5
-docker exec phd-practice-db psql -U postgres -c "ALTER USER postgres WITH PASSWORD 'postgres';" 2>/dev/null || echo "Database password already correct or container not ready"
+docker compose -f docker-compose.prod.yml up -d --no-deps --force-recreate backend frontend
 
 echo "🔥 Configuring firewall..."
 if ! ufw status | grep -q "Status: active"; then
@@ -137,7 +122,10 @@ ENDSSH
 echo ""
 echo "✨ Deployment finished successfully!"
 echo ""
-echo "⚠️  IMPORTANT: Add these URLs to Auth0 Application Settings:"
-echo "   Allowed Callback URLs: https://innovationdesign.io, http://innovationdesign.io, http://104.248.170.26"
-echo "   Allowed Logout URLs: https://innovationdesign.io, http://innovationdesign.io, http://104.248.170.26"
-echo "   Allowed Web Origins: https://innovationdesign.io, http://innovationdesign.io, http://104.248.170.26"
+echo "ℹ️  Production .env/Auth0 settings were preserved on the droplet."
+
+deployment_marker_contents "deploy-to-droplet.sh" | ssh ${DROPLET_USER}@${DROPLET_IP} "cat > ${REMOTE_APP_DIR}/current-deployment.txt"
+
+echo ""
+echo "🧾 Current deployment marker:"
+ssh ${DROPLET_USER}@${DROPLET_IP} "cat ${REMOTE_APP_DIR}/current-deployment.txt"
