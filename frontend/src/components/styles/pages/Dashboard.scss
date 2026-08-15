@@ -2,19 +2,13 @@
 @use '@carbon/react/scss/theme' as *;
 @use '@carbon/react/scss/breakpoint' as *;
 @use '@carbon/react/scss/type' as *;
-@use '@carbon/react/scss/colors' as *;
 
 .dashboard {
   &__hero {
-    width: 100vw;
-    margin-left: calc(50% - 50vw);
-    margin-right: calc(50% - 50vw);
+    width: 100%;
     margin-bottom: $spacing-09;
-    background:
-      linear-gradient(135deg, rgba($cyan-40, 0.18) 0%, transparent 38%),
-      linear-gradient(145deg, $blue-60 0%, $blue-80 62%, $cool-gray-100 100%);
-    position: relative;
-    overflow: hidden;
+    background: $layer-01;
+    border-bottom: 1px solid $border-subtle-01;
 
     &-inner {
       max-width: 99rem;
@@ -26,70 +20,25 @@
         padding-right: $spacing-06;
       }
 
-      @media (max-width: 671px) {
-        padding-left: $spacing-05;
-        padding-right: $spacing-05;
-      }
-    }
-
-    &::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      right: 0;
-      width: 50%;
-      height: 100%;
-      background: linear-gradient(135deg, transparent 0%, rgba($white-0, 0.06) 100%);
-      pointer-events: none;
-    }
-
-    &::after {
-      content: '';
-      position: absolute;
-      bottom: -50%;
-      left: -10%;
-      width: 120%;
-      height: 100%;
-      background: radial-gradient(ellipse at center, rgba($white-0, 0.1) 0%, transparent 70%);
-      pointer-events: none;
-      animation: pulse 8s ease-in-out infinite;
     }
 
     .page-header {
-      position: relative;
-      z-index: 1;
       margin-bottom: 0;
       padding-bottom: 0;
       border-bottom: 0;
     }
 
     .page-header__eyebrow {
-      color: rgba($white-0, 0.74);
+      color: $text-secondary;
     }
 
     .page-header__title {
-      color: $text-on-color;
+      color: $text-primary;
     }
 
     .page-header__description {
-      color: rgba($white-0, 0.88);
-      max-width: 40rem;
+      color: $text-secondary;
     }
-
-    @include breakpoint-down(md) {
-      .page-header__title {
-        @include type-style('heading-04');
-      }
-
-      .page-header__description {
-        max-width: 36rem;
-      }
-    }
-  }
-
-  @keyframes pulse {
-    0%, 100% { opacity: 0.3; transform: scale(1); }
-    50% { opacity: 0.5; transform: scale(1.05); }
   }
 
   &__diagram-section {
@@ -100,26 +49,7 @@
     padding: $spacing-07;
     margin-bottom: $spacing-09;
     background-color: $layer-accent-01;
-    border-radius: 8px;
     border: 1px solid $border-subtle-01;
-    position: relative;
-    overflow: hidden;
-
-    &::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      height: 2px;
-      background: linear-gradient(90deg, transparent, $focus, transparent);
-      animation: shimmer 3s infinite;
-    }
-
-    @keyframes shimmer {
-      0% { transform: translateX(-100%); }
-      100% { transform: translateX(100%); }
-    }
   }
 
   &__diagram-badge {
@@ -140,21 +70,8 @@
   &__granite-tile {
     margin-bottom: $spacing-07;
     padding: $spacing-06;
-    background-color: $layer-accent-01;
+    background-color: $layer-01;
     border: 1px solid $border-subtle-01;
-    border-radius: 8px;
-    position: relative;
-    overflow: hidden;
-
-    &::before {
-      content: '';
-      position: absolute;
-      top: -2px;
-      left: -2px;
-      right: -2px;
-      height: 2px;
-      background-color: $focus;
-    }
   }
 
   &__granite-header {
@@ -217,33 +134,11 @@
   &__granite-hero-wrapper {
     padding: $spacing-09 $spacing-07;
     margin-bottom: $spacing-09;
-    background-color: $layer-accent-01;
-    border-radius: 12px;
+    background-color: $layer-01;
     border: 1px solid $border-subtle-01;
-    position: relative;
-    overflow: hidden;
-
-    &::before {
-      content: '';
-      position: absolute;
-      top: -50%;
-      right: -50%;
-      width: 100%;
-      height: 200%;
-      background: radial-gradient(circle, $layer-hover-01 0%, transparent 70%);
-      pointer-events: none;
-      animation: rotate-slow 20s linear infinite;
-    }
-
-    @keyframes rotate-slow {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
-    }
   }
 
   &__granite-hero-logo {
-    position: relative;
-    z-index: 1;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -279,19 +174,12 @@
 
   &__granite-hero-title {
     @include type-style('heading-05');
-    line-height: 1.2;
     margin: 0 0 $spacing-05;
     color: $text-primary;
-    letter-spacing: -0.02em;
-
-    @include breakpoint-down(lg) {
-      @include type-style('heading-04');
-    }
   }
 
   &__granite-hero-description {
     @include type-style('body-01');
-    line-height: 1.7;
     color: $text-secondary;
     margin: 0 0 $spacing-07;
 
@@ -307,7 +195,6 @@
     gap: $spacing-05;
     padding: $spacing-06;
     background-color: $layer-02;
-    border-radius: 8px;
     border: 1px solid $border-subtle-01;
 
     @include breakpoint-down(lg) {
@@ -321,7 +208,7 @@
     gap: $spacing-02;
 
     &-label {
-      font-size: 0.75rem;
+      @include type-style('label-01');
       text-transform: uppercase;
       letter-spacing: 0.05em;
       color: $text-secondary;
@@ -329,7 +216,7 @@
     }
 
     &-value {
-      font-size: 1rem;
+      @include type-style('body-01');
       color: $text-primary;
       font-weight: 500;
       word-break: break-word;
@@ -455,6 +342,36 @@
     color: $text-primary;
   }
 
+  &__metric-tile {
+    min-height: 0;
+
+    h4 {
+      @include type-style('label-01');
+      margin-bottom: $spacing-03;
+    }
+  }
+
+  &__supporting-grid {
+    padding: 0;
+  }
+
+  &__supporting-tile {
+    min-height: 0;
+    padding: $spacing-05;
+
+    .dashboard__tile-icon {
+      margin-bottom: $spacing-04;
+    }
+
+    h3 {
+      @include type-style('heading-03');
+    }
+
+    p {
+      @include type-style('body-compact-01');
+    }
+  }
+
   &__priority-copy {
     color: $text-secondary;
   }
@@ -536,9 +453,14 @@
       color: $text-secondary;
     }
 
-    li > span:first-child {
+    &-swatch {
       width: 0.65rem;
       height: 0.65rem;
+      background: $border-subtle-01;
+
+      &--controlled { background: $link-primary; }
+      &--anomaly { background: $support-warning; }
+      &--excluded { background: $icon-secondary; }
     }
 
     strong {
@@ -594,15 +516,9 @@
   }
 
   &__density-track {
+    width: 100%;
     height: 0.55rem;
-    background: $layer-accent-01;
-    overflow: hidden;
-
-    span {
-      display: block;
-      height: 100%;
-      background: $teal-40;
-    }
+    accent-color: $link-primary;
   }
 
   &__timeline {
@@ -617,10 +533,10 @@
   }
 
   &__timeline-bar {
-    fill: $cyan-40;
+    fill: $link-primary;
 
     &:hover {
-      fill: $teal-30;
+      fill: $link-primary-hover;
     }
   }
 
@@ -657,9 +573,9 @@
       line-height: 1.25;
     }
 
-    &--complete { border-top-color: $green-40; }
-    &--bounded { border-top-color: $yellow-30; }
-    &--assessed { border-top-color: $blue-40; }
+    &--complete { border-top-color: $support-success; }
+    &--bounded { border-top-color: $support-warning; }
+    &--assessed { border-top-color: $support-info; }
   }
 
   &__claim-states {
@@ -693,9 +609,9 @@
     text-transform: capitalize;
     white-space: nowrap;
 
-    &--supported { color: $green-30; }
-    &--partially_supported { color: $cyan-30; }
-    &--unresolved { color: $yellow-30; }
+    &--supported { color: $support-success; }
+    &--partially_supported { color: $support-info; }
+    &--unresolved { color: $support-warning; }
   }
 
   &__state-note {

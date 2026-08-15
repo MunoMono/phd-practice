@@ -1,7 +1,6 @@
 import { useEffect, useRef } from 'react'
 import * as d3 from 'd3'
 import { chartColors, chartStyles } from '../../utils/carbonD3Theme'
-import '../../styles/components/TemporalDriftChart.scss'
 
 const TemporalDriftChart = () => {
   const svgRef = useRef()

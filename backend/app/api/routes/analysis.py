@@ -110,12 +110,12 @@ async def analyze_query(request: AnalysisRequest):
                 text(
                     """
                     SELECT
-                        chunk_id,
-                        document_id,
-                        chunk_text,
-                        source_page,
-                        source_section,
-                        chunk_type,
+                        dc.chunk_id,
+                        dc.document_id,
+                        dc.chunk_text,
+                        dc.source_page,
+                        dc.source_section,
+                        dc.chunk_type,
                         d.pid,
                         d.title,
                         d.filename,
@@ -127,10 +127,10 @@ async def analyze_query(request: AnalysisRequest):
                         d.asset_id_or_asset_pid,
                         d.source_uri,
                         d.authority_data,
-                        ts_rank(search_tsv, websearch_to_tsquery('english', :query)) AS rank
+                        ts_rank(dc.search_tsv, websearch_to_tsquery('english', :query)) AS rank
                     FROM document_chunks dc
                     JOIN documents d ON d.document_id = dc.document_id
-                    WHERE search_tsv @@ websearch_to_tsquery('english', :query)
+                    WHERE dc.search_tsv @@ websearch_to_tsquery('english', :query)
                         AND d.use_for_ml = 1
                         AND d.ml_policy_status IN ('eligible_unrestricted', 'eligible_page_restricted')
                     ORDER BY rank DESC

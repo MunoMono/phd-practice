@@ -3,7 +3,6 @@ import { Chemistry } from '@carbon/icons-react'
 import PageHeader from '../../components/layout/PageHeader'
 import { PageGrid, PageColumn as Column } from '../../components/layout/PageGrid'
 import TrainingMetricsChart from '../../components/visualizations/TrainingMetricsChart'
-import '../../styles/pages/ExperimentalLog.scss'
 
 const ExperimentalLog = () => {
   return (

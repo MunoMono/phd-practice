@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react'
 import { Grid, Column, Tile, SkeletonText, ProgressBar, Tag } from '@carbon/react'
 import { DataBase, CloudApp, Cube, Chemistry, Archive, Tag as TagIcon } from '@carbon/icons-react'
 import getApiBaseUrl from '../../utils/apiBaseUrl'
-import '../../styles/components/StatsCards.scss'
 
 const StatsCards = () => {
   const [stats, setStats] = useState(null)

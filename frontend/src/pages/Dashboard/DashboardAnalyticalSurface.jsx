@@ -1,5 +1,6 @@
 import * as d3 from 'd3'
 import { Checkmark, InProgress, WarningAlt } from '@carbon/icons-react'
+import { createElement } from 'react'
 import { carbonColors } from '../../utils/carbonD3Theme'
 
 const numberFormat = new Intl.NumberFormat('en-GB')
@@ -16,9 +17,9 @@ const ChartPanel = ({ title, subtitle, children }) => (
 
 const CorpusComposition = ({ composition }) => {
   const segments = [
-    { label: 'Controlled-ingestible sources', value: composition.controlled_ingestible_sources, color: carbonColors.primary.teal },
-    { label: 'Source-format anomalies', value: composition.source_format_anomalies, color: carbonColors.status.warning },
-    { label: 'ML-excluded assets', value: composition.ml_excluded_assets, color: carbonColors.gray[50] },
+    { label: 'Controlled-ingestible sources', value: composition.controlled_ingestible_sources, color: carbonColors.primary.teal, swatch: 'controlled' },
+    { label: 'Source-format anomalies', value: composition.source_format_anomalies, color: carbonColors.status.warning, swatch: 'anomaly' },
+    { label: 'ML-excluded assets', value: composition.ml_excluded_assets, color: carbonColors.gray[50], swatch: 'excluded' },
   ]
   const pie = d3.pie().value((segment) => segment.value).sort(null)(segments)
   const arc = d3.arc().innerRadius(57).outerRadius(82).cornerRadius(2)
@@ -34,7 +35,7 @@ const CorpusComposition = ({ composition }) => {
           </g>
         </svg>
         <ul className="dashboard__chart-key">
-          {segments.map((segment) => <li key={segment.label}><span style={{ backgroundColor: segment.color }} /><span>{segment.label}</span><strong>{segment.value}</strong></li>)}
+          {segments.map((segment) => <li key={segment.label}><span className={`dashboard__chart-key-swatch dashboard__chart-key-swatch--${segment.swatch}`} /><span>{segment.label}</span><strong>{segment.value}</strong></li>)}
         </ul>
       </div>
     </ChartPanel>
@@ -51,7 +52,7 @@ const EvidenceDensity = ({ density, currentChunks }) => {
         {density.slice(0, 10).map((document) => (
           <div className="dashboard__density-row" key={document.document_id} title={document.title}>
             <span className="dashboard__density-label">{document.title}</span>
-            <div className="dashboard__density-track"><span style={{ width: `${(document.chunk_count / highestCount) * 100}%` }} /></div>
+            <progress className="dashboard__density-track" value={document.chunk_count} max={highestCount}>{document.chunk_count}</progress>
             <strong>{numberFormat.format(document.chunk_count)}</strong>
           </div>
         ))}
@@ -100,7 +101,7 @@ const ResearchEvidenceState = ({ runs, claims }) => {
   return (
     <ChartPanel title="Research evidence state" subtitle="Immutable run outcomes and human-authored claim positions are shown separately.">
       <div className="dashboard__run-states">
-        {runStates.map(({ label, value, icon: Icon, className }) => <div className={`dashboard__run-state dashboard__run-state--${className}`} key={label}><Icon size={20} /><strong>{value}</strong><span>{label}</span></div>)}
+        {runStates.map(({ label, value, icon, className }) => <div className={`dashboard__run-state dashboard__run-state--${className}`} key={label}>{createElement(icon, { size: 20 })}<strong>{value}</strong><span>{label}</span></div>)}
       </div>
       <div className="dashboard__claim-states">
         <p>Claims and evidence</p>

@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef } from 'react'
 import * as d3 from 'd3'
 import { chartColors, chartStyles, utils } from '../../utils/carbonD3Theme'
-import './UmapProjection.scss'
 
 const UmapProjection = ({ points, loading, errorState, selectedPoint, highlightedTrace, onSelectPoint }) => {
   const svgRef = useRef(null)

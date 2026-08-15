@@ -16,6 +16,12 @@
 
 This Statement of Work defines the technical scope, deliverables, methods, controls and acceptance criteria for an early-stage experiment using retrieval-augmented inference to interrogate a bounded corpus of digitised records from the Royal College of Art’s Department of Design Research (DDR).
 
+### Research scope and terminology
+
+**Research subject:** Royal College of Art Department of Design Research (DDR)
+
+**Research period:** 1965–1985
+
 The experiment operationalises three parts of the wider PhD research instrument:
 
 1. **Retrieval-augmented archival interrogation** as the primary mode of inquiry.

@@ -13,7 +13,6 @@ import { getMissingnessEvents, getMissingnessSummary } from '../../api/missingne
 import { exportQueryRunJson, exportQueryRunMarkdown, getQueryRun, getQueryRuns } from '../../api/queryRuns'
 import { getResearchStateTag } from '../../utils/researchState'
 import { downloadFile } from '../../utils/workbenchExport'
-import './AuditWorkbench.scss'
 
 const AuditWorkbench = () => {
   const [backendHealth, setBackendHealth] = useState(null)

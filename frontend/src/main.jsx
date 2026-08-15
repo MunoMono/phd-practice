@@ -2,7 +2,7 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { Auth0Provider, Auth0Context } from '@auth0/auth0-react'
 import App from './App.jsx'
-import './styles/index.scss'
+import './components/styles/index.scss'
 
 const domain = 'dev-i4m880asz7y6j5sk.us.auth0.com'
 const clientId = '1s7mH4zeZ1iDyLFcbi6elTNL7fttJwGg'

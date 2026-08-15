@@ -6,7 +6,6 @@ import PanelHeader from '../../components/layout/PanelHeader'
 import { PageGrid, PageColumn as Column } from '../../components/layout/PageGrid'
 import { exportExperimentRunJson, getExperimentRun, listExperimentRuns, saveExperimentAssessment } from '../../api/experiments'
 import { downloadFile } from '../../utils/workbenchExport'
-import './ResearchRuns.scss'
 
 const scoreFields = [
   ['retrieval_relevance', 'Retrieval relevance'],

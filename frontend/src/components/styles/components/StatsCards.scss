@@ -12,13 +12,7 @@
   gap: $spacing-06;
   padding: $spacing-06;
   min-height: 140px;
-  transition: all 0.2s ease;
   background-color: $layer-01;
-
-  &:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--app-shadow-card-hover);
-  }
 
   &__icon {
     display: flex;
@@ -40,10 +34,7 @@
   &__number {
     @include type-style('heading-05');
     margin-bottom: $spacing-03;
-    background: linear-gradient(135deg, $link-primary, $support-info);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+    color: $link-primary;
   }
 
   &__label {
@@ -142,10 +133,7 @@
     }
 
     .stats-card__number {
-      background: linear-gradient(135deg, $support-success, $support-success-inverse);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
+      color: $support-success;
     }
   }
 
@@ -156,10 +144,7 @@
     }
 
     .stats-card__number {
-      background: linear-gradient(135deg, $support-info, $icon-info);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
+      color: $support-info;
     }
   }
 
@@ -170,10 +155,7 @@
     }
 
     .stats-card__number {
-      background: linear-gradient(135deg, $support-warning, $support-warning-inverse);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
+      color: $support-warning;
     }
   }
 

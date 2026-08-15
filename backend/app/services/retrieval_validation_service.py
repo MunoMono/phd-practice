@@ -29,6 +29,7 @@ class QueryExpansion(BaseModel):
     value: str = Field(min_length=1)
     source: str = "researcher_supplied"
     authority_source: str | None = None
+    authority_id: str | None = None
     authority_field: str | None = None
     authority_role: str | None = None
     authority_document_id: str | None = None
@@ -145,6 +146,21 @@ class RetrievalValidationService:
             )
             if not any(authority_fields):
                 continue
+            if expansion.authority_source == "database_authorities.ddr_projects":
+                if not all((expansion.authority_id, expansion.authority_field, expansion.authority_role)):
+                    raise ValueError("Project-authority expansion requires source, authority ID, field, and role.")
+                if expansion.authority_field != "title" or expansion.authority_role != "controlled_query_expansion":
+                    raise ValueError("Project-authority expansion must use the controlled project title.")
+                project = db.execute(
+                    text("""
+                        SELECT 1 FROM database_authorities
+                        WHERE authority_type = 'ddr_projects' AND authority_id = :authority_id
+                    """),
+                    {"authority_id": expansion.authority_id},
+                ).first()
+                if project is None:
+                    raise ValueError("Project-authority expansion requires a resolved DDR project authority record.")
+                continue
             if not all(authority_fields):
                 raise ValueError("Authority-assisted expansion requires source, field, role, and resolved document identity.")
             if expansion.authority_role != "controlled_query_expansion":
@@ -217,7 +233,11 @@ class RetrievalValidationService:
         self._validate_expansions(db, request.expansions)
         transparency = build_query_transparency(request)
         filters = transparency["filters"]
-        conditions = ["dc.search_tsv @@ websearch_to_tsquery('english', :query)"]
+        conditions = [
+            "dc.search_tsv @@ websearch_to_tsquery('english', :query)",
+            "d.use_for_ml = 1",
+            "d.ml_policy_status IN ('eligible_unrestricted', 'eligible_page_restricted')",
+        ]
         params: dict[str, Any] = {"query": transparency["expanded_query"], "limit": request.top_k}
         if filters["pids"]:
             conditions.append("d.pid = ANY(:pids)")

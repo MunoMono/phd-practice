@@ -174,3 +174,15 @@ class RetrievalValidationServiceTests(unittest.TestCase):
         expansion = payload['transparency']['expansion_sources'][0]
         self.assertEqual(expansion['authority_source'], 'ref_methodology')
         self.assertEqual(expansion['authority_role'], 'controlled_query_expansion')
+
+    def test_project_authority_expansion_requires_resolved_project_record(self):
+        expansion = QueryExpansion(
+            value='METHOD building',
+            source='database_authority',
+            authority_source='database_authorities.ddr_projects',
+            authority_id='97',
+            authority_field='title',
+            authority_role='controlled_query_expansion',
+        )
+
+        RetrievalValidationService()._validate_expansions(FakeDatabase([{'authority_id': '97'}]), [expansion])

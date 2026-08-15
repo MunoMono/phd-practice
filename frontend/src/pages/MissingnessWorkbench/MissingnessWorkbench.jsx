@@ -24,7 +24,6 @@ import { PageGrid, PageColumn as Column } from '../../components/layout/PageGrid
 import { getMissingnessEvents, getMissingnessSummary, updateMissingnessEvent } from '../../api/missingness'
 import { getResearchStateTag } from '../../utils/researchState'
 import { downloadCsv } from '../../utils/workbenchExport'
-import './MissingnessWorkbench.scss'
 
 const typologyOptions = ['all', 'documentary', 'descriptive', 'retrieval', 'institutional', 'historiographic', 'computational']
 const statusOptions = ['open', 'reviewing', 'triaged', 'resolved']
@@ -209,8 +208,8 @@ const MissingnessWorkbench = () => {
       </Column>
 
       {(summary?.completeness_cards || []).map((card) => (
-        <Column key={card.label} lg={4} md={4} sm={4}>
-          <Tile>
+        <Column key={card.label} lg={5} xlg={5} max={5} md={4} sm={4}>
+          <Tile className="missingness-workbench__completeness-card">
             <h3 className="missingness-workbench__stat-title">{card.label}</h3>
             <p className="missingness-workbench__stat-value">{card.value}</p>
             <p className="app-copy-reset">{card.note}</p>

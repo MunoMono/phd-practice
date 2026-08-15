@@ -60,6 +60,8 @@ AUTHORITY_DEFINITIONS = {
             job_number
             title
             funder_name
+            start_year
+            end_year
             duration_text
             project_lead_name
           }
@@ -67,7 +69,7 @@ AUTHORITY_DEFINITIONS = {
         """,
         "id_field": "job_number",
         "label_field": "title",
-        "metadata_fields": ["funder_name", "duration_text", "project_lead_name"]
+        "metadata_fields": ["funder_name", "start_year", "end_year", "duration_text", "project_lead_name"]
     },
     "ref_students": {
         "category": "core",

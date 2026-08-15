@@ -2,7 +2,6 @@ import { Tile, DataTable, TableContainer, Table, TableHead, TableRow, TableHeade
 import { Recording } from '@carbon/icons-react'
 import PageHeader from '../../components/layout/PageHeader'
 import { PageGrid, PageColumn as Column } from '../../components/layout/PageGrid'
-import '../../styles/pages/SessionRecorder.scss'
 
 const SessionRecorder = () => {
   const headers = [

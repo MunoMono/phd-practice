@@ -26,7 +26,6 @@ import PanelHeader from '../../components/layout/PanelHeader'
 import { PageGrid, PageColumn as Column } from '../../components/layout/PageGrid'
 import { downloadFile } from '../../utils/workbenchExport'
 import { getResearchStateTag } from '../../utils/researchState'
-import './CrossReadWorkbench.scss'
 
 const relationOptions = ['supports', 'complicates', 'contradicts', 'no-documentary-trace']
 const sourceTypeOptions = ['oral_history', 'interview', 'field_note', 'researcher_note', 'mock_dev']

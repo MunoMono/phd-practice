@@ -4,7 +4,6 @@ import { Loading, Toggle } from '@carbon/react';
 import { carbonColors, chartColors, d3Scales, chartStyles, animations, utils } from '../../utils/carbonD3Theme';
 import { createVisualizationTooltip, hideVisualizationTooltip, showVisualizationTooltip } from '../../utils/d3Tooltip';
 import { fetchThemeDistribution } from '../../api/viz';
-import './ThemeDistribution.scss';
 
 const ThemeDistribution = () => {
   const svgRef = useRef();

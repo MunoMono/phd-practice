@@ -1,6 +1,7 @@
 @use '@carbon/react/scss/spacing' as *;
 @use '@carbon/react/scss/theme' as *;
 @use '@carbon/react/scss/breakpoint' as *;
+@use '@carbon/react/scss/type' as *;
 
 .visual-analytics-page {
   &__status-tags {
@@ -15,6 +16,21 @@
   &__scope-panel {
     background-color: $layer-01;
     border: 1px solid $border-subtle-01;
+  }
+
+  &__framing-card {
+    min-height: 0;
+    padding: $spacing-05;
+
+    h3 {
+      @include type-style('heading-03');
+      margin-bottom: $spacing-03;
+    }
+
+    p {
+      @include type-style('body-compact-01');
+      margin-bottom: 0;
+    }
   }
 
   &__controls,

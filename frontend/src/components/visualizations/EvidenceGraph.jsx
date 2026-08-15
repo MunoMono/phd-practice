@@ -1,7 +1,6 @@
 import { useEffect, useRef } from 'react'
 import * as d3 from 'd3'
-import { chartColors, carbonColors } from '../../utils/carbonD3Theme'
-import '../../styles/components/EvidenceGraph.scss'
+import { chartColors, carbonColors, chartStyles } from '../../utils/carbonD3Theme'
 
 const EvidenceGraph = ({ data }) => {
   const svgRef = useRef()
@@ -13,8 +12,8 @@ const EvidenceGraph = ({ data }) => {
     d3.select(svgRef.current).selectAll('*').remove()
 
     const svg = d3.select(svgRef.current)
-      .attr('width', width)
-      .attr('height', height)
+      .attr('viewBox', `0 0 ${width} ${height}`)
+      .attr('preserveAspectRatio', 'xMidYMid meet')
 
     if (!data) {
       svg.append('text')

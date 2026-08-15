@@ -11,15 +11,7 @@ import {
 import { Copy, Download, Search, Checkmark } from '@carbon/icons-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { analyzeGranite } from '../../api/granite'
-import { getChunkCitation, getChunkProvenance, getInferenceProvenance } from '../../api/provenance'
-import {
-  createClaimFromQueryRun,
-  createMissingnessEventFromQueryRun,
-  createQueryRun,
-  exportQueryRunJson,
-  exportQueryRunMarkdown
-} from '../../api/queryRuns'
+import { exportExperimentRunJson, interrogateTurin } from '../../api/experiments'
 import EvidenceChain from '../../components/evidence/EvidenceChain'
 import EvidenceStatusControl from '../../components/evidence/EvidenceStatusControl'
 import PanelHeader from '../../components/layout/PanelHeader'
@@ -27,8 +19,7 @@ import PageHeader from '../../components/layout/PageHeader'
 import { PageGrid, PageColumn as Column } from '../../components/layout/PageGrid'
 import EvidenceGraph from '../../components/visualizations/EvidenceGraph'
 import { buildEvidenceTraceMemo, downloadMarkdown } from '../../utils/memoExport'
-import { downloadFile, downloadJson } from '../../utils/workbenchExport'
-import '../../styles/pages/EvidenceTracer.scss'
+import { downloadJson } from '../../utils/workbenchExport'
 
 const defaultStatus = 'Needs review'
 
@@ -41,13 +32,6 @@ const EvidenceTracer = () => {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [persistenceError, setPersistenceError] = useState('')
-  const [claimMessage, setClaimMessage] = useState('')
-  const [claimError, setClaimError] = useState('')
-  const [creatingClaim, setCreatingClaim] = useState(false)
-  const [missingnessMessage, setMissingnessMessage] = useState('')
-  const [missingnessError, setMissingnessError] = useState('')
-  const [createdMissingnessEventId, setCreatedMissingnessEventId] = useState('')
-  const [creatingMissingness, setCreatingMissingness] = useState(false)
   const [validationStatuses, setValidationStatuses] = useState({ overall: defaultStatus })
 
   useEffect(() => {
@@ -57,40 +41,6 @@ const EvidenceTracer = () => {
     }
   }, [query, searchParams])
 
-  const persistTrace = async (nextTrace) => {
-    const payload = {
-      query_id: nextTrace.queryId,
-      prompt: nextTrace.prompt,
-      mode,
-      model: nextTrace.model,
-      response: nextTrace.response,
-      caveats: nextTrace.caveats,
-      failed_or_partial: nextTrace.failed_or_partial,
-      failure_reason: nextTrace.failureReason,
-      sources: (nextTrace.sources || []).map((source, index) => ({
-        chunk_id: source.chunkId,
-        document_id: source.documentId,
-        pid: source.pid,
-        title: source.title,
-        page: source.page,
-        section: source.section,
-        excerpt: source.excerpt,
-        score: source.score,
-        rank: index + 1,
-        citation: source.citation,
-        citation_text: typeof source.citation === 'string' ? source.citation : null,
-        provenance: source.provenance,
-        provenance_status: source.provenanceStatus,
-        citation_status: source.citationStatus
-      })),
-      source_metadata: nextTrace.sourceMetadata,
-      citations: nextTrace.citations,
-      page_ranges: nextTrace.pageRanges
-    }
-
-    return createQueryRun(payload)
-  }
-
   const handleTrace = async () => {
     if (!query.trim() || loading || mode !== 'granite') {
       return
@@ -99,68 +49,30 @@ const EvidenceTracer = () => {
     setLoading(true)
     setError('')
     setPersistenceError('')
-    setClaimMessage('')
-    setClaimError('')
-    setMissingnessMessage('')
-    setMissingnessError('')
-    setCreatedMissingnessEventId('')
 
     try {
-      const analysis = await analyzeGranite(query, { num_context_chunks: 3 })
-
-      const enrichedSources = await Promise.all(
-        analysis.sources.map(async (source) => {
-          if (!source.chunkId) {
-            return source
-          }
-
-          const nextSource = { ...source }
-
-          try {
-            const citation = await getChunkCitation(source.chunkId)
-            nextSource.citation = citation
-            nextSource.citationStatus = 'loaded'
-            nextSource.pid = nextSource.pid || citation.pid
-            nextSource.title = nextSource.title || citation.title
-            nextSource.page = nextSource.page || citation.page
-            nextSource.section = nextSource.section || citation.section
-          } catch (citationError) {
-            nextSource.citationStatus = 'error'
-            nextSource.citationError = citationError.message
-          }
-
-          try {
-            const provenance = await getChunkProvenance(source.chunkId)
-            nextSource.provenance = provenance
-            nextSource.provenanceStatus = 'loaded'
-            nextSource.pid = nextSource.pid || provenance.document.pid
-            nextSource.title = nextSource.title || provenance.document.title
-            nextSource.page = nextSource.page || provenance.chunk.page
-            nextSource.section = nextSource.section || provenance.chunk.section
-            nextSource.documentId = nextSource.documentId || provenance.chunk.documentId || provenance.raw?.document_id || null
-          } catch (provenanceError) {
-            nextSource.provenanceStatus = 'error'
-            nextSource.provenanceError = provenanceError.message
-          }
-
-          return nextSource
-        })
-      )
-
-      let inferenceProvenance = null
-      if (analysis.inferenceId) {
-        try {
-          inferenceProvenance = await getInferenceProvenance(analysis.inferenceId)
-        } catch (inferenceError) {
-          inferenceProvenance = { error: inferenceError.message }
-        }
-      }
+      const analysis = await interrogateTurin(query, { top_k: 5 })
+      const enrichedSources = (analysis.retrieved_evidence || []).map((source) => ({
+        chunkId: source.chunk_id,
+        documentId: source.document_id,
+        pid: source.pid,
+        title: source.snapshot?.title || source.snapshot?.catalogue_metadata?.title || source.document_id,
+        page: source.page_start,
+        section: source.snapshot?.source_section || null,
+        excerpt: source.excerpt,
+        score: source.score,
+        citation: `${source.snapshot?.title || source.document_id} | PID: ${source.pid || 'unavailable'} | Page: ${source.page_start || 'unavailable'}`,
+        citationStatus: source.archive_resolution_status === 'resolved_current' ? 'loaded' : 'unavailable',
+        provenance: source.snapshot?.provenance || null,
+        provenanceStatus: source.archive_resolution_status === 'resolved_current' ? 'loaded' : 'unavailable'
+      }))
 
       const nextTrace = {
-        ...analysis,
-        queryId: analysis.inferenceId || `query-${Date.now()}`,
+        queryId: analysis.run_id,
         prompt: query,
+        answer: analysis.answer || '',
         response: analysis.answer || '',
+        model: analysis.model?.name || 'Granite experiment',
         retrievedChunkIds: enrichedSources.map((source) => source.chunkId).filter(Boolean),
         citations: enrichedSources.map((source) => source.citation).filter(Boolean),
         pageRanges: enrichedSources.map((source) => source.page).filter(Boolean),
@@ -173,30 +85,27 @@ const EvidenceTracer = () => {
           section: source.section,
           score: source.score
         })),
-        timestamp: new Date().toISOString(),
-        failed_or_partial: enrichedSources.length === 0 || enrichedSources.some((source) => source.provenanceStatus !== 'loaded'),
-        caveats: enrichedSources.length === 0
-          ? ['No source chunks returned by the current endpoint.']
-          : enrichedSources.some((source) => source.provenanceStatus !== 'loaded')
-            ? ['Some citation or provenance fields are incomplete in the current local stack.']
-            : [],
+        timestamp: analysis.created_at || new Date().toISOString(),
+        failed_or_partial: analysis.status !== 'completed' || analysis.interpretative_status !== 'unassessed',
+        caveats: analysis.missingness?.map((item) => item.explanation) || [],
         sources: enrichedSources,
-        inferenceProvenance
-      }
-
-      let persistedRun = null
-      try {
-        persistedRun = await persistTrace(nextTrace)
-      } catch (persistError) {
-        setPersistenceError(persistError.message || 'The retrieval trail could not be persisted.')
+        inferenceProvenance: analysis.provenance_validation,
+        authorityEvidence: analysis.authority_evidence || [],
+        documentaryEvidence: analysis.documentary_evidence || [],
+        inferences: analysis.inferences || [],
+        contradictions: analysis.contradictions || [],
+        missingness: analysis.missingness || [],
+        followUpQueries: analysis.follow_up_queries || [],
+        runStatus: analysis.status,
+        interpretativeStatus: analysis.interpretative_status,
+        rawModelResponse: analysis.raw_model_response
       }
 
       setTraceData({
         ...nextTrace,
-        queryId: persistedRun?.query_id || nextTrace.queryId,
-        persisted: Boolean(persistedRun),
-        retrievedChunkCount: persistedRun?.retrieved_chunk_count ?? nextTrace.retrievedChunkIds.length,
-        failureReason: persistedRun?.failure_reason ?? nextTrace.failureReason ?? null
+        persisted: true,
+        retrievedChunkCount: nextTrace.retrievedChunkIds.length,
+        failureReason: analysis.error_message || null
       })
 
       setValidationStatuses({
@@ -223,16 +132,6 @@ const EvidenceTracer = () => {
         caveats: [traceError.message || 'Evidence trace failed.'],
         sources: [],
         inferenceProvenance: null
-      }
-
-      try {
-        const persistedRun = await persistTrace(failedTrace)
-        failedTrace.queryId = persistedRun?.query_id || failedTrace.queryId
-        failedTrace.persisted = Boolean(persistedRun)
-        failedTrace.retrievedChunkCount = persistedRun?.retrieved_chunk_count ?? 0
-        failedTrace.failureReason = persistedRun?.failure_reason || failedTrace.failureReason
-      } catch (persistError) {
-        setPersistenceError(persistError.message || 'The failed interrogation could not be persisted.')
       }
 
       setError(traceError.message || 'Evidence trace failed.')
@@ -319,24 +218,6 @@ const EvidenceTracer = () => {
     downloadMarkdown(`${slug}.md`, memo)
   }
 
-  const handleExportMarkdown = async () => {
-    if (!traceData) {
-      return
-    }
-
-    if (traceData.persisted && traceData.queryId) {
-      try {
-        const content = await exportQueryRunMarkdown(traceData.queryId)
-        downloadFile(`${traceData.queryId}.md`, content, 'text/markdown;charset=utf-8')
-        return
-      } catch (exportError) {
-        setPersistenceError(exportError.message || 'Failed to export persisted retrieval memo.')
-      }
-    }
-
-    handleDownloadMemo()
-  }
-
   const goToCorpus = (source) => {
     const params = new URLSearchParams()
     if (source.documentId) params.set('documentId', source.documentId)
@@ -358,8 +239,8 @@ const EvidenceTracer = () => {
 
     if (traceData.persisted && traceData.queryId) {
       try {
-        const content = await exportQueryRunJson(traceData.queryId)
-        downloadFile(`${traceData.queryId}.json`, content, 'application/json;charset=utf-8')
+        const payload = await exportExperimentRunJson(traceData.queryId)
+        downloadJson(`${traceData.queryId}.json`, payload)
         return
       } catch (exportError) {
         setPersistenceError(exportError.message || 'Failed to export the persisted retrieval trail.')
@@ -381,55 +262,6 @@ const EvidenceTracer = () => {
     })
   }
 
-  const handleCreateDraftClaim = async () => {
-    if (!traceData?.queryId || !traceData.response || creatingClaim) {
-      return
-    }
-
-    setCreatingClaim(true)
-    setClaimError('')
-    setClaimMessage('')
-
-    try {
-      const payload = await createClaimFromQueryRun(traceData.queryId, {
-        claim_text: traceData.response,
-        selected_chunk_ids: traceData.retrievedChunkIds,
-        caveats: (traceData.caveats || []).join(' ') || null
-      })
-      setClaimMessage(`Draft claim ${payload.claim_id} created from this interrogation.`)
-      navigate(`/claims-evidence?claimId=${payload.claim_id}`)
-    } catch (createError) {
-      setClaimError(createError.message || 'Failed to create a draft claim from this interrogation.')
-    } finally {
-      setCreatingClaim(false)
-    }
-  }
-
-  const handleCreateAbsencesEvent = async () => {
-    if (!traceData?.queryId || creatingMissingness) {
-      return
-    }
-
-    setCreatingMissingness(true)
-    setMissingnessError('')
-    setMissingnessMessage('')
-
-    try {
-      const payload = await createMissingnessEventFromQueryRun(traceData.queryId, {})
-      setCreatedMissingnessEventId(payload.event_id)
-      setMissingnessMessage(`Absences event ${payload.event_id} created from this interrogation.`)
-    } catch (createError) {
-      setMissingnessError(createError.message || 'Failed to create an Absences event from this interrogation.')
-    } finally {
-      setCreatingMissingness(false)
-    }
-  }
-
-  const canCreateAbsencesEvent = Boolean(
-    traceData?.persisted &&
-    traceData?.queryId &&
-    (traceData.failed_or_partial || (traceData.retrievedChunkCount ?? traceData.retrievedChunkIds?.length ?? 0) === 0)
-  )
   const showNoSourcesReturned = Boolean(
     traceData &&
     !loading &&
@@ -514,40 +346,6 @@ const EvidenceTracer = () => {
         </Column>
       )}
 
-      {claimMessage && (
-        <Column>
-          <InlineNotification lowContrast kind="success" title="Draft claim created" subtitle={claimMessage} />
-        </Column>
-      )}
-
-      {claimError && (
-        <Column>
-          <InlineNotification lowContrast kind="error" title="Claim handoff failed" subtitle={claimError} />
-        </Column>
-      )}
-
-      {missingnessMessage && (
-        <Column>
-          <InlineNotification
-            lowContrast
-            kind="success"
-            title="Absences event created"
-            subtitle={missingnessMessage}
-            actions={(
-              <Button kind="ghost" size="sm" onClick={() => navigate(`/absences?eventId=${createdMissingnessEventId}`)}>
-                Open in Absences
-              </Button>
-            )}
-          />
-        </Column>
-      )}
-
-      {missingnessError && (
-        <Column>
-          <InlineNotification lowContrast kind="error" title="Absences handoff failed" subtitle={missingnessError} />
-        </Column>
-      )}
-
       {traceData?.failed_or_partial && (
         <Column>
           <InlineNotification
@@ -579,6 +377,47 @@ const EvidenceTracer = () => {
           </div>
 
           {traceData && (
+            <div className="tracer__structured-response">
+              <section aria-label="Database authority context">
+                <h4>Database authority context</h4>
+                {traceData.authorityEvidence?.length > 0
+                  ? traceData.authorityEvidence.map((item) => (
+                    <p key={item.authority_id}>
+                      {item.authority_type === 'ddr_projects'
+                        ? `Job ${item.job_number} | ${item.title} | Funder: ${item.funder_name || 'unavailable'} | Duration: ${item.duration_text || 'unavailable'} | Project lead: ${item.project_lead_name || 'unavailable'}`
+                        : item.authority_type !== 'agent_employment'
+                          ? `${item.label} | ${item.authority_type} | ${item.authority_classification || 'database authority record'}${item.description ? ` | ${item.description}` : ''}`
+                        : `${item.assertion} | ${item.role || 'Role unavailable'} | ${item.tenure?.start_date || 'start unavailable'} to ${item.tenure?.end_date || 'end unavailable'}`}
+                    </p>
+                  ))
+                  : <p>No database authority assertion was used for this run.</p>}
+              </section>
+              <section aria-label="Documentary evidence">
+                <h4>Documentary evidence</h4>
+                {traceData.documentaryEvidence?.length > 0
+                  ? traceData.documentaryEvidence.map((item) => <p key={item.chunk_id}>{item.claim} [PID {item.pid}, page {item.page ?? 'unavailable'}]</p>)
+                  : <p>No documentary claim is asserted beyond the retrieved source stack.</p>}
+              </section>
+              <section aria-label="Generated inference">
+                <h4>Generated inference</h4>
+                {traceData.inferences?.length > 0
+                  ? traceData.inferences.map((item, index) => <p key={`${item.inference}-${index}`}>{item.inference} ({item.confidence})</p>)
+                  : <p>No generated inference is asserted.</p>}
+              </section>
+              <section aria-label="Scoped missingness">
+                <h4>Scoped missingness</h4>
+                {traceData.missingness?.length > 0
+                  ? traceData.missingness.map((item, index) => <p key={`${item.category}-${index}`}>{item.explanation}</p>)
+                  : <p>No scoped missingness was recorded.</p>}
+              </section>
+              <section aria-label="Provenance validation">
+                <h4>Provenance validation</h4>
+                <p>{traceData.inferenceProvenance?.valid ? 'Valid for supplied citations.' : 'Requires researcher review.'} Run status: {traceData.runStatus || 'unavailable'}; interpretative status: {traceData.interpretativeStatus || 'unassessed'}.</p>
+              </section>
+            </div>
+          )}
+
+          {traceData && (
             <div className="tracer__answer-controls">
               <EvidenceStatusControl
                 id="overall-evidence-status"
@@ -587,16 +426,8 @@ const EvidenceTracer = () => {
                 onChange={(value) => updateValidationStatus('overall', value)}
               />
               <Button kind="ghost" size="sm" renderIcon={Copy} onClick={handleCopyMemo}>Copy retrieval memo</Button>
-              <Button kind="ghost" size="sm" renderIcon={Download} onClick={handleExportMarkdown}>Download retrieval memo</Button>
+              <Button kind="ghost" size="sm" renderIcon={Download} onClick={handleDownloadMemo}>Download retrieval memo</Button>
               <Button kind="ghost" size="sm" renderIcon={Download} onClick={exportRetrievalTrail}>Export retrieval trail</Button>
-              <Button kind="secondary" size="sm" onClick={handleCreateDraftClaim} disabled={!traceData.queryId || !traceData.response || creatingClaim}>
-                {creatingClaim ? 'Creating draft claim...' : 'Create draft claim'}
-              </Button>
-              {canCreateAbsencesEvent && (
-                <Button kind="secondary" size="sm" onClick={handleCreateAbsencesEvent} disabled={creatingMissingness}>
-                  {creatingMissingness ? 'Creating Absences event...' : 'Create Absences event'}
-                </Button>
-              )}
             </div>
           )}
         </Tile>

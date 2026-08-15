@@ -18,7 +18,6 @@ import { Asleep, ChevronLeft, ChevronRight, Light, UserAvatar } from '@carbon/ic
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth0 } from '@auth0/auth0-react'
 import { getNavigationContext, PRIMARY_SECTIONS } from './navigation'
-import '../../styles/components/AppShell.scss'
 
 const PrimaryNavigation = ({ activeSectionKey, onNavigate }) => (
   <HeaderNavigation aria-label="Primary navigation" className="ddr-app-shell-header__primary-nav">

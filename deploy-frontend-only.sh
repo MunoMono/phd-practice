@@ -47,6 +47,15 @@ rsync -avz --delete \
 	--exclude 'test-results' \
 	./frontend/ ${DROPLET_USER}@${DROPLET_IP}:${REMOTE_APP_DIR}/frontend/
 
+echo "📄 Syncing canonical Turin documentation..."
+rsync -avz --delete \
+	./docs/turin_experiment/ \
+	${DROPLET_USER}@${DROPLET_IP}:${REMOTE_APP_DIR}/docs/turin_experiment/
+
+rsync -avz \
+	./docker-compose.prod.yml \
+	${DROPLET_USER}@${DROPLET_IP}:${REMOTE_APP_DIR}/docker-compose.prod.yml
+
 ssh ${DROPLET_USER}@${DROPLET_IP} << 'ENDSSH'
 set -e
 

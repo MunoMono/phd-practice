@@ -4,7 +4,6 @@ import { Loading } from '@carbon/react';
 import { carbonColors, chartColors, d3Scales, chartStyles, animations, carbonTypography, utils } from '../../utils/carbonD3Theme';
 import { createVisualizationTooltip, hideVisualizationTooltip, removeVisualizationTooltip, showVisualizationTooltip } from '../../utils/d3Tooltip';
 import { fetchDocumentNetwork } from '../../api/viz';
-import './DocumentNetwork.scss';
 
 const DocumentNetwork = () => {
   const svgRef = useRef();

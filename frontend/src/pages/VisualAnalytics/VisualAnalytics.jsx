@@ -19,7 +19,6 @@ import UmapPointDetail from '../../components/visualizations/UmapPointDetail'
 import ClusterPanel from '../../components/visualizations/ClusterPanel'
 import ConceptBridge from '../../components/visualizations/ConceptBridge'
 import { buildClusterMemo, buildVisualAnalyticsMemo, downloadMarkdown } from '../../utils/memoExport'
-import './VisualAnalytics.scss'
 
 const defaultFilters = {
   pointType: 'chunks',
@@ -283,7 +282,7 @@ const VisualAnalytics = () => {
       )}
 
       {framingCards.map((card) => (
-        <Column key={card.title} lg={7} md={4} sm={4}>
+        <Column key={card.title} lg={5} xlg={5} max={5} md={4} sm={4}>
           <Tile className="visual-analytics-page__framing-card">
             <h3>{card.title}</h3>
             <p>{card.body}</p>

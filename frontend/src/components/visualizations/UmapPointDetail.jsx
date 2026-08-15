@@ -1,5 +1,4 @@
 import { Button, Tag, Tile } from '@carbon/react'
-import './UmapPointDetail.scss'
 
 const UmapPointDetail = ({ point, onOpenCorpus, onTraceEvidence, onCopyPid, onCopyExcerpt, onAddToMemo }) => {
   if (!point) {

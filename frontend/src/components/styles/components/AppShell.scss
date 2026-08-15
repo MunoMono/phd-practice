@@ -12,9 +12,20 @@
 }
 
 .ddr-app-shell-header {
+  --ddr-shell-header-height: 3rem;
   height: var(--ddr-shell-header-height);
   border-bottom: 1px solid var(--cds-border-subtle);
   background: var(--ddr-surface);
+
+  .ddr-app-shell-header__primary-nav .cds--header__menu-bar,
+  .ddr-app-shell-header__primary-nav .cds--header__menu-bar > li,
+  .ddr-app-shell-header__primary-nav .cds--header__menu-item {
+    height: 100%;
+  }
+
+  .ddr-app-shell-header__primary-nav .cds--header__menu-item--current::after {
+    inset-block-end: 0;
+  }
 
   .cds--header__name {
     font-weight: 500;
@@ -62,6 +73,8 @@
 .ddr-app-shell-header__primary-nav {
   display: flex !important;
   flex: 1 1 auto;
+  height: var(--ddr-shell-header-height) !important;
+  min-height: var(--ddr-shell-header-height) !important;
   min-width: 0;
 
   @media (max-width: 1055px) {

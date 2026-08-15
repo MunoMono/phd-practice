@@ -1,6 +1,5 @@
 import { Button, InlineNotification, SkeletonText, Tab, TabList, TabPanel, TabPanels, Tabs, Tag, Tile } from '@carbon/react'
 import { useState } from 'react'
-import './CorpusPanels.scss'
 
 const hasValue = (value) => {
   if (value === null || value === undefined) {

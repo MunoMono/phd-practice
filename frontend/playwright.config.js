@@ -1,10 +1,12 @@
 import { defineConfig } from '@playwright/test'
 
+const baseURL = globalThis.process?.env.PLAYWRIGHT_BASE_URL || 'http://localhost:3000'
+
 export default defineConfig({
   testDir: './tests',
   timeout: 30_000,
   use: {
-    baseURL: 'http://localhost:3000',
+    baseURL,
     headless: true,
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure'

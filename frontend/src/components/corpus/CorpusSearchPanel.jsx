@@ -1,5 +1,4 @@
 import { Button, Select, SelectItem, Tag, TextInput, Tile } from '@carbon/react'
-import './CorpusPanels.scss'
 
 const CorpusSearchPanel = ({ filters, suggestions, onChange, onReset }) => {
   const updateField = (field, value) => {

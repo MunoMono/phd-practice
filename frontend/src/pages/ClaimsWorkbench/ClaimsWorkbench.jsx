@@ -15,7 +15,7 @@ import {
   Tile
 } from '@carbon/react'
 import { CheckmarkOutline, Download } from '@carbon/icons-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import PageHeader from '../../components/layout/PageHeader'
 import PanelHeader from '../../components/layout/PanelHeader'
@@ -23,7 +23,6 @@ import { PageGrid, PageColumn as Column } from '../../components/layout/PageGrid
 import { exportClaimsCsv, exportClaimsMarkdown, getClaimDetail, getClaims, updateClaim } from '../../api/claims'
 import { getResearchStateTag } from '../../utils/researchState'
 import { downloadFile } from '../../utils/workbenchExport'
-import './ClaimsWorkbench.scss'
 
 const supportOptions = [
   { value: 'supported', text: 'supported' },

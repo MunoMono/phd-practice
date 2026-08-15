@@ -1,7 +1,6 @@
 import { useAuth0 } from '@auth0/auth0-react'
 import { HeaderGlobalAction } from '@carbon/react'
 import { UserAvatar, Logout } from '@carbon/icons-react'
-import '../../styles/App.scss'
 
 function UserMenu() {
   const { user, logout } = useAuth0()

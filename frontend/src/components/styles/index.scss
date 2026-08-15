@@ -7,27 +7,45 @@
 @use '@carbon/react/scss/type' as *;
 @use '@carbon/react/scss/breakpoint' as *;
 
+@use './App';
+@use './layout';
+@use './pages/AuditWorkbench';
+@use './pages/ClaimsWorkbench';
+@use './pages/CrossReadWorkbench';
+@use './pages/Dashboard';
+@use './pages/Documentation';
+@use './pages/EvidenceTracer';
+@use './pages/ExperimentalLog';
+@use './pages/MLDashboard';
+@use './pages/MissingnessWorkbench';
+@use './pages/ResearchRuns';
+@use './pages/SessionRecorder';
+@use './pages/VisualAnalytics';
+@use './components/AppShell';
+@use './components/CorpusPanels';
+@use './components/EvidenceGraph';
+@use './components/LoginPage';
+@use './components/Markdown';
+@use './components/StatsCards';
+@use './components/TemporalDriftChart';
+@use './visualizations/ClusterPanel';
+@use './visualizations/ConceptBridge';
+@use './visualizations/DocumentNetwork';
+@use './visualizations/EntityNetwork';
+@use './visualizations/TemporalTrends';
+@use './visualizations/ThemeDistribution';
+@use './visualizations/UmapPointDetail';
+@use './visualizations/UmapProjection';
+
 html {
   scroll-behavior: smooth;
   background-color: var(--cds-background);
-  --app-shadow-premium-rest:
-    0 2px 8px color-mix(in srgb, black 5%, transparent),
-    0 8px 24px color-mix(in srgb, var(--cds-link-primary) 8%, transparent);
-  --app-shadow-premium-hover:
-    0 4px 16px color-mix(in srgb, black 8%, transparent),
-    0 12px 32px color-mix(in srgb, var(--cds-link-primary) 15%, transparent);
-  --app-shadow-overlay: 0 8px 24px color-mix(in srgb, black 20%, transparent);
-  --app-shadow-card-hover: 0 4px 12px color-mix(in srgb, black 15%, transparent);
-  --app-shadow-popover: 0 2px 6px color-mix(in srgb, black 10%, transparent);
-  --app-shadow-popover-hover: 0 2px 4px color-mix(in srgb, black 10%, transparent);
-  --app-shadow-login: 0 8px 32px color-mix(in srgb, black 40%, transparent);
-  --app-shadow-particle-glow: 0 0 20px var(--cds-interactive-01);
 }
 
 body {
   margin: 0;
   padding: 0;
-  min-width: 20rem;
+  min-width: 0;
   min-height: 100vh;
   background-color: var(--cds-background);
   color: var(--cds-text-primary);
@@ -153,37 +171,6 @@ ol {
   }
 }
 
-// Animated gradient text utility
-.gradient-text {
-  background: linear-gradient(
-    135deg,
-    var(--cds-link-primary),
-    var(--cds-support-info),
-    var(--cds-icon-info)
-  );
-  background-size: 200% 200%;
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  animation: gradient-shift 8s ease infinite;
-}
-
-@keyframes gradient-shift {
-  0%, 100% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-}
-
-// Premium card elevation
-.premium-elevation {
-  box-shadow: var(--app-shadow-premium-rest);
-  transition: all 0.3s cubic-bezier(0.2, 0, 0.38, 0.9);
-  
-  &:hover {
-    box-shadow: var(--app-shadow-premium-hover);
-    transform: translateY(-2px);
-  }
-}
-
 .app-kicker {
   @include type-style('label-02');
   color: var(--cds-text-secondary);
@@ -212,31 +199,12 @@ ol {
   max-width: 20rem;
   padding: $spacing-04;
   border: 1px solid var(--cds-border-subtle);
-  border-radius: 0.5rem;
   background-color: var(--cds-layer-inverse);
   color: var(--cds-text-inverse);
-  box-shadow: var(--app-shadow-overlay);
   pointer-events: none;
   @include type-style('body-compact-01');
 
   strong {
     color: var(--cds-text-inverse);
   }
-}
-
-// Loading shimmer effect
-@keyframes shimmer {
-  0% { background-position: -1000px 0; }
-  100% { background-position: 1000px 0; }
-}
-
-.shimmer {
-  background: linear-gradient(
-    90deg,
-    var(--cds-layer-01) 0%,
-    var(--cds-layer-02) 50%,
-    var(--cds-layer-01) 100%
-  );
-  background-size: 1000px 100%;
-  animation: shimmer 2s infinite;
 }

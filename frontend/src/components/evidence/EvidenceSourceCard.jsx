@@ -82,9 +82,9 @@ const EvidenceSourceCard = ({
         <div className="evidence-source-card__provenance">
           {source.provenance ? (
             <>
-              <p><strong>Archive URL:</strong> {source.provenance.document.authorityUrl || 'Not yet exposed by endpoint.'}</p>
-              <p><strong>Influenced inferences:</strong> {source.provenance.inferencesInfluenced}</p>
-              <p><strong>Training runs:</strong> {source.provenance.trainingRuns.length > 0 ? source.provenance.trainingRuns.map((run) => run.model).join(', ') : 'None returned'}</p>
+              <p><strong>Archive URL:</strong> {source.provenance.document?.authorityUrl || source.provenance.record_public_uri || 'Not yet exposed by endpoint.'}</p>
+              <p><strong>Influenced inferences:</strong> {source.provenance.inferencesInfluenced || 'Not exposed by this immutable run.'}</p>
+              <p><strong>Training runs:</strong> {(source.provenance.trainingRuns || []).length > 0 ? source.provenance.trainingRuns.map((run) => run.model).join(', ') : 'None returned'}</p>
             </>
           ) : (
             <p>Provenance details are not available from the current endpoint.</p>

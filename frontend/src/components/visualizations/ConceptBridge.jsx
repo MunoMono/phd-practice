@@ -1,7 +1,6 @@
 import { Button, InlineNotification, TextInput, Tile } from '@carbon/react'
 import { useState } from 'react'
 import { semanticSearch } from '../../api/search'
-import './ConceptBridge.scss'
 
 const ConceptBridge = () => {
   const [term, setTerm] = useState('')

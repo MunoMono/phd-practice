@@ -13,6 +13,10 @@ export default defineConfig({
           src: '../docs/turin_experiment/technology-statement-of-work-turin-experiment-v0.2.md',
           dest: 'docs',
         },
+        {
+          src: '../docs/turin_experiment/using-the-turin-research-instrument.md',
+          dest: 'docs',
+        },
       ],
     }),
   ],

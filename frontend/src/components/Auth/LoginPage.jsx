@@ -1,7 +1,6 @@
 import { useAuth0 } from '@auth0/auth0-react'
 import { Loading } from '@carbon/react'
 import { useEffect } from 'react'
-import './LoginPage.scss'
 
 function LoginPage() {
   const { loginWithRedirect, isLoading } = useAuth0()

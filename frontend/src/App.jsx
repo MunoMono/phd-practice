@@ -3,7 +3,6 @@ import { useAuth0 } from '@auth0/auth0-react'
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { Theme, Loading } from '@carbon/react'
 import AppShell from './components/AppShell/AppShell'
-import './styles/App.scss'
 
 const Dashboard = lazy(() => import('./pages/Dashboard/Dashboard'))
 const CorpusExplorer = lazy(() => import('./pages/CorpusExplorer/CorpusExplorer'))

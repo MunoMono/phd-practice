@@ -1,4 +1,4 @@
-import { ClickableTile, InlineNotification, Tag, Tile } from '@carbon/react'
+import { ClickableTile, Grid, InlineNotification, Tag, Tile } from '@carbon/react'
 import { useNavigate } from 'react-router-dom'
 import { Search, WarningAlt, Checkmark, InProgress, Chip, ArrowRight } from '@carbon/icons-react'
 import { useEffect, useMemo, useState } from 'react'
@@ -11,7 +11,6 @@ import { getClaims } from '../../api/claims'
 import { fetchDashboardAnalyticalSurface, fetchDashboardStats } from '../../api/viz'
 import { getGraniteModelInfo } from '../../api/granite'
 import DashboardAnalyticalSurface from './DashboardAnalyticalSurface'
-import '../../styles/pages/Dashboard.scss'
 
 const formatMetricValue = (value, fallback = 'Not yet recorded') => (value === null || value === undefined ? fallback : value)
 
@@ -113,7 +112,7 @@ const Dashboard = () => {
       <div className="dashboard__hero">
         <div className="dashboard__hero-inner">
           <PageHeader
-            title="Archival activation workbench"
+            title="RCA Department of Design Research archive critical inquiry instrument"
             description="Interrogate sources, trace provenance, surface absences and test interpretations across a computational research corpus."
           />
         </div>
@@ -170,8 +169,8 @@ const Dashboard = () => {
         </Column>
 
         {corpusStatus.map((item) => (
-          <Column key={item.label} lg={4} md={4} sm={4}>
-            <Tile className="dashboard__info-tile">
+          <Column key={item.label} lg={5} xlg={5} max={5} md={4} sm={4}>
+            <Tile className="dashboard__info-tile dashboard__metric-tile">
               <h4>{item.label}</h4>
               <p className="dashboard__metric-value">{item.value}</p>
             </Tile>
@@ -186,8 +185,8 @@ const Dashboard = () => {
             </Column>
 
             {archiveInventoryStatus.map((item) => (
-              <Column key={item.label} lg={4} md={4} sm={4}>
-                <Tile className="dashboard__info-tile">
+              <Column key={item.label} lg={5} xlg={5} max={5} md={4} sm={4}>
+                <Tile className="dashboard__info-tile dashboard__metric-tile">
                   <h4>{item.label}</h4>
                   <p className="dashboard__metric-value">{item.value}</p>
                 </Tile>
@@ -208,44 +207,48 @@ const Dashboard = () => {
           <SectionHeading title="Supporting views" />
         </Column>
 
-        <Column lg={5} md={4} sm={4}>
-          <ClickableTile onClick={() => navigate('/sources')} className="dashboard__tile">
-            <div className="dashboard__tile-icon">
-              <Search size={32} />
-            </div>
-            <h3>Sources</h3>
-            <p>Inspect corpus records, policy, page scope, and provenance before interrogation.</p>
-          </ClickableTile>
-        </Column>
+        <Column>
+          <Grid className="dashboard__supporting-grid">
+            <Column lg={5} xlg={5} max={5} md={4} sm={4}>
+              <ClickableTile onClick={() => navigate('/sources')} className="dashboard__tile dashboard__supporting-tile">
+                <div className="dashboard__tile-icon">
+                  <Search size={32} />
+                </div>
+                <h3>Sources</h3>
+                <p>Inspect corpus records, policy, page scope, and provenance before interrogation.</p>
+              </ClickableTile>
+            </Column>
 
-        <Column lg={5} md={4} sm={4}>
-          <ClickableTile onClick={() => navigate('/research-runs')} className="dashboard__tile">
-            <div className="dashboard__tile-icon">
-              <ArrowRight size={32} />
-            </div>
-            <h3>Research runs</h3>
-            <p>Review immutable retrieval and inference experiments with supplied evidence and exportable records.</p>
-          </ClickableTile>
-        </Column>
+            <Column lg={5} xlg={5} max={5} md={4} sm={4}>
+              <ClickableTile onClick={() => navigate('/research-runs')} className="dashboard__tile dashboard__supporting-tile">
+                <div className="dashboard__tile-icon">
+                  <ArrowRight size={32} />
+                </div>
+                <h3>Research runs</h3>
+                <p>Review immutable retrieval and inference experiments with supplied evidence and exportable records.</p>
+              </ClickableTile>
+            </Column>
 
-        <Column lg={5} md={4} sm={4}>
-          <ClickableTile onClick={() => navigate('/provenance')} className="dashboard__tile">
-            <div className="dashboard__tile-icon">
-              <WarningAlt size={32} />
-            </div>
-            <h3>Provenance</h3>
-            <p>Trace query, evidence, authority, and export histories across the research apparatus.</p>
-          </ClickableTile>
-        </Column>
+            <Column lg={5} xlg={5} max={5} md={4} sm={4}>
+              <ClickableTile onClick={() => navigate('/provenance')} className="dashboard__tile dashboard__supporting-tile">
+                <div className="dashboard__tile-icon">
+                  <WarningAlt size={32} />
+                </div>
+                <h3>Provenance</h3>
+                <p>Trace query, evidence, authority, and export histories across the research apparatus.</p>
+              </ClickableTile>
+            </Column>
 
-        <Column lg={5} md={4} sm={4}>
-          <ClickableTile onClick={() => navigate('/claims-evidence')} className="dashboard__tile">
-            <div className="dashboard__tile-icon">
-              <Checkmark size={32} />
-            </div>
-            <h3>Claims and evidence</h3>
-            <p>Review claims against supporting archival evidence and their researcher-held interpretive status.</p>
-          </ClickableTile>
+            <Column lg={5} xlg={5} max={5} md={4} sm={4}>
+              <ClickableTile onClick={() => navigate('/claims-evidence')} className="dashboard__tile dashboard__supporting-tile">
+                <div className="dashboard__tile-icon">
+                  <Checkmark size={32} />
+                </div>
+                <h3>Claims and evidence</h3>
+                <p>Review claims against supporting archival evidence and their researcher-held interpretive status.</p>
+              </ClickableTile>
+            </Column>
+          </Grid>
         </Column>
 
         <Column lg={5} md={8} sm={4}>

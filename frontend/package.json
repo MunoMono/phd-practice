@@ -8,7 +8,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "lint": "eslint .",
-    "test:smoke": "playwright test tests/smoke.spec.js --reporter=line"
+    "test:smoke": "playwright test tests/smoke.spec.js --reporter=line",
+    "test:query-failure": "playwright test tests/source-interrogation-error.spec.js --reporter=line"
   },
   "dependencies": {
     "@auth0/auth0-react": "^2.18.0",

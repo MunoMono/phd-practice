@@ -12,7 +12,7 @@ from typing import Any, Literal, Mapping, Protocol
 from pydantic import BaseModel, Field, ValidationError
 
 
-SYSTEM_PROMPT_V1 = """You are assisting with a bounded archival research experiment.
+SYSTEM_PROMPT_V1 = """You are assisting with a bounded archival research experiment concerning the Royal College of Art Department of Design Research (DDR), 1965–1985.
 
 Use only the supplied context.
 

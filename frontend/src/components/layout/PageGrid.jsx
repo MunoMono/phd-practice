@@ -1,11 +1,10 @@
 import { Grid, Column } from '@carbon/react'
-import './PageShell.scss'
 
 const joinClassNames = (...values) => values.filter(Boolean).join(' ')
 
 export const PageGrid = ({ children, className = '' }) => {
   return (
-    <Grid narrow className={joinClassNames('page-grid', className)}>
+    <Grid className={joinClassNames('page-grid', className)}>
       {children}
     </Grid>
   )
@@ -14,7 +13,7 @@ export const PageGrid = ({ children, className = '' }) => {
 export const PageColumn = ({
   children,
   className = '',
-  lg = 14,
+  lg = 16,
   md = 8,
   sm = 4,
   xlg,
@@ -26,8 +25,8 @@ export const PageColumn = ({
       lg={lg}
       md={md}
       sm={sm}
-      xlg={xlg ?? lg}
-      max={max ?? lg}
+      xlg={xlg ?? 16}
+      max={max ?? 16}
       className={joinClassNames('page-grid__column', className)}
       {...rest}
     >

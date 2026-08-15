@@ -6,7 +6,6 @@ import PageHeader from '../../components/layout/PageHeader'
 import { PageGrid, PageColumn as Column } from '../../components/layout/PageGrid'
 import MarkdownRenderer from '../../components/MarkdownRenderer/MarkdownRenderer'
 import { DOCUMENTATION_ENTRIES, getDocumentationEntry } from '../../data/documentationCatalog'
-import './Documentation.scss'
 
 const renderSectionBlock = (block) => {
   if (block.type === 'table') {
@@ -159,7 +158,7 @@ const Documentation = () => {
                       <span>Classification</span><strong>{selectedEntry.classification}</strong>
                       <span>Source</span><strong>{selectedEntry.sourceFormat}</strong>
                       <span>Date</span><strong>{selectedEntry.date}</strong>
-                      <span>{selectedEntry.markdown ? 'Version' : 'Words'}</span><strong>{selectedEntry.markdown ? '0.2' : selectedEntry.wordCount}</strong>
+                      <span>{selectedEntry.markdown ? 'Version' : 'Words'}</span><strong>{selectedEntry.markdown ? selectedEntry.version : selectedEntry.wordCount}</strong>
                       <span>Seed</span><strong>{selectedEntry.publishedLabel}</strong>
                     </div>
 
@@ -220,7 +219,7 @@ const Documentation = () => {
                   </header>
 
                   {selectedEntry.markdown ? (
-                    <section className="documentation-page__markdown-reader" aria-label="Technology Statement of Work">
+                    <section className="documentation-page__markdown-reader" aria-label={selectedEntry.fullTitle}>
                       {markdownError ? <p>{markdownError}</p> : null}
                       {!markdownContent && !markdownError ? <InlineLoading description="Loading canonical Markdown source" /> : null}
                       {markdownContent ? <MarkdownRenderer content={markdownContent} /> : null}

@@ -41,7 +41,6 @@ import {
   fetchDashboardStats as fetchDashboardStatsData,
   refreshDashboardStats as refreshDashboardStatsData
 } from '../../api/viz';
-import './MLDashboard.scss';
 
 const MLDashboard = () => {
   const [stats, setStats] = useState(null);

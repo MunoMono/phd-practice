@@ -1,6 +1,11 @@
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import './../../styles/components/Markdown.scss'
+
+const headingId = (children) => children
+  .toString()
+  .toLowerCase()
+  .replace(/[^a-z0-9]+/g, '-')
+  .replace(/^-|-$/g, '')
 
 const MarkdownRenderer = ({ content, className = '' }) => {
   return (
@@ -8,6 +13,7 @@ const MarkdownRenderer = ({ content, className = '' }) => {
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
+          h2: ({ children }) => <h2 id={headingId(children)}>{children}</h2>,
           table: ({ children }) => (
             <div className="markdown-content__table-scroll">
               <table>{children}</table>

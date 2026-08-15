@@ -275,6 +275,8 @@ class GraniteService:
         
         prompt = f"""You are an archival research analyst specialising in design history. Answer the question below using only the sources provided.
 
+    Research scope: Royal College of Art Department of Design Research (DDR), 1965–1985.
+
 Rules:
 - Write 150–250 words maximum.
 - Be specific: quote or paraphrase exact details from the sources rather than restating generic themes.

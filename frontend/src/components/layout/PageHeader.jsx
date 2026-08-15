@@ -1,5 +1,3 @@
-import './PageShell.scss'
-
 const joinClassNames = (...values) => values.filter(Boolean).join(' ')
 
 const PageHeader = ({

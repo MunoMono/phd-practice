@@ -3,58 +3,73 @@ import { test, expect } from '@playwright/test'
 const routes = [
   {
     path: '/',
-    heading: 'Critical testamentary traces of contested design knowledge using multimodal machine learning and visual analytics',
+    heading: 'RCA Department of Design Research archive critical inquiry instrument',
     assertions: async (page) => {
-      await expect(page.getByText('Powered by IBM Granite')).toBeVisible()
-      await expect(page.getByRole('heading', { level: 2, name: 'Research workflow' })).toBeVisible()
+      await expect(page.getByRole('heading', { level: 2, name: 'Research apparatus status' })).toBeVisible()
     }
   },
   {
-    path: '/corpus',
-    heading: 'Corpus explorer',
+    path: '/sources',
+    heading: 'Sources',
     assertions: async (page) => {
-      await expect(page.getByText('Current corpus contract')).toBeVisible()
-      await expect(page.getByRole('button', { name: 'Reset filters' })).toBeVisible()
+      await expect(page.getByText('Methodological distinction')).toBeVisible()
     }
   },
   {
-    path: '/tracer',
-    heading: 'Evidence tracer',
+    path: '/source-interrogation',
+    heading: 'Source interrogation',
     assertions: async (page) => {
       await expect(page.getByRole('heading', { level: 3, name: 'Research query' })).toBeVisible()
-      await expect(page.getByRole('button', { name: 'Trace evidence' })).toBeVisible()
+      await expect(page.getByRole('button', { name: 'Run interrogation' })).toBeVisible()
     }
   },
   {
-    path: '/visual-analytics',
-    heading: 'Visual analytics',
+    path: '/absences',
+    heading: 'Absences',
     assertions: async (page) => {
-      await expect(page.getByText('Partial evidence surface')).toBeVisible()
-      await expect(page.getByRole('heading', { level: 3, name: 'UMAP projection' })).toBeVisible()
+      await expect(page.getByRole('heading', { level: 3, name: 'Typology filter and export' })).toBeVisible()
     }
   },
   {
-    path: '/sessions',
-    heading: 'Session recorder',
+    path: '/cross-readings',
+    heading: 'Cross-readings',
     assertions: async (page) => {
-      await expect(page.getByText('Recent sessions')).toBeVisible()
-      await expect(page.getByRole('columnheader', { name: 'Confidence' })).toBeVisible()
+      await expect(page.getByRole('heading', { level: 3, name: 'Passage input or list' })).toBeVisible()
     }
   },
   {
-    path: '/experiments',
-    heading: 'Experimental log',
+    path: '/semantic-atlas',
+    heading: 'Semantic atlas',
     assertions: async (page) => {
-      await expect(page.getByRole('heading', { level: 3, name: 'Training loss curves' })).toBeVisible()
-      await expect(page.getByText('Training run provenance')).toBeVisible()
+      await expect(page.getByRole('heading', { level: 3, name: 'Metadata overlays and evidence surface scope' })).toBeVisible()
     }
   },
   {
-    path: '/ml-dashboard',
-    heading: 'ML processing dashboard',
+    path: '/claims-evidence',
+    heading: 'Claims and evidence',
     assertions: async (page) => {
-      await expect(page.getByRole('button', { name: 'Refresh stats' })).toBeVisible()
-      await expect(page.getByText('Granite archive chat')).toBeVisible()
+      await expect(page.getByRole('heading', { level: 3, name: 'Claim table' })).toBeVisible()
+    }
+  },
+  {
+    path: '/provenance',
+    heading: 'Provenance',
+    assertions: async (page) => {
+      await expect(page.getByRole('heading', { level: 3, name: 'Apparatus status' })).toBeVisible()
+    }
+  },
+  {
+    path: '/research-runs',
+    heading: 'Research runs',
+    assertions: async (page) => {
+      await expect(page.getByRole('heading', { level: 3, name: 'Saved runs' })).toBeVisible()
+    }
+  },
+  {
+    path: '/documentation',
+    heading: 'Documentation',
+    assertions: async (page) => {
+      await expect(page.getByText('Documentation reader')).toBeVisible()
     }
   }
 ]
@@ -63,7 +78,8 @@ for (const route of routes) {
   test(`smoke ${route.path}`, async ({ page }) => {
     await page.goto(route.path, { waitUntil: 'networkidle' })
     await expect(page.getByRole('heading', { level: 1, name: route.heading })).toBeVisible()
-    await expect(page.locator('main, .app-content')).toBeVisible()
+    await expect(page.locator('main')).toBeVisible()
+    await expect(page.locator('.page-grid')).toBeVisible()
     await route.assertions(page)
   })
 }

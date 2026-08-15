@@ -1,5 +1,4 @@
 import { Button, Tag, Tile } from '@carbon/react'
-import './ClusterPanel.scss'
 
 const ClusterPanel = ({ clusters, selectedCluster, onSelectCluster, onCopyClusterMemo }) => {
   return (
