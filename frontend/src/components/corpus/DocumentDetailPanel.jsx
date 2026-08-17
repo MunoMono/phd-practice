@@ -1,5 +1,6 @@
 import { Button, InlineNotification, SkeletonText, Tab, TabList, TabPanel, TabPanels, Tabs, Tag, Tile } from '@carbon/react'
 import { useState } from 'react'
+import { DDR_PUBLIC_RECORD_ROUTE_AVAILABLE } from '../../config/capabilities'
 
 const hasValue = (value) => {
   if (value === null || value === undefined) {
@@ -179,25 +180,10 @@ const HUMAN_FIELD_LABELS = {
   parent_collection: 'Parent collection',
 }
 
-const copyCitation = async (detail) => {
-  const document = detail?.document || {}
-  const annotations = detail?.annotations || {}
-  const citation = [
-    document.title || 'Untitled document',
-    annotations.archive_record_pid ? `Archive record PID: ${annotations.archive_record_pid}` : annotations.pid ? `PID: ${annotations.pid}` : null,
-    annotations.asset_pid ? `Asset PID: ${annotations.asset_pid}` : annotations.asset_id ? `Asset ID: ${annotations.asset_id}` : null,
-    document.publication_year ? `Year: ${document.publication_year}` : null,
-    document.id ? `Document ID: ${document.id}` : null
-  ].filter(Boolean).join(' | ')
-
-  if (navigator?.clipboard?.writeText) {
-    await navigator.clipboard.writeText(citation)
-  }
-}
-
 const DocumentDetailPanel = ({ detail, loading, onRefreshMetadata, onTraceEvidence, onViewAnalytics, onInspectMissingness, authoritySummary = null }) => {
   const [refreshing, setRefreshing] = useState(false)
   const [refreshResult, setRefreshResult] = useState(null)
+  const [citationCopyFeedback, setCitationCopyFeedback] = useState(null)
 
   if (loading) {
     return (
@@ -216,13 +202,14 @@ const DocumentDetailPanel = ({ detail, loading, onRefreshMetadata, onTraceEviden
     )
   }
 
-  const { document, annotations, similarDocuments, error } = detail
+  const { document, annotations, relatedDocuments, error } = detail
   const metadataDetail = annotations || document || {}
   const catalogueMetadata = metadataDetail.catalogue_metadata || document?.catalogue_metadata || {}
   const provenanceMetadata = metadataDetail.retrieval_provenance || document?.retrieval_provenance || {}
   const rightsAccess = metadataDetail.rights_access || document?.rights_access || {}
   const policyReason = formatPolicyReason(annotations)
   const recordPublicUrl = pickFirstValue(annotations?.record_public_uri, document?.record_public_uri, provenanceMetadata.record_public_uri) || null
+  const canOpenDdrPublicRecord = DDR_PUBLIC_RECORD_ROUTE_AVAILABLE && Boolean(recordPublicUrl)
   const policyStatusLabel = formatStatusLabel(annotations?.ml_policy_status)
   const policyExplanation = annotations?.ml_policy_status === 'policy_unresolved' || annotations?.used_for_ml === null || annotations?.used_for_ml === undefined
     ? policyReason || 'The current local record does not yet contain enough asset-level policy data to determine ML eligibility or page scope.'
@@ -240,6 +227,7 @@ const DocumentDetailPanel = ({ detail, loading, onRefreshMetadata, onTraceEviden
     { label: 'Location note', value: provenanceMetadata.location_note },
     { label: 'Page count', value: annotations?.page_count ?? document.page_count ?? provenanceMetadata.page_count ?? null, fallback: 'Not yet recorded' },
     { label: 'Source URI', value: pickFirstValue(annotations?.source_uri, document.source_uri) },
+    { label: 'DDR public record URI', value: recordPublicUrl },
   ])
   const rightsRows = buildFieldRows([
     { label: 'Copyright holder', value: rightsAccess.copyright_holder },
@@ -296,6 +284,27 @@ const DocumentDetailPanel = ({ detail, loading, onRefreshMetadata, onTraceEviden
     }
   }
 
+  const handleCopyCitation = async () => {
+    const citation = [
+      document.title || 'Untitled document',
+      annotations.archive_record_pid ? `Archive record PID: ${annotations.archive_record_pid}` : annotations.pid ? `PID: ${annotations.pid}` : null,
+      annotations.asset_pid ? `Asset PID: ${annotations.asset_pid}` : annotations.asset_id ? `Asset ID: ${annotations.asset_id}` : null,
+      document.publication_year ? `Year: ${document.publication_year}` : null,
+      document.id ? `Document ID: ${document.id}` : null
+    ].filter(Boolean).join(' | ')
+
+    setCitationCopyFeedback(null)
+    try {
+      if (!navigator?.clipboard?.writeText) {
+        throw new Error('Clipboard access is unavailable.')
+      }
+      await navigator.clipboard.writeText(citation)
+      setCitationCopyFeedback({ kind: 'success', title: 'Citation copied', subtitle: 'The current source detail remains unchanged.' })
+    } catch (copyError) {
+      setCitationCopyFeedback({ kind: 'error', title: 'Citation could not be copied', subtitle: copyError.message || 'The current source detail remains unchanged.' })
+    }
+  }
+
   return (
     <Tile>
       <h3 className="corpus-panel__section-title">{document.title}</h3>
@@ -306,6 +315,8 @@ const DocumentDetailPanel = ({ detail, loading, onRefreshMetadata, onTraceEviden
       </div>
 
       {error && <p>{error}</p>}
+
+      {citationCopyFeedback && <InlineNotification lowContrast kind={citationCopyFeedback.kind} title={citationCopyFeedback.title} subtitle={citationCopyFeedback.subtitle} />}
 
       <Tabs className="corpus-detail-tabs">
         <TabList aria-label="Source detail sections" contained>
@@ -481,18 +492,21 @@ const DocumentDetailPanel = ({ detail, loading, onRefreshMetadata, onTraceEviden
         ) : null}
 
         <div>
-          <h4 className="corpus-panel__section-title">Similar documents</h4>
-          {similarDocuments?.length > 0 ? (
+          <h4 className="corpus-panel__section-title">Other documents in this archive record</h4>
+          {relatedDocuments?.length > 0 ? (
             <div className="corpus-panel__list">
-              {similarDocuments.slice(0, 5).map((similar) => (
-                <div key={similar.document_id}>
-                  <strong>{similar.title}</strong>
-                  <div className="corpus-panel__meta">PID: {similar.pid || 'Not yet exposed by endpoint'} | Similarity: {(similar.similarity * 100).toFixed(1)}%</div>
+              {relatedDocuments.slice(0, 5).map((related) => (
+                <div key={related.document_id}>
+                  <strong>{related.title}</strong>
+                  <div className="corpus-panel__meta">Year: {related.year || 'Not recorded'} | Asset PID: {related.asset_pid || 'Not exposed'} | Archive record PID: {related.archive_record_pid || 'Not exposed'}</div>
                 </div>
               ))}
             </div>
           ) : (
-            <p className="corpus-panel__empty">No similar documents returned for this document.</p>
+            <>
+              <p className="corpus-panel__empty">No related source documents are recorded for this item.</p>
+              <p className="corpus-panel__meta">This refers to the current local archive-record relationship and does not indicate that no related material exists elsewhere in the archive.</p>
+            </>
           )}
         </div>
 
@@ -500,8 +514,18 @@ const DocumentDetailPanel = ({ detail, loading, onRefreshMetadata, onTraceEviden
           <Button kind="primary" onClick={onTraceEvidence}>Interrogate this source</Button>
           <Button kind="secondary" onClick={onInspectMissingness}>Inspect absences</Button>
           <Button kind="ghost" onClick={onViewAnalytics}>Locate in atlas</Button>
-          <Button kind="ghost" onClick={() => copyCitation(detail)}>Copy citation</Button>
-          <Button kind="ghost" disabled={!recordPublicUrl} onClick={() => recordPublicUrl && window.open(recordPublicUrl, '_blank', 'noopener,noreferrer')}>Open DDR source</Button>
+          <Button kind="ghost" onClick={handleCopyCitation}>Copy citation</Button>
+          <Button
+            kind="ghost"
+            disabled={!canOpenDdrPublicRecord}
+            title={recordPublicUrl && !DDR_PUBLIC_RECORD_ROUTE_AVAILABLE ? 'The authoritative DDR record URI is retained, but the public DDR record interface does not currently resolve this record.' : undefined}
+            onClick={() => canOpenDdrPublicRecord && window.open(recordPublicUrl, '_blank', 'noopener,noreferrer')}
+          >
+            {recordPublicUrl && !DDR_PUBLIC_RECORD_ROUTE_AVAILABLE ? 'DDR public record currently unavailable' : 'Open DDR source'}
+          </Button>
+          {recordPublicUrl && !DDR_PUBLIC_RECORD_ROUTE_AVAILABLE ? (
+            <p className="corpus-panel__meta">The authoritative DDR record URI is retained, but the public DDR record interface does not currently resolve this record.</p>
+          ) : null}
         </div>
             </div>
           </TabPanel>

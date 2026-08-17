@@ -5,19 +5,22 @@ export const semanticSearch = (payload) => apiRequest('/api/search/semantic', {
   body: payload
 })
 
-export const getSimilarDocuments = async (documentId) => {
-  const payload = await apiRequest(`/api/search/similar-documents/${documentId}`)
+export const getArchiveRecordSiblings = async (documentId) => {
+  const payload = await apiRequest(`/api/search/archive-record-siblings/${documentId}`)
 
   return {
     sourceDocument: payload?.sourceDocument || null,
-    similarDocuments: (payload?.similarDocuments || []).map((document) => ({
+    relatedDocuments: (payload?.relatedDocuments || []).map((document) => ({
       document_id: document.documentId,
-      pid: document.pid || null,
+      attached_media_pid: document.attachedMediaPid || null,
+      archive_record_pid: document.archiveRecordPid || null,
+      asset_pid: document.assetPid || null,
+      source_uri: document.sourceUri || null,
+      archive_record_title: document.archiveRecordTitle || null,
       title: document.title || 'Untitled document',
-      similarity: document.similarity || 0,
-      themes: document.themes || [],
-      pdf_count: document.pdfCount || 0,
-      year: document.year || null
+      year: document.year || null,
+      used_for_ml: document.usedForMl ?? null,
+      ml_policy_status: document.mlPolicyStatus || null,
     })),
     metadata: payload?.metadata || {}
   }

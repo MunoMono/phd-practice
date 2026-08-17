@@ -11,6 +11,8 @@ from app.core.database import LocalSessionLocal
 
 router = APIRouter()
 
+CURRENT_TURIN_CORPUS_VERSION = 'corpus_f40d78dbce52'
+
 
 class SearchResult(BaseModel):
     document_id: str
@@ -229,6 +231,106 @@ async def find_similar_documents(
             }
         }
         
+    finally:
+        db.close()
+
+
+@router.get("/archive-record-siblings/{document_id}")
+async def find_archive_record_siblings(document_id: str):
+    """Return other current local source assets in the selected archive record."""
+    db = LocalSessionLocal()
+
+    try:
+        source = db.execute(
+            text(
+                """
+                SELECT document_id, archive_record_pid
+                FROM documents
+                WHERE document_id = :document_id
+                """
+            ),
+            {"document_id": document_id},
+        ).fetchone()
+
+        if not source:
+            raise HTTPException(status_code=404, detail="Document not found")
+
+        if not source.archive_record_pid:
+            return {
+                "sourceDocument": {"documentId": source.document_id, "archiveRecordPid": None},
+                "relatedDocuments": [],
+                "metadata": {"relationship": "shared_archive_record", "count": 0},
+            }
+
+        rows = db.execute(
+            text(
+                """
+                WITH candidate_sources AS (
+                    SELECT
+                        document_id,
+                        title,
+                        publication_year,
+                        pid AS attached_media_pid,
+                        archive_record_pid,
+                        asset_pid,
+                        source_uri,
+                        authority_data->>'record_title' AS archive_record_title,
+                        use_for_ml,
+                        ml_policy_status,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY COALESCE(NULLIF(asset_pid, ''), NULLIF(source_uri, ''), document_id)
+                            ORDER BY publication_year ASC NULLS LAST, title ASC NULLS LAST, document_id ASC
+                        ) AS source_identity_rank
+                    FROM documents
+                    WHERE archive_record_pid = :archive_record_pid
+                        AND metadata_source = 'archive_graphql.records_v1'
+                        AND corpus_version = :corpus_version
+                        AND document_id <> :document_id
+                )
+                SELECT
+                    document_id,
+                    title,
+                    publication_year,
+                    attached_media_pid,
+                    archive_record_pid,
+                    asset_pid,
+                    source_uri,
+                    archive_record_title,
+                    use_for_ml,
+                    ml_policy_status
+                FROM candidate_sources
+                WHERE source_identity_rank = 1
+                ORDER BY publication_year ASC NULLS LAST, title ASC NULLS LAST, document_id ASC
+                """
+            ),
+            {
+                "archive_record_pid": source.archive_record_pid,
+                "corpus_version": CURRENT_TURIN_CORPUS_VERSION,
+                "document_id": document_id,
+            },
+        ).fetchall()
+
+        related_documents = [
+            {
+                "documentId": row.document_id,
+                "title": row.title,
+                "year": row.publication_year,
+                "attachedMediaPid": row.attached_media_pid,
+                "archiveRecordPid": row.archive_record_pid,
+                "assetPid": row.asset_pid,
+                "sourceUri": row.source_uri,
+                "archiveRecordTitle": row.archive_record_title,
+                "usedForMl": bool(row.use_for_ml) if row.use_for_ml is not None else None,
+                "mlPolicyStatus": row.ml_policy_status,
+            }
+            for row in rows
+        ]
+
+        return {
+            "sourceDocument": {"documentId": source.document_id, "archiveRecordPid": source.archive_record_pid},
+            "relatedDocuments": related_documents,
+            "metadata": {"relationship": "shared_archive_record", "count": len(related_documents)},
+        }
     finally:
         db.close()
 

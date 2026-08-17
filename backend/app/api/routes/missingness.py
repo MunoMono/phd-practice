@@ -56,6 +56,25 @@ def serialize_event(event: MissingnessEvent) -> dict:
     }
 
 
+def calculate_metadata_coverage(
+    total_documents: int,
+    documents_with_title: int,
+    documents_with_pid: int,
+    documents_with_filename: int,
+    documents_with_publication_year: int,
+) -> int:
+    if not total_documents:
+        return 0
+
+    filled_fields = (
+        documents_with_title
+        + documents_with_pid
+        + documents_with_filename
+        + documents_with_publication_year
+    )
+    return round((filled_fields / (total_documents * 4)) * 100)
+
+
 @router.get("/summary")
 async def get_missingness_summary():
     db = LocalSessionLocal()
@@ -64,11 +83,14 @@ async def get_missingness_summary():
         documents_with_title = db.query(func.count(Document.id)).filter(Document.title.isnot(None), Document.title != "").scalar() or 0
         documents_with_pid = db.query(func.count(Document.id)).filter(Document.pid.isnot(None), Document.pid != "").scalar() or 0
         documents_with_filename = db.query(func.count(Document.id)).filter(Document.filename.isnot(None), Document.filename != "").scalar() or 0
-
-        metadata_score = 0
-        if total_documents:
-            filled_fields = documents_with_title + documents_with_pid + documents_with_filename + total_documents
-            metadata_score = round((filled_fields / (total_documents * 4)) * 100)
+        documents_with_publication_year = db.query(func.count(Document.id)).filter(Document.publication_year.isnot(None)).scalar() or 0
+        metadata_score = calculate_metadata_coverage(
+            total_documents,
+            documents_with_title,
+            documents_with_pid,
+            documents_with_filename,
+            documents_with_publication_year,
+        )
 
         retrieved_document_count = db.query(func.count(func.distinct(DocumentChunk.document_id))).scalar() or 0
 
@@ -95,24 +117,24 @@ async def get_missingness_summary():
 
         completeness_cards = [
             {
-                "label": "Metadata completeness",
+                "label": "Local metadata coverage",
                 "value": f"{metadata_score}%",
-                "note": "Computed from title, PID, filename, and required publication year coverage across local documents.",
+                "note": f"Title, PID, source filename, and publication year across {total_documents} local documents.",
             },
             {
-                "label": "Retrieval coverage",
+                "label": "Local documents with chunks",
                 "value": f"{retrieved_document_count}/{total_documents} documents with chunks" if total_documents else "0/0 documents with chunks",
-                "note": "Computed from distinct documents represented in document_chunks. This is the current local retrieval surface.",
+                "note": "Local document representation in DocumentChunk. This is not frozen-corpus retrieval coverage.",
             },
             {
-                "label": "Entity presence",
+                "label": "Entity registry",
                 "value": entity_presence_label,
-                "note": "Marked provisional where entity persistence is not yet available in the local stack.",
+                "note": "No records are currently stored in the local entity registry when this value is zero.",
             },
             {
-                "label": "Institutional gaps",
+                "label": "Institutional missingness events",
                 "value": str(institutional_gap_count),
-                "note": "Count of persisted missingness events tagged as institutional.",
+                "note": "Persisted MissingnessEvent rows of type institutional. Check event evidence and reviewer notes before interpretation.",
             },
         ]
 

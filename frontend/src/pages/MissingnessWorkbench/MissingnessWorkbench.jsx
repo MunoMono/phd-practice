@@ -40,21 +40,28 @@ const headers = [
   { key: 'created_at', header: 'Created' }
 ]
 
+const getEventIdFromTableRow = (row) => {
+  return row.cells.find((cell) => cell.info.header === 'event_id')?.value || ''
+}
+
 const MissingnessWorkbench = () => {
   const [searchParams] = useSearchParams()
+  const requestedEventId = searchParams.get('eventId') || ''
   const [filter, setFilter] = useState('all')
   const [summary, setSummary] = useState(null)
   const [events, setEvents] = useState([])
   const [loading, setLoading] = useState(true)
-  const [saveState, setSaveState] = useState('idle')
   const [error, setError] = useState('')
+  const [selectionError, setSelectionError] = useState('')
   const [selectedEventId, setSelectedEventId] = useState('')
-  const [draftStatus, setDraftStatus] = useState('open')
-  const [draftReviewerNote, setDraftReviewerNote] = useState('')
+  const [statusDrafts, setStatusDrafts] = useState({})
+  const [reviewerNoteDrafts, setReviewerNoteDrafts] = useState({})
+  const [savingEventId, setSavingEventId] = useState('')
+  const [savedEventId, setSavedEventId] = useState('')
+  const [saveError, setSaveError] = useState('')
 
   useEffect(() => {
     let isCancelled = false
-    const seededEventId = searchParams.get('eventId') || ''
 
     const loadMissingness = async () => {
       setLoading(true)
@@ -71,14 +78,29 @@ const MissingnessWorkbench = () => {
         }
 
         setSummary(summaryPayload)
-        setEvents(eventsPayload.events || [])
-        setSelectedEventId((current) => current || seededEventId || eventsPayload.events?.[0]?.event_id || '')
+        const loadedEvents = eventsPayload.events || []
+        setEvents(loadedEvents)
+        setSelectedEventId((current) => {
+          if (current) {
+            return loadedEvents.some((event) => event.event_id === current) ? current : ''
+          }
+
+          if (requestedEventId) {
+            const requestedEventExists = loadedEvents.some((event) => event.event_id === requestedEventId)
+            setSelectionError(requestedEventExists ? '' : 'Requested missingness event could not be loaded.')
+            return requestedEventExists ? requestedEventId : ''
+          }
+
+          setSelectionError('')
+          return ''
+        })
       } catch (loadError) {
         if (!isCancelled) {
           setError(loadError.message || 'Failed to load persisted missingness data.')
           setSummary(null)
           setEvents([])
           setSelectedEventId('')
+          setSelectionError('')
         }
       } finally {
         if (!isCancelled) {
@@ -92,7 +114,7 @@ const MissingnessWorkbench = () => {
     return () => {
       isCancelled = true
     }
-  }, [filter, searchParams])
+  }, [filter, requestedEventId])
 
   const rows = useMemo(() => {
     return events.map((event) => ({ id: event.event_id, ...event }))
@@ -103,16 +125,22 @@ const MissingnessWorkbench = () => {
     [events, selectedEventId]
   )
 
-  useEffect(() => {
-    if (!selectedEvent) {
-      setDraftStatus('open')
-      setDraftReviewerNote('')
-      return
-    }
+  const draftStatus = selectedEvent
+    ? (Object.hasOwn(statusDrafts, selectedEvent.event_id)
+        ? statusDrafts[selectedEvent.event_id]
+        : selectedEvent.status || 'open')
+    : 'open'
 
-    setDraftStatus(selectedEvent.status)
-    setDraftReviewerNote(selectedEvent.reviewer_note || '')
-  }, [selectedEvent])
+  const draftReviewerNote = selectedEvent
+    ? (Object.hasOwn(reviewerNoteDrafts, selectedEvent.event_id)
+        ? reviewerNoteDrafts[selectedEvent.event_id]
+        : selectedEvent.reviewer_note || '')
+    : ''
+
+  const isReviewDirty = Boolean(selectedEvent) && (
+    draftStatus !== (selectedEvent.status || 'open')
+    || draftReviewerNote !== (selectedEvent.reviewer_note || '')
+  )
 
   const exportRows = rows.map((row) => ({
     event_id: row.event_id,
@@ -138,23 +166,39 @@ const MissingnessWorkbench = () => {
   }, [events])
 
   const handleSaveEvent = async () => {
-    if (!selectedEvent) {
+    if (!selectedEvent || !isReviewDirty || savingEventId) {
       return
     }
 
-    setSaveState('saving')
-    try {
-      const updated = await updateMissingnessEvent(selectedEvent.event_id, {
-        status: draftStatus,
-        reviewer_note: draftReviewerNote
-      })
-
-      setEvents((current) => current.map((event) => event.event_id === updated.event_id ? updated : event))
-      setSaveState('saved')
-    } catch (saveError) {
-      setSaveState('error')
-      setError(saveError.message || 'Failed to update missingness event.')
+    const saveTargetEventId = selectedEvent.event_id
+    const savePayload = {
+      status: draftStatus,
+      reviewer_note: draftReviewerNote
     }
+
+    setSavingEventId(saveTargetEventId)
+    setSavedEventId('')
+    setSaveError('')
+    try {
+      const updated = await updateMissingnessEvent(saveTargetEventId, savePayload)
+      if (updated.event_id !== saveTargetEventId) {
+        throw new Error('The saved review response did not match the selected event.')
+      }
+
+      setEvents((current) => current.map((event) => event.event_id === saveTargetEventId ? updated : event))
+      setStatusDrafts((current) => {
+        const { [saveTargetEventId]: _savedDraft, ...remaining } = current
+        return remaining
+      })
+      setReviewerNoteDrafts((current) => {
+        const { [saveTargetEventId]: _savedDraft, ...remaining } = current
+        return remaining
+      })
+      setSavedEventId(saveTargetEventId)
+    } catch (saveError) {
+      setSaveError('Review state could not be saved. Your local changes have not been lost.')
+    }
+    setSavingEventId('')
   }
 
   return (
@@ -162,7 +206,7 @@ const MissingnessWorkbench = () => {
       <Column>
         <PageHeader
           title="Absences"
-          description="Make failed retrieval, sparse metadata, absent entities, access limits, and description gaps available as analytical evidence."
+          description="Make scoped retrieval, metadata, registry, access, and description conditions available as analytical evidence."
           actions={(
             <Tag type="magenta" size="md">
               <WarningAlt size={16} /> Analytical gaps visible
@@ -176,7 +220,7 @@ const MissingnessWorkbench = () => {
           lowContrast
           kind="info"
           title="Analytical output"
-          subtitle="This view produces an absences / missingness report: explicit gap events, typology assignments, reviewer notes, and exportable evidence of what the current archive and retrieval stack cannot yet support. Missingness is treated as a candidate analytical condition, not proof of historical absence."
+          subtitle="This view reports scoped missingness in the current corpus, metadata, and retrieval system. It records explicit events, typology assignments, reviewer notes, and exportable evidence; it is not proof of historical absence."
         />
       </Column>
 
@@ -185,6 +229,27 @@ const MissingnessWorkbench = () => {
           <InlineNotification lowContrast kind="error" title="Absences unavailable" subtitle={error} />
         </Column>
       )}
+
+      {selectionError && (
+        <Column>
+          <InlineNotification lowContrast kind="warning" title="Missingness event unavailable" subtitle={selectionError} />
+        </Column>
+      )}
+
+      {saveError && (
+        <Column>
+          <InlineNotification lowContrast kind="error" title="Review state could not be saved" subtitle="Your local changes have not been lost." />
+        </Column>
+      )}
+
+      <Column>
+        <Tile>
+          <PanelHeader
+            title="Scoped coverage and missingness diagnostics"
+            description="Summary cards show global system state. Typology filters apply to the event log and events table below."
+          />
+        </Tile>
+      </Column>
 
       <Column>
         <Tile>
@@ -201,7 +266,7 @@ const MissingnessWorkbench = () => {
             </Select>
             <div>
               <strong>Reviewer workflow</strong>
-              <p className="app-text-muted missingness-workbench__review-note">Use status and reviewer note fields to distinguish genuine archival absence from ingestion, retrieval, or description limits.</p>
+              <p className="app-text-muted missingness-workbench__review-note">Use status and reviewer note fields to distinguish scoped system conditions from ingestion, retrieval, or description limits.</p>
             </div>
           </div>
         </Tile>
@@ -239,24 +304,41 @@ const MissingnessWorkbench = () => {
           {selectedEvent ? (
             <>
               {getResearchStateTag(selectedEvent) ? <Tag type={getResearchStateTag(selectedEvent).type}>{getResearchStateTag(selectedEvent).label}</Tag> : null}
+              <p className="app-list-item__meta">Event ID: {selectedEvent.event_id}</p>
+              <p className="app-list-item__meta">Typology: {selectedEvent.type}</p>
               <p><strong>{selectedEvent.query_or_entity_or_field}</strong></p>
               {selectedEvent.query_id && <p className="app-list-item__meta">Source run: {selectedEvent.query_id}</p>}
+              {selectedEvent.source_document_id && <p className="app-list-item__meta">Source document: {selectedEvent.source_document_id}</p>}
+              {selectedEvent.source_chunk_id && <p className="app-list-item__meta">Source chunk: {selectedEvent.source_chunk_id}</p>}
+              {selectedEvent.created_at && <p className="app-list-item__meta">Created: {selectedEvent.created_at}</p>}
               <p className="app-text-muted">{selectedEvent.evidence}</p>
-              <Select id="selected-missingness-status" labelText="Status" value={draftStatus} onChange={(event) => setDraftStatus(event.target.value)}>
+              <Select
+                id="selected-missingness-status"
+                labelText="Researcher review status"
+                helperText="Workflow state only; resolved means the review condition is resolved."
+                value={draftStatus}
+                onChange={(event) => setStatusDrafts((current) => ({
+                  ...current,
+                  [selectedEvent.event_id]: event.target.value
+                }))}
+              >
                 {statusOptions.map((option) => (
                   <SelectItem key={option} value={option} text={option} />
                 ))}
               </Select>
               <TextArea
                 id="selected-missingness-reviewer-note"
-                labelText="Reviewer note"
+                labelText="Researcher review note - changes remain local until saved"
                 rows={5}
                 value={draftReviewerNote}
-                onChange={(event) => setDraftReviewerNote(event.target.value)}
+                onChange={(event) => setReviewerNoteDrafts((current) => ({
+                  ...current,
+                  [selectedEvent.event_id]: event.target.value
+                }))}
               />
               <div className="app-actions-row app-actions-row--comfortable missingness-workbench__detail-actions">
-                <Button size="sm" onClick={handleSaveEvent} disabled={saveState === 'saving'}>Save review state</Button>
-                {saveState === 'saved' && <span>Saved</span>}
+                <Button size="sm" onClick={handleSaveEvent} disabled={!isReviewDirty || Boolean(savingEventId)}>Save review state</Button>
+                {savedEventId === selectedEvent.event_id && <span>Saved</span>}
               </div>
             </>
           ) : (
@@ -266,7 +348,13 @@ const MissingnessWorkbench = () => {
       </Column>
 
       <Column lg={10} md={8} sm={4}>
-        <DataTable rows={rows} headers={headers}>
+        {!loading && events.length === 0 ? (
+          <Tile>
+            <PanelHeader title="Missingness events table" />
+            <p className="app-copy-reset">No missingness events are recorded for this typology.</p>
+          </Tile>
+        ) : (
+          <DataTable rows={rows} headers={headers}>
           {({ rows, headers, getTableProps, getHeaderProps, getRowProps }) => (
             <TableContainer title="Missingness events table">
               <Table {...getTableProps()}>
@@ -285,16 +373,20 @@ const MissingnessWorkbench = () => {
                 <TableBody>
                   {rows.map((row) => {
                     const { key, ...rowProps } = getRowProps({ row })
+                    const eventId = getEventIdFromTableRow(row)
                     return (
                       <TableRow
                         key={key || row.id}
                         {...rowProps}
-                        onClick={() => setSelectedEventId(row.id)}
-                        className={row.id === selectedEventId ? 'app-table-row--interactive app-table-row--selected' : 'app-table-row--interactive'}
+                        onClick={() => {
+                          setSelectionError('')
+                          setSelectedEventId(eventId)
+                        }}
+                        className={eventId === selectedEventId ? 'app-table-row--interactive app-table-row--selected' : 'app-table-row--interactive'}
                       >
                         {row.cells.map((cell) => {
                           if (cell.info.header === 'event_id') {
-                            const event = events.find((item) => item.event_id === row.id)
+                            const event = events.find((item) => item.event_id === eventId)
                             const stateTag = getResearchStateTag(event)
 
                             return (
@@ -316,7 +408,8 @@ const MissingnessWorkbench = () => {
               </Table>
             </TableContainer>
           )}
-        </DataTable>
+          </DataTable>
+        )}
       </Column>
     </PageGrid>
   )

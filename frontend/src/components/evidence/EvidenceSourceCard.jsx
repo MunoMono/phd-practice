@@ -1,5 +1,4 @@
 import { Button, Tag, Tile } from '@carbon/react'
-import EvidenceStatusControl from './EvidenceStatusControl'
 
 const renderCitation = (citation) => {
   if (!citation) {
@@ -22,8 +21,6 @@ const renderCitation = (citation) => {
 const EvidenceSourceCard = ({
   source,
   index,
-  validationStatus,
-  onValidationChange,
   onCopyCitation,
   onOpenCorpus,
   onShowAnalytics,
@@ -61,14 +58,6 @@ const EvidenceSourceCard = ({
 
       <div className="evidence-source-card__citation">
         <strong>Citation:</strong> {renderCitation(source.citation)}
-      </div>
-
-      <div className="evidence-source-card__controls">
-        <EvidenceStatusControl
-          id={`evidence-status-${source.chunkId || index}`}
-          value={validationStatus}
-          onChange={onValidationChange}
-        />
       </div>
 
       <div className="evidence-source-card__actions">

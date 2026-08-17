@@ -7,6 +7,8 @@ import { PageGrid, PageColumn as Column } from '../../components/layout/PageGrid
 import MarkdownRenderer from '../../components/MarkdownRenderer/MarkdownRenderer'
 import { DOCUMENTATION_ENTRIES, getDocumentationEntry } from '../../data/documentationCatalog'
 
+const EXPANDED_ABSTRACT_SLUG = 'expanded-abstract'
+
 const renderSectionBlock = (block) => {
   if (block.type === 'table') {
     return (
@@ -256,7 +258,7 @@ const Documentation = () => {
 
               <div className="documentation-page__related-note">
                 <span>Documentation continuity</span>
-                <button type="button" className="documentation-page__related-link" onClick={() => openEntry(DOCUMENTATION_ENTRIES[0])}>
+                <button type="button" className="documentation-page__related-link" onClick={() => navigate(`/documentation/${EXPANDED_ABSTRACT_SLUG}`)}>
                   Return to the expanded abstract as the foundational documentation record
                   <ArrowRight size={16} />
                 </button>

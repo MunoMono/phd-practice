@@ -1,0 +1,1 @@
+export const DDR_PUBLIC_RECORD_ROUTE_AVAILABLE = import.meta.env.VITE_DDR_PUBLIC_RECORD_ROUTE_AVAILABLE === 'true'

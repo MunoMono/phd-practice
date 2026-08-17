@@ -4,8 +4,6 @@ import EvidenceSourceCard from './EvidenceSourceCard'
 const EvidenceChain = ({
   sources,
   showEmptyState = false,
-  validationStatuses,
-  onValidationChange,
   onCopyCitation,
   onOpenCorpus,
   onShowAnalytics,
@@ -33,8 +31,6 @@ const EvidenceChain = ({
           key={source.chunkId || `source-${index}`}
           source={source}
           index={index}
-          validationStatus={validationStatuses[source.chunkId || `source-${index}`] || 'Needs review'}
-          onValidationChange={(value) => onValidationChange(source, value)}
           onCopyCitation={() => onCopyCitation(source)}
           onOpenCorpus={() => onOpenCorpus(source)}
           onShowAnalytics={() => onShowAnalytics(source)}

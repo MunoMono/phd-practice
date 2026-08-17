@@ -1,10 +1,10 @@
 import { InlineNotification, Tag } from '@carbon/react'
 import { Search } from '@carbon/icons-react'
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { getAuthoritySummary } from '../../api/authorities'
 import { listDocuments, getDocument, getDocumentAnnotations, syncDocumentMetadata } from '../../api/documents'
-import { getSimilarDocuments, autocompleteSearch } from '../../api/search'
+import { getArchiveRecordSiblings, autocompleteSearch } from '../../api/search'
 import CorpusSearchPanel from '../../components/corpus/CorpusSearchPanel'
 import DocumentTable from '../../components/corpus/DocumentTable'
 import DocumentDetailPanel from '../../components/corpus/DocumentDetailPanel'
@@ -19,10 +19,15 @@ const defaultFilters = {
 
 const CorpusExplorer = () => {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const handoffDocumentId = searchParams.get('documentId') || ''
+  const handoffPid = searchParams.get('pid') || ''
+  const handoffRequested = searchParams.has('documentId') || searchParams.has('pid')
   const [filters, setFilters] = useState(defaultFilters)
   const [documents, setDocuments] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [handoffError, setHandoffError] = useState('')
   const [selectedDocumentId, setSelectedDocumentId] = useState(null)
   const [detailLoading, setDetailLoading] = useState(false)
   const [selectedDetail, setSelectedDetail] = useState(null)
@@ -35,6 +40,7 @@ const CorpusExplorer = () => {
     const loadDocuments = async () => {
       setLoading(true)
       setError('')
+      setHandoffError('')
 
       try {
         const payload = await listDocuments({
@@ -47,6 +53,25 @@ const CorpusExplorer = () => {
         }
 
         setDocuments(payload.documents)
+
+        if (handoffRequested) {
+          const requestedDocument = handoffDocumentId
+            ? payload.documents.find((document) => document.id === handoffDocumentId)
+            : null
+          const requestedPid = requestedDocument?.attached_media_pid || requestedDocument?.pid || ''
+          const pidMatches = !handoffPid || String(requestedPid) === handoffPid
+
+          if (!requestedDocument || !pidMatches) {
+            setSelectedDetail(null)
+            setSelectedDocumentId(null)
+            setHandoffError('The requested local source record could not be matched to the current Sources dataset.')
+            return
+          }
+
+          setSelectedDocumentId(requestedDocument.id)
+          return
+        }
+
         setSelectedDocumentId((currentSelectedId) => {
           if (payload.documents.length === 0) {
             setSelectedDetail(null)
@@ -72,7 +97,7 @@ const CorpusExplorer = () => {
     return () => {
       isCancelled = true
     }
-  }, [filters.year, filters.status])
+  }, [filters.year, filters.status, handoffDocumentId, handoffPid, handoffRequested])
 
   useEffect(() => {
     let isCancelled = false
@@ -115,10 +140,10 @@ const CorpusExplorer = () => {
       setDetailLoading(true)
 
       try {
-        const [detail, annotations, similar] = await Promise.all([
+        const [detail, annotations, related] = await Promise.all([
           getDocument(selectedDocument.id),
           getDocumentAnnotations(selectedDocument.id),
-          getSimilarDocuments(selectedDocument.id).catch(() => ({ similarDocuments: [], metadata: {} }))
+          getArchiveRecordSiblings(selectedDocument.id).catch(() => ({ relatedDocuments: [], metadata: {} }))
         ])
 
         if (isCancelled) {
@@ -133,14 +158,14 @@ const CorpusExplorer = () => {
             page_count: annotations.page_count ?? detail.page_count ?? null
           },
           annotations,
-          similarDocuments: similar.similarDocuments || []
+          relatedDocuments: related.relatedDocuments || []
         })
       } catch (detailError) {
         if (!isCancelled) {
           setSelectedDetail({
             document: selectedDocument,
             annotations: null,
-            similarDocuments: [],
+            relatedDocuments: [],
             error: detailError.message || 'Failed to load document detail.'
           })
         }
@@ -265,6 +290,17 @@ const CorpusExplorer = () => {
             kind="error"
             title="Corpus load failed"
             subtitle={error}
+          />
+        </Column>
+      )}
+
+      {handoffError && (
+        <Column>
+          <InlineNotification
+            lowContrast
+            kind="error"
+            title="Requested source could not be loaded"
+            subtitle={handoffError}
           />
         </Column>
       )}

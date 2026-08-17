@@ -59,6 +59,7 @@ const VisualAnalytics = () => {
   const [selectedCluster, setSelectedCluster] = useState(null)
   const [memoPoints, setMemoPoints] = useState([])
   const [refreshToken, setRefreshToken] = useState(0)
+  const [copyFeedback, setCopyFeedback] = useState(null)
 
   const highlightedTrace = useMemo(() => ({
     chunkId: searchParams.get('chunkId'),
@@ -178,12 +179,10 @@ const VisualAnalytics = () => {
   }
 
   const handleCopyClusterMemo = async () => {
-    if (!selectedCluster || !navigator?.clipboard?.writeText) {
-      return
-    }
-
-    const memo = buildClusterMemo({ cluster: selectedCluster, visiblePoints: filteredPoints })
-    await navigator.clipboard.writeText(memo)
+    const memo = selectedCluster
+      ? buildClusterMemo({ cluster: selectedCluster, visiblePoints: filteredPoints })
+      : ''
+    await copyValue(memo, 'Cluster interpretation note')
   }
 
   const handleExportMemo = () => {
@@ -209,9 +208,19 @@ const VisualAnalytics = () => {
     })
   }
 
-  const copyValue = async (value) => {
-    if (navigator?.clipboard?.writeText && value) {
+  const copyValue = async (value, label = 'Value') => {
+    setCopyFeedback(null)
+    try {
+      if (!value) {
+        throw new Error('No value is available to copy.')
+      }
+      if (!navigator?.clipboard?.writeText) {
+        throw new Error('Clipboard access is unavailable.')
+      }
       await navigator.clipboard.writeText(value)
+      setCopyFeedback({ kind: 'success', title: `${label} copied`, subtitle: 'The current atlas state remains unchanged.' })
+    } catch (copyError) {
+      setCopyFeedback({ kind: 'error', title: `${label} could not be copied`, subtitle: copyError.message || 'The current atlas state remains unchanged.' })
     }
   }
 
@@ -249,6 +258,12 @@ const VisualAnalytics = () => {
             title="UMAP endpoint unavailable"
             subtitle={errorState}
           />
+        </Column>
+      )}
+
+      {copyFeedback && (
+        <Column>
+          <InlineNotification lowContrast kind={copyFeedback.kind} title={copyFeedback.title} subtitle={copyFeedback.subtitle} />
         </Column>
       )}
 

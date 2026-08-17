@@ -13,6 +13,7 @@ import { getGraniteModelInfo } from '../../api/granite'
 import DashboardAnalyticalSurface from './DashboardAnalyticalSurface'
 
 const formatMetricValue = (value, fallback = 'Not yet recorded') => (value === null || value === undefined ? fallback : value)
+const formatCount = (value, fallback = 0) => Number(value ?? fallback).toLocaleString()
 
 const Dashboard = () => {
   const navigate = useNavigate()
@@ -21,7 +22,8 @@ const Dashboard = () => {
   const [authoritySummary, setAuthoritySummary] = useState(null)
   const [inventorySummary, setInventorySummary] = useState(null)
   const [analyticalSurface, setAnalyticalSurface] = useState(null)
-  const [claims, setClaims] = useState([])
+  const [analyticalSurfaceStatus, setAnalyticalSurfaceStatus] = useState('loading')
+  const [claims, setClaims] = useState(null)
   const [loadError, setLoadError] = useState('')
 
   useEffect(() => {
@@ -29,12 +31,14 @@ const Dashboard = () => {
 
     const loadDashboard = async () => {
       try {
-        const [granitePayload, statsPayload, authorityPayload, inventoryPayload, analyticalPayload, claimsPayload] = await Promise.all([
+        const [granitePayload, statsPayload, authorityPayload, inventoryPayload, analyticalResult, claimsPayload] = await Promise.all([
           getGraniteModelInfo().catch(() => null),
           fetchDashboardStats().catch(() => null),
           getAuthoritySummary().catch(() => null),
           getDocumentInventorySummary().catch(() => null),
-          fetchDashboardAnalyticalSurface().catch(() => null),
+          fetchDashboardAnalyticalSurface()
+            .then((data) => ({ data, status: 'ready' }))
+            .catch(() => ({ data: null, status: 'unavailable' })),
           getClaims().catch(() => null),
         ])
 
@@ -46,8 +50,9 @@ const Dashboard = () => {
         setStats(statsPayload)
         setAuthoritySummary(authorityPayload)
         setInventorySummary(inventoryPayload)
-        setAnalyticalSurface(analyticalPayload)
-        setClaims(claimsPayload?.claims || [])
+        setAnalyticalSurface(analyticalResult.data)
+        setAnalyticalSurfaceStatus(analyticalResult.status)
+        setClaims(claimsPayload?.claims ?? null)
       } catch (error) {
         if (!isCancelled) {
           setLoadError(error.message || 'Failed to load dashboard metrics.')
@@ -62,17 +67,43 @@ const Dashboard = () => {
     }
   }, [])
 
-  const corpusStatus = useMemo(() => {
+  const frozenCorpusStatus = useMemo(() => {
+    const overview = stats?.overview || {}
+    return [
+      { label: 'Frozen corpus version', value: analyticalSurface?.corpus_version || 'Loading' },
+      {
+        label: 'Searchable FTS chunks',
+        value: formatCount(analyticalSurface?.composition?.current_chunks ?? overview.totalPages),
+        detail: `${formatCount(analyticalSurface?.composition?.controlled_ingestible_sources)} successfully ingested frozen-corpus sources`
+      }
+    ]
+  }, [analyticalSurface, stats])
+
+  const archiveLocalStatus = useMemo(() => {
     const overview = stats?.overview || {}
     const mlProcessing = stats?.mlProcessing || {}
     const corpusCounts = overview.corpusStatus || {}
+    const persistedDocumentCount = formatMetricValue(corpusCounts.persistedDocumentCount, 0)
     return [
-      { label: 'Frozen corpus version', value: analyticalSurface?.corpus_version || 'Loading' },
-      { label: 'Searchable evidence', value: analyticalSurface?.composition?.current_chunks ?? formatMetricValue(overview.totalPages, 0) },
-      { label: 'Archive-resolved/current records', value: formatMetricValue(corpusCounts.archiveResolvedDocumentCount, 0) },
-      { label: 'Unresolved legacy records', value: formatMetricValue(corpusCounts.unresolvedLegacyDocumentCount, 0) },
-      { label: 'Documents with embeddings', value: formatMetricValue(mlProcessing.documentsWithEmbeddings, 0) },
-      { label: 'Archive-linked PDF assets', value: formatMetricValue(overview.totalPdfAssets ?? overview.totalPdfs, 0) }
+      {
+        label: `Archive-resolved current document records (of ${persistedDocumentCount} local records)`,
+        value: formatMetricValue(corpusCounts.archiveResolvedDocumentCount, 0)
+      },
+      {
+        label: `Legacy document records without current archive resolution (of ${persistedDocumentCount} local records)`,
+        value: formatMetricValue(corpusCounts.unresolvedLegacyDocumentCount, 0)
+      },
+      {
+        label: 'Documents with stored embeddings',
+        value: `${formatMetricValue(mlProcessing.documentsWithEmbeddings, 0)} of ${persistedDocumentCount} local records`,
+        detail: 'Inactive for retrieval; PostgreSQL FTS remains active.'
+      },
+      {
+        label: 'ML-authorised archive PDF media',
+        // totalPdfs includes retained legacy APR material and is not a frozen-corpus metric.
+        value: formatMetricValue(overview.totalPdfAssets, 0),
+        detail: 'PID-linked archive metadata'
+      }
     ]
   }, [stats])
 
@@ -83,8 +114,8 @@ const Dashboard = () => {
 
     return [
       { label: 'Authoritative archive assets', value: inventorySummary.count },
-      { label: 'ML-eligible assets', value: inventorySummary.eligibleUnrestricted + inventorySummary.eligibleRestricted },
-      { label: 'ML excluded', value: inventorySummary.excluded },
+      { label: 'ML-eligible archive assets', value: `${inventorySummary.eligibleUnrestricted + inventorySummary.eligibleRestricted} of ${inventorySummary.count}` },
+      { label: 'ML-excluded archive assets', value: `${inventorySummary.excluded} of ${inventorySummary.count}` },
       { label: 'Archive authorities', value: authoritySummary ? `${authoritySummary.totalRecords} records / ${authoritySummary.count} types` : 'Unavailable' },
     ]
   }, [authoritySummary, inventorySummary])
@@ -164,15 +195,31 @@ const Dashboard = () => {
         )}
 
         <Column>
-          <SectionHeading title="Research instrument status" />
-          <p className="app-copy-tight">Live values distinguish the frozen retrieval corpus from the broader archive inventory.</p>
+          <SectionHeading title="Frozen retrieval corpus" />
+          <p className="app-copy-tight">Versioned PostgreSQL full-text retrieval evidence, separate from archive inventory and local processing state.</p>
         </Column>
 
-        {corpusStatus.map((item) => (
+        {frozenCorpusStatus.map((item) => (
           <Column key={item.label} lg={5} xlg={5} max={5} md={4} sm={4}>
             <Tile className="dashboard__info-tile dashboard__metric-tile">
               <h4>{item.label}</h4>
               <p className="dashboard__metric-value">{item.value}</p>
+              {item.detail && <p className="app-copy-tight">{item.detail}</p>}
+            </Tile>
+          </Column>
+        ))}
+
+        <Column>
+          <SectionHeading title="Archive / local system state" />
+          <p className="app-copy-tight">Archive metadata and inactive embedding state are not measures of frozen-corpus retrieval coverage.</p>
+        </Column>
+
+        {archiveLocalStatus.map((item) => (
+          <Column key={item.label} lg={5} xlg={5} max={5} md={4} sm={4}>
+            <Tile className="dashboard__info-tile dashboard__metric-tile">
+              <h4>{item.label}</h4>
+              <p className="dashboard__metric-value">{item.value}</p>
+              {item.detail && <p className="app-copy-tight">{item.detail}</p>}
             </Tile>
           </Column>
         ))}
@@ -200,7 +247,12 @@ const Dashboard = () => {
         </Column>
 
         <Column>
-          <DashboardAnalyticalSurface data={analyticalSurface} claims={claims} />
+          <DashboardAnalyticalSurface
+            data={analyticalSurface}
+            claims={claims}
+            claimsAvailable={claims !== null}
+            status={analyticalSurfaceStatus}
+          />
         </Column>
 
         <Column>

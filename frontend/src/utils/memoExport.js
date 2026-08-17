@@ -18,45 +18,147 @@ const formatCitation = (source) => {
   return parts.join(' | ')
 }
 
-export const buildEvidenceTraceMemo = ({ trace, validationStatuses, generatedAt = new Date() }) => {
+const systemDerivedMissingnessCategories = new Set([
+  'zero_retrieval',
+  'insufficient_temporally_valid_evidence',
+  'no_matching_authority_record',
+  'no_matching_job_numbers',
+  'no_matching_job_number',
+  'insufficient_project_temporal_authority',
+  'no_projects_with_explicit_dates_for_year',
+  'no_documentary_retrieval_for_resolved_project',
+  'no_documentary_retrieval_for_authority',
+  'no_temporally_valid_documentary_support'
+])
+
+const validationFailureCategories = new Set([
+  'parse_failure',
+  'provenance_validation_failure'
+])
+
+const formatScore = (score) => Number.isFinite(score) ? score.toFixed(3) : null
+
+const formatAuthorityContext = (item) => {
+  if (item.authority_type === 'ddr_projects') {
+    return `Job ${item.job_number} | ${item.title} | Funder: ${item.funder_name || 'unrecorded'} | Duration: ${item.duration_text || 'unrecorded'} | Project lead: ${item.project_lead_name || 'unrecorded'}`
+  }
+
+  if (item.authority_type === 'agent_employment') {
+    return `${item.assertion} | ${item.role || 'Role unrecorded'} | ${item.tenure?.start_date || 'start unrecorded'} to ${item.tenure?.end_date || 'end unrecorded'}`
+  }
+
+  return `${item.label} | ${item.authority_type} | ${item.authority_classification || 'database authority record'}${item.description ? ` | ${item.description}` : ''}`
+}
+
+const appendSection = (lines, heading, entries) => {
+  if (entries.length === 0) {
+    return
+  }
+
+  lines.push('', `## ${heading}`, '', ...entries)
+}
+
+const retrievalDiagnosticLines = (diagnostics) => {
+  if (!diagnostics) {
+    return []
+  }
+
+  const lines = []
+  if (Number.isInteger(diagnostics.result_count)) lines.push(`- Retrieved passages: ${diagnostics.result_count}`)
+  if (Number.isFinite(diagnostics.min_score) && Number.isFinite(diagnostics.max_score)) lines.push(`- Lexical score range: ${formatScore(diagnostics.min_score)} to ${formatScore(diagnostics.max_score)}`)
+  if (diagnostics.possible_low_recall) lines.push('- Weak lexical match or no retrieved passage was detected for this query.')
+  if (diagnostics.evidence_concentration) lines.push('- Retrieved passages are concentrated in one document.')
+  if (diagnostics.retrieval_redundancy) lines.push('- Multiple retrieved passages come from the same document.')
+  if (diagnostics.provenance_incomplete) lines.push('- Some retrieved passages have incomplete provenance.')
+  if (diagnostics.requested_years?.length > 0) lines.push(`- Requested temporal scope: ${diagnostics.requested_years.join(', ')}`)
+  if (Number.isInteger(diagnostics.temporally_valid_result_count)) lines.push(`- Temporally valid retrieved passages: ${diagnostics.temporally_valid_result_count}`)
+  if (diagnostics.temporal_rejections?.length > 0) lines.push(`- Temporal filtering excluded ${diagnostics.temporal_rejections.length} retrieved passage${diagnostics.temporal_rejections.length === 1 ? '' : 's'}.`)
+  diagnostics.notes?.forEach((note) => lines.push(`- ${note}`))
+  return lines
+}
+
+export const buildEvidenceTraceMemo = ({ trace, generatedAt = new Date() }) => {
+  const generatedAtValue = trace.timestamp || generatedAt.toISOString()
+  const retrieval = trace.retrieval || {}
   const sourceLines = trace.sources.length > 0
     ? trace.sources.map((source, index) => {
-        const status = validationStatuses[source.chunkId || `source-${index}`] || 'Needs review'
-        return [
+        const lines = [
           `### Source ${index + 1}`,
-          `- Document: ${source.title || 'Not available from current endpoint.'}`,
-          `- PID: ${source.pid || 'Not available from current endpoint.'}`,
-          `- Chunk ID: ${source.chunkId || 'Not available from current endpoint.'}`,
-          `- Page/Section: ${source.page || 'N/A'}${source.section ? ` / ${source.section}` : ''}`,
-          `- Retrieval score: ${source.score ?? 'Not available'}`,
-          `- Validation status: ${status}`,
-          `- Citation: ${formatCitation(source)}`,
-          `- Excerpt: ${source.excerpt || 'No excerpt returned.'}`
-        ].join('\n')
+        ]
+        if (Number.isInteger(source.rank)) lines.push(`- Rank: ${source.rank}`)
+        if (source.title) lines.push(`- Title: ${source.title}`)
+        if (source.documentId) lines.push(`- Document ID: ${source.documentId}`)
+        if (source.pid) lines.push(`- PID: ${source.pid}`)
+        if (source.archiveRecordPid) lines.push(`- Archive record PID: ${source.archiveRecordPid}`)
+        if (source.page !== null && source.page !== undefined) lines.push(`- Page: ${source.page}${source.section ? ` / ${source.section}` : ''}`)
+        if (source.chunkId) lines.push(`- Chunk ID: ${source.chunkId}`)
+        if (source.score !== null && source.score !== undefined) lines.push(`- Retrieval score: ${source.score}`)
+        if (source.citation) lines.push(`- Citation: ${formatCitation(source)}`)
+        if (source.excerpt) lines.push(`- Excerpt: ${source.excerpt}`)
+        return lines.join('\n')
       }).join('\n\n')
-    : 'No source chunks were returned by the current endpoint.'
+    : ''
 
-  return [
-    `# Evidence Trace Memo`,
+  const lines = [
+    '# Turin retrieval memo',
     '',
-    `- Date: ${generatedAt.toISOString()}`,
-    `- Query: ${trace.query || 'Not available'}`,
-    `- Model: ${trace.model || 'Not available'}`,
-    `- Model version: ${trace.modelVersion || 'Not available'}`,
-    `- Inference ID: ${trace.inferenceId || 'Not available'}`,
-    '',
-    `## Answer`,
-    '',
-    trace.answer || 'No answer returned.',
-    '',
-    `## Sources`,
-    '',
-    sourceLines,
-    '',
-    `## Methodological note`,
-    '',
-    'This memo was generated from an evidence-tracing session and should be reviewed against the original DDR archival sources.'
-  ].join('\n')
+    `- Generated: ${generatedAtValue}`,
+    ...(trace.queryId ? [`- Run ID: ${trace.queryId}`] : []),
+    ...(trace.runStatus ? [`- Status: ${trace.runStatus}${trace.interpretativeStatus ? ` / ${trace.interpretativeStatus}` : ''}`] : []),
+    '- Scope: Current Source interrogation snapshot; not a substitute for the saved experiment-run export.'
+  ]
+
+  appendSection(lines, 'Research question', trace.prompt ? [trace.prompt] : [])
+
+  const retrievalLines = [
+    ...(trace.corpusVersion ? [`- Corpus: ${trace.corpusVersion}`] : []),
+    ...(trace.retrievalMethod ? [`- Retrieval method: ${trace.retrievalMethod}`] : []),
+    ...(retrieval.normalised_query ? [`- Normalized query: ${retrieval.normalised_query}`] : []),
+    ...(retrieval.expanded_query ? [`- Expanded query: ${retrieval.expanded_query}`] : []),
+    ...(retrieval.query_expansions?.length ? [`- Query expansions: ${retrieval.query_expansions.join(', ')}`] : [])
+  ]
+  appendSection(lines, 'Retrieval', retrievalLines)
+  appendSection(lines, 'Retrieval diagnostics', retrievalDiagnosticLines(trace.retrievalDiagnostics))
+  appendSection(lines, 'Retrieved source-document evidence', sourceLines ? [sourceLines] : [])
+  appendSection(lines, 'Archive / database authority context', (trace.authorityEvidence || []).map((item) => `- ${formatAuthorityContext(item)}`))
+
+  const generatedInterpretation = [
+    ...(trace.answer ? [`### Answer\n\n${trace.answer}`] : []),
+    ...(trace.documentaryEvidence?.length ? ['### Documentary evidence claims', ...trace.documentaryEvidence.map((item) => `- ${item.claim} [PID ${item.pid || 'unrecorded'}, page ${item.page ?? 'unrecorded'}]`)] : []),
+    ...(trace.inferences?.length ? ['### Inferences', ...trace.inferences.map((item) => `- ${item.inference}${item.confidence ? ` (${item.confidence})` : ''}`)] : []),
+    ...(trace.contradictions?.length ? ['### Contradictions', ...trace.contradictions.map((item) => `- ${item.contradiction || item}`)] : [])
+  ]
+  appendSection(lines, 'Generated interpretation', generatedInterpretation)
+
+  const limits = (trace.missingness || [])
+    .filter((item) => !validationFailureCategories.has(item.category))
+    .map((item) => [
+      `- ${systemDerivedMissingnessCategories.has(item.category) ? 'System-derived' : 'Model-generated'} | Scope: ${item.scope} | Category: ${item.category}`,
+      `  ${item.explanation}`,
+      ...(item.follow_up_action ? [`  Follow-up action: ${item.follow_up_action}`] : [])
+    ].join('\n'))
+  appendSection(lines, 'Scoped evidential limits', limits)
+
+  if (trace.inferenceProvenance) {
+    const provenanceLines = [trace.inferenceProvenance.valid ? '- Valid for supplied citations; this does not establish historical truth.' : '- Requires researcher review; provenance validation does not establish historical truth.']
+    if (trace.inferenceProvenance.issues?.length) provenanceLines.push(...trace.inferenceProvenance.issues.map((issue) => `- ${issue}`))
+    appendSection(lines, 'Provenance validation', provenanceLines)
+  }
+
+  const validationFailure = (trace.missingness || []).find((item) => validationFailureCategories.has(item.category))
+  if (validationFailure || trace.errorCode) {
+    const failureLabel = trace.errorCode === 'granite_failure'
+      ? 'Model runtime failure'
+      : 'Generated-response validation failure'
+    appendSection(lines, 'Model/output failure', [
+      `- ${failureLabel}`,
+      ...(validationFailure?.explanation ? [`- ${validationFailure.explanation}`] : []),
+      ...(trace.errorMessage ? [`- ${trace.errorMessage}`] : [])
+    ])
+  }
+
+  lines.push('', '## Methodological note', '', 'Generated interpretation is provisional and must be reviewed against the retrieved source-document evidence. Authority context is separately labelled and is not source-document evidence.')
+  return lines.join('\n')
 }
 
 export const downloadMarkdown = (filename, content) => {
@@ -78,7 +180,26 @@ export const buildVisualAnalyticsMemo = ({
   selectedCluster,
   generatedAt = new Date()
 }) => {
-  const visiblePids = [...new Set((projection?.points || []).map((point) => point.pid).filter(Boolean))]
+  const points = projection?.points || []
+  const visiblePids = [...new Set(points.map((point) => point.pid).filter(Boolean))]
+
+  if (points.length === 0) {
+    return [
+      '# Visual Analytics Capability State',
+      '',
+      `- Date: ${generatedAt.toISOString()}`,
+      `- Point type: ${filters.pointType}`,
+      `- Colour by: ${filters.colorBy}`,
+      `- Year range: ${filters.yearMin || 'Any'} to ${filters.yearMax || 'Any'}`,
+      `- Theme filter: ${filters.theme || 'Any'}`,
+      `- Source type filter: ${filters.sourceType || 'Any'}`,
+      '',
+      'No approved embedding/projection was available for the current filter state.',
+      'No coordinates were exported.',
+      'No clusters were exported.',
+      'This document records capability state and filter state only; it is not an analytical interpretation.'
+    ].join('\n')
+  }
 
   const pointSection = selectedPoint
     ? [

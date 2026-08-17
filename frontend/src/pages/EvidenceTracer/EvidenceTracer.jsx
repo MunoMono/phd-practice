@@ -9,11 +9,10 @@ import {
   Tile
 } from '@carbon/react'
 import { Copy, Download, Search, Checkmark } from '@carbon/icons-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { exportExperimentRunJson, interrogateTurin } from '../../api/experiments'
+import { exportExperimentRunJson, getExperimentRun, interrogateTurin } from '../../api/experiments'
 import EvidenceChain from '../../components/evidence/EvidenceChain'
-import EvidenceStatusControl from '../../components/evidence/EvidenceStatusControl'
 import PanelHeader from '../../components/layout/PanelHeader'
 import PageHeader from '../../components/layout/PageHeader'
 import { PageGrid, PageColumn as Column } from '../../components/layout/PageGrid'
@@ -21,7 +20,178 @@ import EvidenceGraph from '../../components/visualizations/EvidenceGraph'
 import { buildEvidenceTraceMemo, downloadMarkdown } from '../../utils/memoExport'
 import { downloadJson } from '../../utils/workbenchExport'
 
-const defaultStatus = 'Needs review'
+const systemDerivedMissingnessCategories = new Set([
+  'zero_retrieval',
+  'insufficient_temporally_valid_evidence',
+  'no_matching_authority_record',
+  'no_matching_job_numbers',
+  'no_matching_job_number',
+  'insufficient_project_temporal_authority',
+  'no_projects_with_explicit_dates_for_year',
+  'no_documentary_retrieval_for_resolved_project',
+  'no_documentary_retrieval_for_authority',
+  'no_temporally_valid_documentary_support'
+])
+
+const validationFailureCategories = new Set([
+  'parse_failure',
+  'provenance_validation_failure'
+])
+
+const formatScore = (score) => Number.isFinite(score) ? score.toFixed(3) : null
+
+const getRetrievalMemoFilename = (runId) => {
+  const safeRunId = typeof runId === 'string'
+    ? runId.replace(/[^A-Za-z0-9._-]/g, '')
+    : ''
+
+  return safeRunId
+    ? `turin-retrieval-memo-${safeRunId}.md`
+    : 'turin-retrieval-memo.md'
+}
+
+const getRetrievalTrailFilename = (runId) => {
+  const safeRunId = typeof runId === 'string'
+    ? runId.replace(/[^A-Za-z0-9._-]/g, '')
+    : ''
+
+  return `turin-retrieval-trail-${safeRunId}.json`
+}
+
+const mapRetrievedSources = (retrievedEvidence = []) => retrievedEvidence.map((source) => ({
+  chunkId: source.chunk_id,
+  documentId: source.document_id,
+  pid: source.pid,
+  archiveRecordPid: source.archive_record_pid,
+  rank: source.rank,
+  title: source.snapshot?.title || source.snapshot?.catalogue_metadata?.title || source.document_id,
+  page: source.page_start,
+  section: source.snapshot?.source_section || null,
+  excerpt: source.excerpt,
+  score: source.score,
+  citation: `${source.snapshot?.title || source.document_id} | PID: ${source.pid || 'unavailable'} | Page: ${source.page_start || 'unavailable'}`,
+  citationStatus: source.archive_resolution_status === 'resolved_current' ? 'loaded' : 'unavailable',
+  provenance: source.snapshot?.provenance || null,
+  provenanceStatus: source.archive_resolution_status === 'resolved_current' ? 'loaded' : 'unavailable'
+}))
+
+const mapAuthorityEvidence = (authorityContext = {}) => (authorityContext.contexts || []).map((item) => {
+  const fields = item.fields || {}
+  if (item.authority_type === 'ddr_projects') {
+    return {
+      authority_type: item.authority_type,
+      authority_id: item.authority_id,
+      source: item.source,
+      job_number: fields.job_number,
+      title: fields.title,
+      funder_name: fields.funder_name,
+      duration_text: fields.duration_text,
+      project_lead_name: fields.project_lead_name,
+      start_year: fields.start_year,
+      end_year: fields.end_year,
+      filter: fields.authority_filter
+    }
+  }
+  if (item.authority_type === 'agent_employment') {
+    return {
+      authority_type: item.authority_type,
+      authority_id: item.authority_id,
+      source: item.source,
+      assertion: fields.name,
+      role: fields.job_title_label,
+      tenure: { start_date: fields.start_date, end_date: fields.end_date }
+    }
+  }
+  return {
+    authority_type: item.authority_type,
+    authority_id: item.authority_id,
+    source: item.source,
+    label: fields.label,
+    code: fields.code,
+    description: fields.description,
+    epistemic_type: fields.epistemic_type,
+    authority_classification: fields.authority_classification
+  }
+})
+
+const mapPersistedRunToTrace = (run) => {
+  const sources = mapRetrievedSources(run.retrieved_evidence)
+  const response = run.structured_response || {}
+
+  return {
+    queryId: run.run_id,
+    prompt: run.prompt?.question || '',
+    researchCase: run.research_case || null,
+    corpusVersion: run.corpus_version || null,
+    retrievalMethod: run.retrieval_method || null,
+    retrieval: run.retrieval || null,
+    answer: response.answer || '',
+    response: response.answer || '',
+    model: run.model?.name || 'Granite experiment',
+    retrievedChunkIds: sources.map((source) => source.chunkId).filter(Boolean),
+    citations: sources.map((source) => source.citation).filter(Boolean),
+    pageRanges: sources.map((source) => source.page).filter(Boolean),
+    sourceMetadata: sources.map((source) => ({ chunkId: source.chunkId, documentId: source.documentId, pid: source.pid, title: source.title, page: source.page, section: source.section, score: source.score })),
+    timestamp: run.created_at || null,
+    failed_or_partial: run.status !== 'completed' || run.interpretative_status !== 'unassessed',
+    caveats: response.missingness?.map((item) => item.explanation) || [],
+    sources,
+    inferenceProvenance: run.provenance_validation || null,
+    authorityEvidence: mapAuthorityEvidence(run.authority_context),
+    documentaryEvidence: response.evidence || [],
+    inferences: response.inferences || [],
+    contradictions: response.contradictions || [],
+    missingness: response.missingness || [],
+    retrievalDiagnostics: run.retrieval_diagnostics || null,
+    followUpQueries: response.follow_up_queries || [],
+    runStatus: run.status,
+    interpretativeStatus: run.interpretative_status,
+    rawModelResponse: run.raw_model_response,
+    errorCode: run.error_code || null,
+    errorMessage: run.error_message || null,
+    persisted: true,
+    retrievedChunkCount: sources.length,
+    failureReason: run.error_message || null
+  }
+}
+
+const getRetrievalDiagnosticItems = (diagnostics) => {
+  if (!diagnostics) {
+    return []
+  }
+
+  const items = []
+  if (Number.isInteger(diagnostics.result_count)) {
+    items.push(`Retrieved passages: ${diagnostics.result_count}.`)
+  }
+  if (Number.isFinite(diagnostics.max_score) && Number.isFinite(diagnostics.min_score)) {
+    items.push(`Lexical score range: ${formatScore(diagnostics.min_score)} to ${formatScore(diagnostics.max_score)}.`)
+  }
+  if (diagnostics.possible_low_recall) {
+    items.push('Weak lexical match or no retrieved passage was detected for this query.')
+  }
+  if (diagnostics.evidence_concentration) {
+    items.push('Retrieved passages are concentrated in one document.')
+  }
+  if (diagnostics.retrieval_redundancy) {
+    items.push('Multiple retrieved passages come from the same document.')
+  }
+  if (diagnostics.provenance_incomplete) {
+    items.push('Some retrieved passages have incomplete provenance.')
+  }
+  if (diagnostics.requested_years?.length > 0) {
+    items.push(`Requested temporal scope: ${diagnostics.requested_years.join(', ')}.`)
+  }
+  if (Number.isInteger(diagnostics.temporally_valid_result_count)) {
+    items.push(`Temporally valid retrieved passages: ${diagnostics.temporally_valid_result_count}.`)
+  }
+  if (diagnostics.temporal_rejections?.length > 0) {
+    items.push(`Temporal filtering excluded ${diagnostics.temporal_rejections.length} retrieved passage${diagnostics.temporal_rejections.length === 1 ? '' : 's'}.`)
+  }
+  diagnostics.notes?.forEach((note) => items.push(note))
+
+  return items
+}
 
 const EvidenceTracer = () => {
   const navigate = useNavigate()
@@ -32,7 +202,14 @@ const EvidenceTracer = () => {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [persistenceError, setPersistenceError] = useState('')
-  const [validationStatuses, setValidationStatuses] = useState({ overall: defaultStatus })
+  const [memoCopyError, setMemoCopyError] = useState('')
+  const [memoCopied, setMemoCopied] = useState(false)
+  const [citationCopyFeedback, setCitationCopyFeedback] = useState(null)
+  const [memoDownloadError, setMemoDownloadError] = useState('')
+  const [retrievalTrailExportError, setRetrievalTrailExportError] = useState('')
+  const [savedRunLoadError, setSavedRunLoadError] = useState('')
+  const currentRunIdRef = useRef(null)
+  const rehydrationRequestRef = useRef(null)
 
   useEffect(() => {
     const seededQuery = searchParams.get('query') || searchParams.get('pid') || searchParams.get('chunkId') || ''
@@ -40,6 +217,47 @@ const EvidenceTracer = () => {
       setQuery(seededQuery)
     }
   }, [query, searchParams])
+
+  useEffect(() => {
+    const runId = searchParams.get('runId')
+    if (!runId || (currentRunIdRef.current === runId && traceData?.queryId === runId)) {
+      return undefined
+    }
+
+    if (!/^experiment-[A-Za-z0-9._-]+$/.test(runId)) {
+      setSavedRunLoadError('The requested saved interrogation identifier is invalid.')
+      return undefined
+    }
+
+    let cancelled = false
+    let rehydrationRequest = rehydrationRequestRef.current
+    if (!rehydrationRequest || rehydrationRequest.runId !== runId) {
+      currentRunIdRef.current = runId
+      rehydrationRequest = { runId, promise: getExperimentRun(runId) }
+      rehydrationRequestRef.current = rehydrationRequest
+    }
+    setSavedRunLoadError('')
+    setLoading(true)
+    rehydrationRequest.promise
+      .then((run) => {
+        if (cancelled) return
+        const restoredTrace = mapPersistedRunToTrace(run)
+        currentRunIdRef.current = runId
+        setTraceData(restoredTrace)
+        setQuery(restoredTrace.prompt)
+      })
+      .catch((loadError) => {
+        if (cancelled) return
+        currentRunIdRef.current = null
+        if (rehydrationRequestRef.current === rehydrationRequest) {
+          rehydrationRequestRef.current = null
+        }
+        setSavedRunLoadError(loadError.message || 'The requested saved interrogation could not be loaded.')
+      })
+      .finally(() => !cancelled && setLoading(false))
+
+    return () => { cancelled = true }
+  }, [searchParams, traceData?.queryId])
 
   const handleTrace = async () => {
     if (!query.trim() || loading || mode !== 'granite') {
@@ -49,27 +267,23 @@ const EvidenceTracer = () => {
     setLoading(true)
     setError('')
     setPersistenceError('')
+    setMemoCopyError('')
+    setMemoCopied(false)
+    setMemoDownloadError('')
+    setRetrievalTrailExportError('')
+    setSavedRunLoadError('')
 
     try {
       const analysis = await interrogateTurin(query, { top_k: 5 })
-      const enrichedSources = (analysis.retrieved_evidence || []).map((source) => ({
-        chunkId: source.chunk_id,
-        documentId: source.document_id,
-        pid: source.pid,
-        title: source.snapshot?.title || source.snapshot?.catalogue_metadata?.title || source.document_id,
-        page: source.page_start,
-        section: source.snapshot?.source_section || null,
-        excerpt: source.excerpt,
-        score: source.score,
-        citation: `${source.snapshot?.title || source.document_id} | PID: ${source.pid || 'unavailable'} | Page: ${source.page_start || 'unavailable'}`,
-        citationStatus: source.archive_resolution_status === 'resolved_current' ? 'loaded' : 'unavailable',
-        provenance: source.snapshot?.provenance || null,
-        provenanceStatus: source.archive_resolution_status === 'resolved_current' ? 'loaded' : 'unavailable'
-      }))
+      const enrichedSources = mapRetrievedSources(analysis.retrieved_evidence)
 
       const nextTrace = {
         queryId: analysis.run_id,
         prompt: query,
+        researchCase: analysis.research_case || null,
+        corpusVersion: analysis.corpus_version || null,
+        retrievalMethod: analysis.retrieval_method || null,
+        retrieval: analysis.retrieval || null,
         answer: analysis.answer || '',
         response: analysis.answer || '',
         model: analysis.model?.name || 'Granite experiment',
@@ -95,10 +309,13 @@ const EvidenceTracer = () => {
         inferences: analysis.inferences || [],
         contradictions: analysis.contradictions || [],
         missingness: analysis.missingness || [],
+        retrievalDiagnostics: analysis.retrieval_diagnostics || null,
         followUpQueries: analysis.follow_up_queries || [],
         runStatus: analysis.status,
         interpretativeStatus: analysis.interpretative_status,
-        rawModelResponse: analysis.raw_model_response
+        rawModelResponse: analysis.raw_model_response,
+        errorCode: analysis.error_code || null,
+        errorMessage: analysis.error_message || null
       }
 
       setTraceData({
@@ -108,10 +325,12 @@ const EvidenceTracer = () => {
         failureReason: analysis.error_message || null
       })
 
-      setValidationStatuses({
-        overall: defaultStatus,
-        ...Object.fromEntries(enrichedSources.map((source, index) => [source.chunkId || `source-${index}`, defaultStatus]))
-      })
+      if (analysis.run_id) {
+        currentRunIdRef.current = analysis.run_id
+        const params = new URLSearchParams(searchParams)
+        params.set('runId', analysis.run_id)
+        navigate(`/source-interrogation?${params.toString()}`, { replace: true })
+      }
     } catch (traceError) {
       const failedTrace = {
         query,
@@ -136,7 +355,6 @@ const EvidenceTracer = () => {
 
       setError(traceError.message || 'Evidence trace failed.')
       setTraceData(failedTrace)
-      setValidationStatuses({ overall: defaultStatus })
     } finally {
       setLoading(false)
     }
@@ -158,13 +376,6 @@ const EvidenceTracer = () => {
 
     return { label: 'Retrieval only', type: 'gray' }
   }, [traceData])
-
-  const updateValidationStatus = (key, value) => {
-    setValidationStatuses((current) => ({
-      ...current,
-      [key]: value
-    }))
-  }
 
   const handleToggleProvenance = (source) => {
     setTraceData((current) => {
@@ -192,8 +403,15 @@ const EvidenceTracer = () => {
         ? [source.citation.title, source.citation.pid ? `PID: ${source.citation.pid}` : null, source.citation.page ? `Page: ${source.citation.page}` : null, source.citation.publicUrl || null].filter(Boolean).join(' | ')
         : 'Not available from current endpoint.'
 
-    if (navigator?.clipboard?.writeText) {
+    setCitationCopyFeedback(null)
+    try {
+      if (!navigator?.clipboard?.writeText) {
+        throw new Error('Clipboard access is unavailable.')
+      }
       await navigator.clipboard.writeText(citationText)
+      setCitationCopyFeedback({ kind: 'success', title: 'Citation copied', subtitle: 'The current retrieval result remains unchanged.' })
+    } catch (copyError) {
+      setCitationCopyFeedback({ kind: 'error', title: 'Citation could not be copied', subtitle: copyError.message || 'The current retrieval result remains unchanged.' })
     }
   }
 
@@ -202,20 +420,32 @@ const EvidenceTracer = () => {
       return
     }
 
-    const memo = buildEvidenceTraceMemo({ trace: traceData, validationStatuses })
-    if (navigator?.clipboard?.writeText) {
+    setMemoCopyError('')
+    setMemoCopied(false)
+    try {
+      if (!navigator?.clipboard?.writeText) {
+        throw new Error('Clipboard API is unavailable.')
+      }
+      const memo = buildEvidenceTraceMemo({ trace: traceData })
       await navigator.clipboard.writeText(memo)
+      setMemoCopied(true)
+    } catch (copyError) {
+      setMemoCopyError(copyError.message || 'Retrieval memo could not be copied to the clipboard.')
     }
   }
 
   const handleDownloadMemo = () => {
-    if (!traceData) {
+    if (!canUseRetrievalMemo) {
       return
     }
 
-    const memo = buildEvidenceTraceMemo({ trace: traceData, validationStatuses })
-    const slug = (traceData.query || 'evidence-trace').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'evidence-trace'
-    downloadMarkdown(`${slug}.md`, memo)
+    setMemoDownloadError('')
+    try {
+      const memo = buildEvidenceTraceMemo({ trace: traceData })
+      downloadMarkdown(getRetrievalMemoFilename(traceData.queryId), memo)
+    } catch (downloadError) {
+      setMemoDownloadError(downloadError.message || 'Retrieval memo could not be downloaded.')
+    }
   }
 
   const goToCorpus = (source) => {
@@ -233,33 +463,17 @@ const EvidenceTracer = () => {
   }
 
   const exportRetrievalTrail = async () => {
-    if (!traceData) {
+    if (!canExportRetrievalTrail) {
       return
     }
 
-    if (traceData.persisted && traceData.queryId) {
-      try {
-        const payload = await exportExperimentRunJson(traceData.queryId)
-        downloadJson(`${traceData.queryId}.json`, payload)
-        return
-      } catch (exportError) {
-        setPersistenceError(exportError.message || 'Failed to export the persisted retrieval trail.')
-      }
+    setRetrievalTrailExportError('')
+    try {
+      const payload = await exportExperimentRunJson(traceData.queryId)
+      downloadJson(getRetrievalTrailFilename(traceData.queryId), payload)
+    } catch (exportError) {
+      setRetrievalTrailExportError(exportError.message || 'Retrieval trail could not be exported.')
     }
-
-    downloadJson('ask-retrieval-trail.json', {
-      query_id: traceData.queryId,
-      prompt: traceData.prompt,
-      response: traceData.response,
-      model: traceData.model,
-      retrieved_chunk_ids: traceData.retrievedChunkIds,
-      citations: traceData.citations,
-      page_ranges: traceData.pageRanges,
-      source_metadata: traceData.sourceMetadata,
-      timestamp: traceData.timestamp,
-      failed_or_partial: traceData.failed_or_partial,
-      caveats: traceData.caveats
-    })
   }
 
   const showNoSourcesReturned = Boolean(
@@ -267,6 +481,13 @@ const EvidenceTracer = () => {
     !loading &&
     (traceData.retrievedChunkCount ?? traceData.sources?.length ?? 0) === 0
   )
+
+  const validationFailure = traceData?.missingness?.find((item) => validationFailureCategories.has(item.category))
+  const isModelRuntimeFailure = traceData?.errorCode === 'granite_failure'
+  const scopedLimits = traceData?.missingness?.filter((item) => !validationFailureCategories.has(item.category)) || []
+  const retrievalDiagnosticItems = getRetrievalDiagnosticItems(traceData?.retrievalDiagnostics)
+  const canUseRetrievalMemo = Boolean(traceData && !error)
+  const canExportRetrievalTrail = Boolean(traceData?.persisted && traceData.queryId)
 
   return (
     <PageGrid className="evidence-tracer">
@@ -346,13 +567,60 @@ const EvidenceTracer = () => {
         </Column>
       )}
 
-      {traceData?.failed_or_partial && (
+      {savedRunLoadError && (
+        <Column>
+          <InlineNotification lowContrast kind="error" title="Saved interrogation could not be loaded" subtitle={savedRunLoadError} />
+        </Column>
+      )}
+
+      {retrievalTrailExportError && (
+        <Column>
+          <InlineNotification lowContrast kind="error" title="Retrieval trail could not be exported" subtitle="The current interrogation result remains unchanged." />
+        </Column>
+      )}
+
+      {memoCopied && (
+        <Column>
+          <InlineNotification lowContrast kind="success" title="Retrieval memo copied" subtitle="The current result remains unchanged." />
+        </Column>
+      )}
+
+      {memoCopyError && (
+        <Column>
+          <InlineNotification lowContrast kind="error" title="Retrieval memo could not be copied to the clipboard" subtitle="The current result remains unchanged." />
+        </Column>
+      )}
+
+      {citationCopyFeedback && (
+        <Column>
+          <InlineNotification lowContrast kind={citationCopyFeedback.kind} title={citationCopyFeedback.title} subtitle={citationCopyFeedback.subtitle} />
+        </Column>
+      )}
+
+      {memoDownloadError && (
+        <Column>
+          <InlineNotification lowContrast kind="error" title="Retrieval memo could not be downloaded" subtitle="The current result remains unchanged." />
+        </Column>
+      )}
+
+      {validationFailure && (
         <Column>
           <InlineNotification
             lowContrast
             kind="warning"
-            title="Retrieval / provenance issue"
-            subtitle={(traceData.caveats || []).join(' ') || 'The current interrogation completed with partial provenance or incomplete source coverage.'}
+            title="Generated-response validation failure"
+            subtitle={`Documentary evidence may have been retrieved, but the generated response could not be validated. ${validationFailure.explanation}`}
+          />
+        </Column>
+      )}
+
+      {isModelRuntimeFailure && (
+        <Column>
+          <InlineNotification
+            lowContrast
+            kind="warning"
+            title="Model runtime failure"
+            subtitle="The generated response could not be completed. Any retrieved evidence remains available below; this does not indicate corpus or historical absence."
           />
         </Column>
       )}
@@ -398,17 +666,27 @@ const EvidenceTracer = () => {
                   ? traceData.documentaryEvidence.map((item) => <p key={item.chunk_id}>{item.claim} [PID {item.pid}, page {item.page ?? 'unavailable'}]</p>)
                   : <p>No documentary claim is asserted beyond the retrieved source stack.</p>}
               </section>
+              <section aria-label="Retrieval diagnostics">
+                <h4>Retrieval diagnostics</h4>
+                {retrievalDiagnosticItems.length > 0
+                  ? retrievalDiagnosticItems.map((item, index) => <p key={`diagnostic-${index}`}>{item}</p>)
+                  : <p>Retrieval diagnostics were not calculated for this run.</p>}
+              </section>
               <section aria-label="Generated inference">
                 <h4>Generated inference</h4>
                 {traceData.inferences?.length > 0
                   ? traceData.inferences.map((item, index) => <p key={`${item.inference}-${index}`}>{item.inference} ({item.confidence})</p>)
                   : <p>No generated inference is asserted.</p>}
               </section>
-              <section aria-label="Scoped missingness">
-                <h4>Scoped missingness</h4>
-                {traceData.missingness?.length > 0
-                  ? traceData.missingness.map((item, index) => <p key={`${item.category}-${index}`}>{item.explanation}</p>)
-                  : <p>No scoped missingness was recorded.</p>}
+              <section aria-label="Scoped evidential limits">
+                <h4>Scoped evidential limits</h4>
+                {scopedLimits.length > 0
+                  ? scopedLimits.map((item, index) => (
+                    <p key={`${item.category}-${index}`}>
+                      <strong>{systemDerivedMissingnessCategories.has(item.category) ? 'System-derived' : 'Model-generated'}:</strong> {item.explanation}
+                    </p>
+                  ))
+                  : <p>No scoped evidential limits were recorded.</p>}
               </section>
               <section aria-label="Provenance validation">
                 <h4>Provenance validation</h4>
@@ -419,15 +697,9 @@ const EvidenceTracer = () => {
 
           {traceData && (
             <div className="tracer__answer-controls">
-              <EvidenceStatusControl
-                id="overall-evidence-status"
-                label="Overall claim status"
-                value={validationStatuses.overall || defaultStatus}
-                onChange={(value) => updateValidationStatus('overall', value)}
-              />
-              <Button kind="ghost" size="sm" renderIcon={Copy} onClick={handleCopyMemo}>Copy retrieval memo</Button>
-              <Button kind="ghost" size="sm" renderIcon={Download} onClick={handleDownloadMemo}>Download retrieval memo</Button>
-              <Button kind="ghost" size="sm" renderIcon={Download} onClick={exportRetrievalTrail}>Export retrieval trail</Button>
+              {canUseRetrievalMemo && <Button kind="ghost" size="sm" renderIcon={Copy} onClick={handleCopyMemo}>Copy retrieval memo</Button>}
+              {canUseRetrievalMemo && <Button kind="ghost" size="sm" renderIcon={Download} onClick={handleDownloadMemo}>Download retrieval memo</Button>}
+              {canExportRetrievalTrail && <Button kind="ghost" size="sm" renderIcon={Download} onClick={exportRetrievalTrail}>Export retrieval trail</Button>}
             </div>
           )}
         </Tile>
@@ -442,8 +714,6 @@ const EvidenceTracer = () => {
           <EvidenceChain
             sources={traceData?.sources || []}
             showEmptyState={showNoSourcesReturned}
-            validationStatuses={validationStatuses}
-            onValidationChange={(source, value) => updateValidationStatus(source.chunkId || source.documentId || source.pid, value)}
             onCopyCitation={handleCopyCitation}
             onOpenCorpus={goToCorpus}
             onShowAnalytics={goToAnalytics}

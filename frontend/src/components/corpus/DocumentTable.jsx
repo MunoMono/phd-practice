@@ -70,7 +70,7 @@ const DocumentTable = ({ documents, loading, selectedDocumentId, onSelect }) => 
             <TableContainer
               className="corpus-document-table"
               title="Corpus documents"
-              description="Select a document to inspect available annotation, PID, and similarity metadata."
+              description="Select a document to inspect available annotation, PID, and archive-record metadata."
             >
             <Table {...getTableProps()}>
               <TableHead>

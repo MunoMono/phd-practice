@@ -1,7 +1,8 @@
 import * as d3 from 'd3'
 import { Checkmark, InProgress, WarningAlt } from '@carbon/icons-react'
-import { createElement } from 'react'
+import { createElement, useEffect, useRef } from 'react'
 import { carbonColors } from '../../utils/carbonD3Theme'
+import { createVisualizationTooltip, hideVisualizationTooltip, removeVisualizationTooltip, showVisualizationTooltip } from '../../utils/d3Tooltip'
 
 const numberFormat = new Intl.NumberFormat('en-GB')
 
@@ -15,7 +16,36 @@ const ChartPanel = ({ title, subtitle, children }) => (
   </section>
 )
 
+const AnalyticalState = ({ children }) => <p className="dashboard__analytical-state">{children}</p>
+
+const useAnalyticalTooltip = (className) => {
+  const tooltipRef = useRef(null)
+
+  useEffect(() => {
+    const tooltip = createVisualizationTooltip(className)
+    tooltipRef.current = tooltip
+
+    return () => {
+      removeVisualizationTooltip(tooltip)
+      tooltipRef.current = null
+    }
+  }, [className])
+
+  return tooltipRef
+}
+
 const CorpusComposition = ({ composition }) => {
+  const tooltipRef = useAnalyticalTooltip('dashboard-composition-tooltip')
+  const hasData = composition && Number(composition.current_assets) > 0
+
+  if (!hasData) {
+    return (
+      <ChartPanel title="Corpus composition" subtitle="Current archive assets, classified by controlled ingestion status.">
+        <AnalyticalState>No corpus-composition data are available for the current analytical surface.</AnalyticalState>
+      </ChartPanel>
+    )
+  }
+
   const segments = [
     { label: 'Controlled-ingestible sources', value: composition.controlled_ingestible_sources, color: carbonColors.primary.teal, swatch: 'controlled' },
     { label: 'Source-format anomalies', value: composition.source_format_anomalies, color: carbonColors.status.warning, swatch: 'anomaly' },
@@ -29,7 +59,18 @@ const CorpusComposition = ({ composition }) => {
       <div className="dashboard__composition">
         <svg viewBox="0 0 200 200" role="img" aria-label={`${composition.current_assets} current archive assets`}>
           <g transform="translate(100 100)">
-            {pie.map((segment) => <path key={segment.data.label} d={arc(segment)} fill={segment.data.color}><title>{`${segment.data.label}: ${segment.data.value}`}</title></path>)}
+            {pie.map((segment) => (
+              <path
+                key={segment.data.label}
+                data-testid={`composition-segment-${segment.data.swatch}`}
+                d={arc(segment)}
+                fill={segment.data.color}
+                onMouseEnter={(event) => showVisualizationTooltip(tooltipRef.current, `<strong>${segment.data.label}</strong><br/>Assets: ${segment.data.value}`, event.nativeEvent)}
+                onMouseLeave={() => hideVisualizationTooltip(tooltipRef.current)}
+              >
+                <title>{`${segment.data.label}: ${segment.data.value} assets`}</title>
+              </path>
+            ))}
             <text textAnchor="middle" dy="-3" className="dashboard__donut-value">{composition.current_assets}</text>
             <text textAnchor="middle" dy="17" className="dashboard__donut-label">current assets</text>
           </g>
@@ -43,6 +84,16 @@ const CorpusComposition = ({ composition }) => {
 }
 
 const EvidenceDensity = ({ density, currentChunks }) => {
+  const tooltipRef = useAnalyticalTooltip('dashboard-density-tooltip')
+
+  if (!Array.isArray(density) || density.length === 0) {
+    return (
+      <ChartPanel title="Evidence density" subtitle="Highest current searchable chunk counts by source document.">
+        <AnalyticalState>No evidence-density data are available for the current analytical surface.</AnalyticalState>
+      </ChartPanel>
+    )
+  }
+
   const highestCount = Math.max(...density.map((document) => document.chunk_count), 1)
 
   return (
@@ -50,7 +101,13 @@ const EvidenceDensity = ({ density, currentChunks }) => {
       <div className="dashboard__density-total"><strong>{numberFormat.format(currentChunks)}</strong><span>current chunks across 95 controlled-ingestible sources</span></div>
       <div className="dashboard__density-list">
         {density.slice(0, 10).map((document) => (
-          <div className="dashboard__density-row" key={document.document_id} title={document.title}>
+          <div
+            className="dashboard__density-row"
+            key={document.document_id}
+            data-testid="evidence-density-row"
+            onMouseEnter={(event) => showVisualizationTooltip(tooltipRef.current, `<strong>${document.title}</strong><br/>Current frozen-corpus chunks: ${numberFormat.format(document.chunk_count)}`, event.nativeEvent)}
+            onMouseLeave={() => hideVisualizationTooltip(tooltipRef.current)}
+          >
             <span className="dashboard__density-label">{document.title}</span>
             <progress className="dashboard__density-track" value={document.chunk_count} max={highestCount}>{document.chunk_count}</progress>
             <strong>{numberFormat.format(document.chunk_count)}</strong>
@@ -62,7 +119,17 @@ const EvidenceDensity = ({ density, currentChunks }) => {
 }
 
 const CorpusAcrossTime = ({ temporal }) => {
-  const bins = temporal.bins
+  const tooltipRef = useAnalyticalTooltip('dashboard-timeline-tooltip')
+  const bins = temporal?.bins || []
+
+  if (bins.length === 0) {
+    return (
+      <ChartPanel title="Corpus across time" subtitle="Frozen current sources with an explicit publication year; no dates are inferred.">
+        <AnalyticalState>No temporal distribution data are available for the current analytical surface.</AnalyticalState>
+      </ChartPanel>
+    )
+  }
+
   const maxCount = Math.max(...bins.map((bin) => bin.document_count), 1)
   const width = 460
   const height = 190
@@ -79,7 +146,21 @@ const CorpusAcrossTime = ({ temporal }) => {
         {bins.map((bin) => {
           const x = scaleX(bin.year)
           const y = scaleY(bin.document_count)
-          return <rect key={bin.year} x={x} y={y} width={scaleX.bandwidth()} height={height - padding.bottom - y} className="dashboard__timeline-bar"><title>{`${bin.year}: ${bin.document_count} documents`}</title></rect>
+          return (
+            <rect
+              key={bin.year}
+              data-testid={`timeline-bar-${bin.year}`}
+              x={x}
+              y={y}
+              width={scaleX.bandwidth()}
+              height={height - padding.bottom - y}
+              className="dashboard__timeline-bar"
+              onMouseEnter={(event) => showVisualizationTooltip(tooltipRef.current, `<strong>${bin.year}</strong><br/>Current sources: ${bin.document_count}`, event.nativeEvent)}
+              onMouseLeave={() => hideVisualizationTooltip(tooltipRef.current)}
+            >
+              <title>{`${bin.year}: ${bin.document_count} current sources`}</title>
+            </rect>
+          )
         })}
         {tickYears.map((bin) => <text key={bin.year} x={(scaleX(bin.year) || 0) + scaleX.bandwidth() / 2} y={height - 10} textAnchor="middle" className="dashboard__timeline-label">{bin.year}</text>)}
       </svg>
@@ -87,7 +168,15 @@ const CorpusAcrossTime = ({ temporal }) => {
   )
 }
 
-const ResearchEvidenceState = ({ runs, claims }) => {
+const ResearchEvidenceState = ({ runs, claims, claimsAvailable }) => {
+  if (!runs || !claimsAvailable) {
+    return (
+      <ChartPanel title="Research evidence state" subtitle="Immutable run outcomes and human-authored claim positions are shown separately.">
+        <AnalyticalState>Research evidence-state data are unavailable for the current analytical surface.</AnalyticalState>
+      </ChartPanel>
+    )
+  }
+
   const claimStates = ['supported', 'partially_supported', 'unresolved'].map((state) => ({
     state,
     count: claims.filter((claim) => claim.support_level === state).length,
@@ -112,15 +201,23 @@ const ResearchEvidenceState = ({ runs, claims }) => {
   )
 }
 
-const DashboardAnalyticalSurface = ({ data, claims }) => {
-  if (!data) return null
+const DashboardAnalyticalSurface = ({ data, claims, claimsAvailable, status }) => {
+  if (status === 'loading') {
+    return <AnalyticalState>Loading analytical surface.</AnalyticalState>
+  }
+
+  if (status === 'unavailable' || !data) {
+    return <AnalyticalState>Analytical surface unavailable. Current corpus-status metrics remain available, but analytical summaries could not be loaded.</AnalyticalState>
+  }
+
+  const composition = data.composition || null
 
   return (
     <div className="dashboard__analytical-grid">
-      <CorpusComposition composition={data.composition} />
-      <EvidenceDensity density={data.density} currentChunks={data.composition.current_chunks} />
+      <CorpusComposition composition={composition} />
+      <EvidenceDensity density={data.density} currentChunks={composition?.current_chunks ?? 0} />
       <CorpusAcrossTime temporal={data.temporal} />
-      <ResearchEvidenceState runs={data.runs} claims={claims} />
+      <ResearchEvidenceState runs={data.runs} claims={claims || []} claimsAvailable={claimsAvailable} />
     </div>
   )
 }
