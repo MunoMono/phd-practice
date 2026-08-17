@@ -199,12 +199,12 @@ ol {
   max-width: 20rem;
   padding: $spacing-04;
   border: 1px solid var(--cds-border-subtle);
-  background-color: var(--cds-layer-inverse);
-  color: var(--cds-text-inverse);
+  background-color: $background-inverse;
+  color: $text-inverse;
   pointer-events: none;
   @include type-style('body-compact-01');
 
   strong {
-    color: var(--cds-text-inverse);
+    color: $text-inverse;
   }
 }

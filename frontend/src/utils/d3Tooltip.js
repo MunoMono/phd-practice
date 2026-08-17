@@ -4,16 +4,15 @@ export const createVisualizationTooltip = (className = '') => {
   const tooltip = d3.select('body')
     .append('div')
     .attr('class', ['viz-tooltip', className].filter(Boolean).join(' '))
-    .style('opacity', 0)
+    .style('visibility', 'hidden')
 
   return tooltip
 }
 
 export const showVisualizationTooltip = (tooltip, html, event, offset = { x: 10, y: -10 }) => {
   tooltip
-    .transition()
-    .duration(200)
-    .style('opacity', 1)
+    .interrupt()
+    .style('visibility', 'visible')
 
   tooltip
     .html(html)
@@ -29,9 +28,8 @@ export const moveVisualizationTooltip = (tooltip, event, offset = { x: 10, y: -1
 
 export const hideVisualizationTooltip = (tooltip) => {
   tooltip
-    .transition()
-    .duration(200)
-    .style('opacity', 0)
+    .interrupt()
+    .style('visibility', 'hidden')
 }
 
 export const removeVisualizationTooltip = (tooltip) => {
