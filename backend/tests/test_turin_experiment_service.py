@@ -101,6 +101,13 @@ class TurinExperimentContextTests(unittest.TestCase):
         self.assertIn("do not claim historical absence", prompt)
         self.assertIn("SOURCE DOCUMENT EVIDENCE", prompt)
 
+    def test_known_relationship_prompt_requires_one_complete_evidence_object(self):
+        context = self.builder.assemble(FIXTURE_CHUNKS, context_budget=3000)
+        _, prompt = render_prompt("known_relationship", "What relationship is supported?", context)
+        self.assertIn("The evidence array must contain exactly one complete object.", prompt)
+        self.assertIn("Do not split evidence fields across multiple objects.", prompt)
+        self.assertIn("claim, pid, page, chunk_id, and quotation_or_paraphrase", prompt)
+
 
 class TurinExperimentParsingAndProvenanceTests(unittest.TestCase):
     def setUp(self):

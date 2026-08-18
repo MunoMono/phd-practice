@@ -52,7 +52,7 @@ Use empty arrays where the supplied context does not support a category."""
 
 CONCISE_RESPONSE_REQUIREMENT = """The local runtime is bounded. Keep the answer under 180 characters; use at most one concise item in each array; keep every string under 180 characters; use empty arrays rather than elaborating unsupported categories."""
 
-KNOWN_RELATIONSHIP_COMMISSIONING_REQUIREMENT = """For this known-relationship commissioning response, return exactly one evidence item with a quotation_or_paraphrase under 100 characters. Keep answer under 120 characters. Return empty arrays for inferences, contradictions, missingness, follow_up_queries, and authority_assertions unless a non-empty item is strictly required by the supplied source."""
+KNOWN_RELATIONSHIP_COMMISSIONING_REQUIREMENT = """For this known-relationship commissioning response, return exactly one evidence item with a quotation_or_paraphrase under 100 characters. The evidence array must contain exactly one complete object. Do not split evidence fields across multiple objects. The claim, pid, page, chunk_id, and quotation_or_paraphrase fields must all belong to that same evidence object. Never output partial evidence objects. Return only the JSON object with no additional text. Keep answer under 120 characters. Return empty arrays for inferences, contradictions, missingness, follow_up_queries, and authority_assertions unless a non-empty item is strictly required by the supplied source."""
 
 
 class EvidenceItem(BaseModel):
