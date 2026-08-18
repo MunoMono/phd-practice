@@ -13,6 +13,7 @@ from app.services.experiment_run_service import (
     ResearchInterrogationRequest,
     ResearcherAssessmentInput,
     apply_temporal_guardrail,
+    render_run_report,
     serialize_run,
 )
 from app.services.retrieval_validation_service import RetrievalValidationRequest
@@ -194,6 +195,74 @@ class ExperimentRunServiceTests(unittest.TestCase):
         self.assertEqual(len(contexts), 1)
         self.assertEqual(contexts[0].authority_type, "agent_employment")
         self.assertEqual(contexts[0].fields["requested_year"], 1980)
+
+    def test_named_staff_authority_context_is_separate_from_documentary_retrieval(self):
+        class StaffAuthorityDatabase(FakeDatabase):
+            def execute(self, *_):
+                return AuthorityRows([{
+                    "authority_id": "KENNETHBAY",
+                    "label": "Kenneth Baynes",
+                    "metadata": {
+                        "job_title_label": "Research Fellow / later Tutor DEU / later Head of Department DEU",
+                        "start_date": "1976-01-01",
+                        "end_date": "1985-12-31",
+                        "is_primary": True,
+                    },
+                }])
+
+        class CapturingRetrieval(FixtureRetrieval):
+            def __init__(self):
+                self.calls = 0
+
+            def retrieve(self, database, request):
+                self.calls += 1
+                return super().retrieve(database, request)
+
+        retrieval = CapturingRetrieval()
+        run = asyncio.run(
+            ExperimentRunService(retrieval_service=retrieval, granite_service=FakeGranite()).run_research_interrogation(
+                StaffAuthorityDatabase(),
+                ResearchInterrogationRequest(research_question="How did Ken Baynes appear across DDR records?"),
+            )
+        )
+
+        self.assertEqual(retrieval.calls, 1)
+        self.assertEqual(run.retrieval_method, "postgresql_fts")
+        self.assertEqual(run.authority_context_json["contexts"][0]["authority_id"], "KENNETHBAY")
+        self.assertEqual(run.authority_context_json["contexts"][0]["fields"]["name"], "Kenneth Baynes")
+        self.assertEqual(run.authority_context_json["contexts"][0]["fields"]["job_title_label"], "Research Fellow / later Tutor DEU / later Head of Department DEU")
+        self.assertEqual(run.structured_response_json["evidence"][0]["chunk_id"], "fixture-chunk-1")
+        self.assertIn("KENNETHBAY", render_run_report(run))
+
+    def test_unknown_person_keeps_documentary_retrieval_unchanged(self):
+        class StaffAuthorityDatabase(FakeDatabase):
+            def execute(self, *_):
+                return AuthorityRows([{
+                    "authority_id": "KENNETHBAY",
+                    "label": "Kenneth Baynes",
+                    "metadata": {"job_title_label": "Research Fellow"},
+                }])
+
+        class CapturingRetrieval(FixtureRetrieval):
+            def __init__(self):
+                self.calls = 0
+
+            def retrieve(self, database, request):
+                self.calls += 1
+                return super().retrieve(database, request)
+
+        retrieval = CapturingRetrieval()
+        run = asyncio.run(
+            ExperimentRunService(retrieval_service=retrieval, granite_service=FakeGranite()).run_research_interrogation(
+                StaffAuthorityDatabase(),
+                ResearchInterrogationRequest(research_question="How did Unknown Person appear across DDR records?"),
+            )
+        )
+
+        self.assertEqual(retrieval.calls, 1)
+        self.assertEqual(run.retrieval_method, "postgresql_fts")
+        self.assertEqual(run.authority_context_json["contexts"], [])
+        self.assertEqual(run.structured_response_json["evidence"][0]["chunk_id"], "fixture-chunk-1")
 
     def test_project_job_range_is_authority_only_and_never_fabricates_numbers(self):
         class CountingGranite(FakeGranite):

@@ -253,6 +253,9 @@ def render_run_report(run: ExperimentRun) -> str:
         "## Research question",
         payload["prompt"]["question"],
         "",
+        "## Authority context",
+        json.dumps(payload["authority_context"], indent=2),
+        "",
         "## Retrieval and source evidence",
     ]
     for item in payload.get("retrieved_evidence", []):
@@ -284,6 +287,14 @@ class ExperimentRunService:
             if lead_names and re.search(r"\b(?:lead(?:ing)?|projects? did)\b", question, re.IGNORECASE):
                 resolution.contexts.extend(self.resolve_named_staff_context(db, lead_names, years))
             return resolution
+
+        named_staff_context = self.resolve_named_staff_query_context(db, question, years)
+        if named_staff_context:
+            return AuthorityResolution(
+                contexts=named_staff_context,
+                intent="staff_employment",
+                requires_documentary_retrieval=True,
+            )
 
         if not re.search(r"\b(who\s+worked|staff|worked\s+at|employment|head of department)\b", question, re.IGNORECASE):
             contexts = self.authority_registry.resolve(db, question)
@@ -328,6 +339,51 @@ class ExperimentRunService:
             )
             for row in rows
         ], intent="staff_employment", requires_documentary_retrieval=True)
+
+    def resolve_named_staff_query_context(self, db: Any, question: str, years: list[int]) -> list[AuthorityContext]:
+        if not hasattr(db, "execute"):
+            return []
+        requested_year = years[0] if len(years) == 1 else None
+        rows = db.execute(
+            text("SELECT authority_id, label, metadata FROM database_authorities WHERE authority_type = 'agent_employment' ORDER BY label")
+        ).mappings().all()
+        contexts = []
+        for row in rows:
+            metadata = dict(row["metadata"] or {})
+            if not self._matches_staff_name(question, str(row["label"] or "")):
+                continue
+            start, end = metadata.get("start_date"), metadata.get("end_date")
+            if requested_year and start and end and not (str(start)[:4] <= str(requested_year) <= str(end)[:4]):
+                continue
+            contexts.append(
+                AuthorityContext(
+                    source="database_authorities.agent_employment",
+                    authority_type="agent_employment",
+                    authority_id=str(row["authority_id"]),
+                    role="structural_context",
+                    fields={
+                        "name": row["label"],
+                        "staff_code": str(row["authority_id"]),
+                        **metadata,
+                        "requested_year": requested_year,
+                        "authority_join": "recognised staff-name match",
+                    },
+                )
+            )
+        return contexts
+
+    @staticmethod
+    def _matches_staff_name(question: str, label: str) -> bool:
+        question_terms = set(re.findall(r"[a-z]{3,}", question.lower()))
+        name_terms = re.findall(r"[a-z]{3,}", label.lower())
+        if len(name_terms) < 2:
+            return False
+        exact_matches = question_terms.intersection(name_terms)
+        abbreviated_first_name = any(
+            len(term) >= 3 and name_terms[0].startswith(term)
+            for term in question_terms
+        )
+        return len(exact_matches) >= 2 or (name_terms[-1] in question_terms and abbreviated_first_name)
 
     def resolve_named_staff_context(self, db: Any, names: list[str], years: list[int]) -> list[AuthorityContext]:
         requested_year = years[0] if len(years) == 1 else None

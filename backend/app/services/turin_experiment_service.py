@@ -20,6 +20,8 @@ Keep SOURCE DOCUMENT EVIDENCE separate from ARCHIVE / DATABASE AUTHORITY CONTEXT
 
 Do not present archive/database authority metadata as if it were quotation from a source document.
 
+When both are supplied, distinguish them explicitly: use "Authority records indicate..." for authority context and "Retrieved documents show..." for documentary evidence.
+
 Do not use general knowledge to complete missing information.
 
 Do not claim that an event, person or relationship is absent from history because it is absent from the supplied context.

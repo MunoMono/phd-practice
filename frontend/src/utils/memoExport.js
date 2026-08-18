@@ -44,7 +44,7 @@ const formatAuthorityContext = (item) => {
   }
 
   if (item.authority_type === 'agent_employment') {
-    return `${item.assertion} | ${item.role || 'Role unrecorded'} | ${item.tenure?.start_date || 'start unrecorded'} to ${item.tenure?.end_date || 'end unrecorded'}`
+    return `${item.assertion} | Staff code: ${item.authority_id || 'unrecorded'} | ${item.role || 'Role unrecorded'} | ${item.tenure?.start_date || 'start unrecorded'} to ${item.tenure?.end_date || 'end unrecorded'}`
   }
 
   return `${item.label} | ${item.authority_type} | ${item.authority_classification || 'database authority record'}${item.description ? ` | ${item.description}` : ''}`

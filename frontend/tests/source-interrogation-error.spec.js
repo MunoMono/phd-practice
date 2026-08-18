@@ -85,15 +85,15 @@ test('a successful structured interrogation renders separated evidence and sourc
         retrieval_method: 'postgresql_fts',
         status: 'completed',
         interpretative_status: 'unassessed',
-        answer: 'The authority context identifies a DDR staff record spanning 1980.',
+        answer: 'Authority records indicate a DDR role history. Retrieved documents show an activity trace.',
         model: { name: 'granite-local' },
         provenance_validation: { valid: true },
         authority_evidence: [{
           authority_type: 'agent_employment',
-          assertion: 'Bruce Archer',
-          authority_id: 'BRUCEARCHE',
-          role: 'Director of Research',
-          tenure: { start_date: '1961-01-01', end_date: '1988-12-31' }
+          assertion: 'Kenneth Baynes',
+          authority_id: 'KENNETHBAY',
+          role: 'Research Fellow / later Tutor DEU / later Head of Department DEU',
+          tenure: { start_date: '1976-01-01', end_date: '1985-12-31' }
         }],
         documentary_evidence: [{ claim: 'A dated staff record is available.', pid: 'PID-1980', page: 1, chunk_id: 'chunk-ddr-1980' }],
         inferences: [],
@@ -132,12 +132,12 @@ test('a successful structured interrogation renders separated evidence and sourc
   })
 
   await page.goto('/source-interrogation')
-  await page.getByRole('textbox', { name: 'Research query' }).fill('Who worked at the DDR in 1980?')
+  await page.getByRole('textbox', { name: 'Research query' }).fill('How did Ken Baynes appear across DDR records?')
   await page.getByRole('button', { name: 'Run interrogation' }).evaluate((button) => button.click())
 
-  await expect(page.getByText('The authority context identifies a DDR staff record spanning 1980.')).toBeVisible()
+  await expect(page.getByText('Authority records indicate a DDR role history. Retrieved documents show an activity trace.')).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Database authority context' })).toBeVisible()
-  await expect(page.getByText('Bruce Archer | Director of Research | 1961-01-01 to 1988-12-31')).toBeVisible()
+  await expect(page.getByText('Kenneth Baynes | Staff code: KENNETHBAY | Research Fellow / later Tutor DEU / later Head of Department DEU | 1976-01-01 to 1985-12-31')).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Documentary evidence' })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Generated inference' })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Retrieval diagnostics' })).toBeVisible()
@@ -174,13 +174,14 @@ test('a successful structured interrogation renders separated evidence and sourc
   page.off('request', requestListener)
   await expect(page.getByText('Retrieval memo copied')).toBeVisible()
   expect(copiedMemo).toContain('# Turin retrieval memo')
-  expect(copiedMemo).toContain('Who worked at the DDR in 1980?')
+  expect(copiedMemo).toContain('How did Ken Baynes appear across DDR records?')
   expect(copiedMemo).not.toContain('Query: Not available')
   expect(copiedMemo).toContain('Run ID: experiment-ddr-1980')
   expect(copiedMemo).toContain('Corpus: corpus_f40d78dbce52')
   expect(copiedMemo).toContain('Lexical score range: 0.900 to 0.900')
   expect(copiedMemo).toContain('Archive record PID: record-1980')
   expect(copiedMemo).toContain('## Archive / database authority context')
+  expect(copiedMemo).toContain('Staff code: KENNETHBAY')
   expect(copiedMemo).toContain('## Generated interpretation')
   expect(copiedMemo).toContain('## Provenance validation')
   expect(copiedMemo).not.toMatch(/validation status|partially supported|speculative|needs review/i)
