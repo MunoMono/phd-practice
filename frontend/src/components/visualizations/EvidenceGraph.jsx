@@ -7,7 +7,10 @@ const EvidenceGraph = ({ data }) => {
 
   useEffect(() => {
     const width = 960
-    const height = 420
+    const rowSpacing = 84
+    const topOffset = 80
+    const rowCount = Math.max(data?.sources?.length || 0, 1)
+    const height = Math.max(420, topOffset + ((rowCount - 1) * rowSpacing) + 64)
 
     d3.select(svgRef.current).selectAll('*').remove()
 
@@ -70,8 +73,6 @@ const EvidenceGraph = ({ data }) => {
     })
 
     const columns = [80, 240, 420, 600, 760, 900]
-    const rowSpacing = 84
-    const topOffset = 80
 
     nodes.forEach((node) => {
       node.x = columns[node.column]
