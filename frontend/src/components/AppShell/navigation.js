@@ -12,6 +12,7 @@ export const PRIMARY_SECTIONS = [
   { key: 'workbench', label: 'Workbench', path: '/workbench', icon: Chip },
   { key: 'sources', label: 'Sources', path: '/sources', icon: Search },
   { key: 'analysis', label: 'Analysis', path: '/source-interrogation', icon: DataVis_4 },
+  { key: 'visual-analytics', label: 'Visual analytics', path: '/semantic-atlas', icon: DataVis_4 },
   { key: 'evidence', label: 'Evidence', path: '/claims-evidence', icon: CheckmarkOutline },
   { key: 'documentation', label: 'Documentation', path: '/documentation', icon: Catalog },
 ]
@@ -27,6 +28,8 @@ export const SECONDARY_SECTIONS = {
     { key: 'source-interrogation', label: 'Source interrogation', path: '/source-interrogation', icon: Search, matches: ['/source-interrogation', '/ask', '/tracer'] },
     { key: 'absences', label: 'Absences', path: '/absences', icon: WarningAlt, matches: ['/absences', '/missingness'] },
     { key: 'cross-readings', label: 'Cross-readings', path: '/cross-readings', icon: ArrowsHorizontal, matches: ['/cross-readings', '/cross-read'] },
+  ],
+  'visual-analytics': [
     { key: 'semantic-atlas', label: 'Semantic atlas', path: '/semantic-atlas', icon: DataVis_4, matches: ['/semantic-atlas', '/clusters', '/visual-analytics'] },
   ],
   evidence: [
@@ -43,7 +46,8 @@ export const SECONDARY_SECTIONS = {
 const PRIMARY_ROUTE_MATCHERS = [
   { key: 'workbench', matches: ['/', '/workbench', '/dashboard'] },
   { key: 'sources', matches: ['/sources', '/corpus'] },
-  { key: 'analysis', matches: ['/source-interrogation', '/ask', '/tracer', '/absences', '/missingness', '/cross-readings', '/cross-read', '/semantic-atlas', '/clusters', '/visual-analytics'] },
+  { key: 'analysis', matches: ['/source-interrogation', '/ask', '/tracer', '/absences', '/missingness', '/cross-readings', '/cross-read'] },
+  { key: 'visual-analytics', matches: ['/semantic-atlas', '/clusters', '/visual-analytics'] },
   { key: 'evidence', matches: ['/claims-evidence', '/claims', '/research-runs', '/experiments', '/provenance', '/audit', '/sessions', '/ml-dashboard'] },
   { key: 'documentation', matches: ['/documentation'] },
 ]
