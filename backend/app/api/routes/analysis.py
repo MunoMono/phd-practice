@@ -260,32 +260,40 @@ def _catalogue_response(query: str, retrieval: dict[str, Any], authority_evidenc
         lead = f"Retrieved catalogue records for {subject}:"
     lines = [] if authority_defined_question else [lead, *[f"- {record['title']} (Asset PID {record['asset_pid']}, p. {record['page']})" for record in unique_records]]
     direct_authority_lines = []
-    for authority in authority_evidence:
+    authority_claims = []
+    for authority_number, authority in enumerate(authority_evidence, start=1):
         fields = authority.get("fields") or {}
         if authority["authority_type"] == "ddr_projects":
             start = fields.get("start_year") or fields.get("start_date") or "year unavailable"
             end = fields.get("end_year") or fields.get("end_date") or start
-            direct_authority_lines.append(
-                f"- Job {authority['authority_id']}: {fields.get('title') or fields.get('label')} "
+            claim = (
+                f"Job {authority['authority_id']}: {fields.get('title') or fields.get('label')} "
                 f"({start}–{end}; "
                 f"project lead: {fields.get('project_lead_name') or 'unavailable'})"
             )
+            direct_authority_lines.append(f"- {claim}")
         elif authority["authority_type"] == "ref_students":
             detail = fields.get("degree") or "degree unavailable"
             if "thesis" in question_lower:
                 detail = fields.get("thesis_title") or "thesis title unavailable"
-            direct_authority_lines.append(f"- {fields.get('label')} ({fields.get('year') or 'year unavailable'}; {detail})")
+            claim = f"{fields.get('label')} ({fields.get('year') or 'year unavailable'}; {detail})"
+            direct_authority_lines.append(f"- {claim}")
         elif authority["authority_type"] == "ref_ddr_period":
-            direct_authority_lines.append(
-                f"- {authority['authority_id']} - {fields.get('label')}: "
+            claim = (
+                f"{authority['authority_id']} - {fields.get('label')}: "
                 f"{fields.get('description') or 'description unavailable'}"
             )
+            direct_authority_lines.append(f"- {claim}")
         elif authority["authority_type"] == "agent_employment":
             name = fields.get("name") or fields.get("label") or authority["authority_id"]
             role = fields.get("job_title_label") or fields.get("job_title_code") or "role unavailable"
             start = fields.get("start_date") or "start date unavailable"
             end = fields.get("end_date") or "end date unavailable"
-            direct_authority_lines.append(f"- {name}: {role} ({start} to {end})")
+            claim = f"{name}: {role} ({start} to {end})"
+            direct_authority_lines.append(f"- {claim}")
+        else:
+            continue
+        authority_claims.append({"text": claim, "authority_numbers": [authority_number]})
     if direct_authority_lines:
         authority_block = ["Authority-register results (not documentary quotations):", *direct_authority_lines]
         authority_first = exact_job_lookup or question_lower.startswith("what projects") or bool(authority_evidence)
@@ -298,7 +306,12 @@ def _catalogue_response(query: str, retrieval: dict[str, Any], authority_evidenc
             lines = [*authority_block, "", *lines]
         else:
             lines.extend(["", *authority_block])
-    return {"answer": "\n".join(lines), "records": unique_records, "subject": subject}
+    return {
+        "answer": "\n".join(lines),
+        "answer_paragraphs": [{"claims": authority_claims}] if authority_claims else [],
+        "records": unique_records,
+        "subject": subject,
+    }
 
 
 def _project_staged_exploratory_response(
@@ -830,6 +843,7 @@ async def interrogate_exploratory_corpus(request: ExploratoryInterrogationReques
             "response_schema": "turin-catalogue-result-v1",
             "status": "completed",
             "answer": catalogue["answer"],
+            "answer_paragraphs": catalogue["answer_paragraphs"],
             "answer_origin": "deterministic_catalogue_result",
             "model": {"name": "none", "display_name": "Catalogue lookup", "runtime": "deterministic"},
             "runtime": {"model_status": "not_used"},

@@ -401,16 +401,25 @@ const AnswerWithSourceLinks = ({ trace }) => {
   if (trace?.answerParagraphs?.length > 0) {
     return trace.answerParagraphs.map((paragraph, paragraphIndex) => (
       <p key={`answer-paragraph-${paragraphIndex}`}>
-        {paragraph.claims.map((claim, claimIndex) => (
-          <span key={`answer-claim-${paragraphIndex}-${claimIndex}`}>
+        {paragraph.claims.map((claim, claimIndex) => {
+          const sourceNumbers = claim.sourceNumbers || claim.source_numbers || []
+          const authorityNumbers = claim.authorityNumbers || claim.authority_numbers || []
+          return (
+            <span key={`answer-claim-${paragraphIndex}-${claimIndex}`}>
             {claim.text}{' '}
-            <sup className="tracer__source-citation">
-              {claim.sourceNumbers.map((sourceNumber, citationIndex) => (
+            {sourceNumbers.length > 0 && <sup className="tracer__source-citation">
+              {sourceNumbers.map((sourceNumber, citationIndex) => (
                 <span key={sourceNumber}>{citationIndex > 0 ? ', ' : ''}<a href={`#source-${sourceNumber}`} aria-label={`Jump to source ${sourceNumber}`}>{sourceNumber}</a></span>
               ))}
-            </sup>{' '}
-          </span>
-        ))}
+            </sup>}
+            {authorityNumbers.length > 0 && <sup className="tracer__source-citation">
+              {authorityNumbers.map((authorityNumber, citationIndex) => (
+                <span key={authorityNumber}>{citationIndex > 0 ? ', ' : ''}<a href={`#authority-${authorityNumber}`} aria-label={`Jump to authority record ${authorityNumber}`}>A{authorityNumber}</a></span>
+              ))}
+            </sup>}{' '}
+            </span>
+          )
+        })}
       </p>
     ))
   }
@@ -1155,8 +1164,8 @@ const EvidenceTracer = () => {
               <section aria-label="Database authority context">
                 <h4>Database authority context</h4>
                 {traceData.authorityEvidence?.length > 0
-                  ? traceData.authorityEvidence.map((item) => (
-                    <p key={item.authority_id}>
+                  ? traceData.authorityEvidence.map((item, authorityIndex) => (
+                    <p key={item.authority_id} id={`authority-${authorityIndex + 1}`}>
                       {item.authority_type === 'ddr_projects'
                         ? `Job ${item.job_number} | ${item.title} | Funder: ${item.funder_name || 'unavailable'} | Duration: ${item.duration_text || 'unavailable'} | Project lead: ${item.project_lead_name || 'unavailable'}`
                         : item.authority_type !== 'agent_employment'

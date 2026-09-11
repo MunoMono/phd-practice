@@ -6,6 +6,7 @@ const responseFor = (query) => ({
   status: 'completed',
   persisted: false,
   answer: `Answer for ${query}.`,
+  answer_paragraphs: [{ claims: [{ text: `Answer for ${query}.`, source_numbers: [1] }] }],
   model: { name: 'qwen-fixture', display_name: 'Qwen fixture' },
   provenance_validation: { valid: true, source_count: 1 },
   retrieval: {},
@@ -31,6 +32,7 @@ test('active Source Interrogation result survives analysis navigation until inte
   await input.fill('Query A')
   await page.getByRole('button', { name: 'Run interrogation' }).click()
   await expect(page.getByText('Answer for Query A.')).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Jump to source 1' })).toBeVisible()
   await expect(page.getByText('Source for Query A', { exact: true })).toBeVisible()
 
   await page.reload()
