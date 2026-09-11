@@ -4,13 +4,14 @@ import {
   Select,
   SelectItem,
   Tag,
+  TextArea,
   TextInput,
   Tile
 } from '@carbon/react'
 import { DataVis_4 } from '@carbon/icons-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { getUmapProjection } from '../../api/viz'
+import { createAtlasCoverageMissingness, createEmbeddingReadinessReview, getEmbeddingReadiness, getUmapProjection } from '../../api/viz'
 import PanelHeader from '../../components/layout/PanelHeader'
 import PageHeader from '../../components/layout/PageHeader'
 import { PageGrid, PageColumn as Column } from '../../components/layout/PageGrid'
@@ -18,6 +19,7 @@ import UmapProjection from '../../components/visualizations/UmapProjection'
 import UmapPointDetail from '../../components/visualizations/UmapPointDetail'
 import ClusterPanel from '../../components/visualizations/ClusterPanel'
 import ConceptBridge from '../../components/visualizations/ConceptBridge'
+import AtlasCoverageChart from '../../components/visualizations/AtlasCoverageChart'
 import { buildClusterMemo, buildVisualAnalyticsMemo, downloadMarkdown } from '../../utils/memoExport'
 
 const defaultFilters = {
@@ -29,6 +31,30 @@ const defaultFilters = {
   sourceType: ''
 }
 
+const createEmptyReadinessForm = () => ({
+  status: 'draft', corpus_release: '', source_scope: '', exclusions: '', embedding_model: '', model_revision_or_checksum: '',
+  vector_dimensions: '', runtime_and_license: '', normalisation_chunking_version: '', capacity_retention_plan: '',
+  fts_separation_plan: 'FTS remains the evidence-selection method; vectors only support visual exploration.', analytical_question: '', reviewed_by: ''
+})
+
+const readinessTextFields = [
+  ['corpus_release', 'Corpus release'],
+  ['embedding_model', 'Embedding model'],
+  ['model_revision_or_checksum', 'Model revision or checksum'],
+  ['vector_dimensions', 'Vector dimensions'],
+  ['normalisation_chunking_version', 'Normalisation and chunking version'],
+  ['reviewed_by', 'Reviewing researcher']
+]
+
+const readinessLongFields = [
+  ['source_scope', 'Approved source scope and access policy'],
+  ['exclusions', 'Exclusions and reasons'],
+  ['runtime_and_license', 'Runtime and licensing assessment'],
+  ['capacity_retention_plan', 'Capacity, rollback, and retention plan'],
+  ['fts_separation_plan', 'FTS separation plan'],
+  ['analytical_question', 'First analytical question']
+]
+
 const framingCards = [
   {
     title: 'Oral-historical interpretation',
@@ -36,7 +62,7 @@ const framingCards = [
   },
   {
     title: 'Archival LLM interrogation',
-    body: 'Link visual clusters back to Granite-assisted evidence tracing so that semantic patterns remain tied to source chunks and PIDs.'
+    body: 'Link visual clusters back to model-assisted evidence tracing so that semantic patterns remain tied to source chunks and PIDs.'
   },
   {
     title: 'Embedding-based visual analytics',
@@ -60,6 +86,11 @@ const VisualAnalytics = () => {
   const [memoPoints, setMemoPoints] = useState([])
   const [refreshToken, setRefreshToken] = useState(0)
   const [copyFeedback, setCopyFeedback] = useState(null)
+  const [readiness, setReadiness] = useState({ ready_for_embedding: false, review: null, message: '' })
+  const [readinessForm, setReadinessForm] = useState(createEmptyReadinessForm())
+  const [savingReadiness, setSavingReadiness] = useState(false)
+  const [readinessError, setReadinessError] = useState('')
+  const [recordingCoverageGap, setRecordingCoverageGap] = useState(false)
 
   const highlightedTrace = useMemo(() => ({
     chunkId: searchParams.get('chunkId'),
@@ -115,6 +146,14 @@ const VisualAnalytics = () => {
       isCancelled = true
     }
   }, [filters, refreshToken])
+
+  useEffect(() => {
+    let isCancelled = false
+    getEmbeddingReadiness()
+      .then((payload) => { if (!isCancelled) setReadiness(payload) })
+      .catch((error) => { if (!isCancelled) setReadinessError(error.message || 'Readiness state could not be loaded.') })
+    return () => { isCancelled = true }
+  }, [])
 
   useEffect(() => {
     if (!projection.points.length) {
@@ -176,6 +215,40 @@ const VisualAnalytics = () => {
     setFilters(defaultFilters)
     setSelectedCluster(null)
     setSelectedPoint(null)
+  }
+
+  const handleRecordCoverageGap = async () => {
+    setRecordingCoverageGap(true)
+    setErrorState('')
+    try {
+      const event = await createAtlasCoverageMissingness({
+        document_id: highlightedTrace.documentId || undefined,
+        chunk_id: highlightedTrace.chunkId || undefined,
+        pid: highlightedTrace.pid || undefined,
+        projection_id: projection.metadata.projectionId || undefined,
+      })
+      navigate(`/absences?eventId=${encodeURIComponent(event.event_id)}`)
+    } catch (error) {
+      setErrorState(error.message || 'The Atlas coverage condition could not be recorded.')
+    } finally {
+      setRecordingCoverageGap(false)
+    }
+  }
+
+  const updateReadinessField = (field, value) => setReadinessForm((current) => ({ ...current, [field]: value }))
+
+  const handleSaveReadiness = async () => {
+    setSavingReadiness(true)
+    setReadinessError('')
+    try {
+      const payload = await createEmbeddingReadinessReview({ ...readinessForm, vector_dimensions: Number(readinessForm.vector_dimensions) })
+      setReadiness(payload)
+      setReadinessForm(createEmptyReadinessForm())
+    } catch (error) {
+      setReadinessError(error.message || 'Readiness review could not be saved.')
+    } finally {
+      setSavingReadiness(false)
+    }
   }
 
   const handleCopyClusterMemo = async () => {
@@ -247,6 +320,9 @@ const VisualAnalytics = () => {
             title="Trace selected"
             subtitle="No visual point is currently available for this trace. The handoff parameters were received, but the current projection does not contain a matching chunk, document, or PID."
           />
+          <Button kind="secondary" size="sm" onClick={handleRecordCoverageGap} disabled={recordingCoverageGap}>
+            {recordingCoverageGap ? 'Recording coverage condition...' : 'Record computational coverage condition'}
+          </Button>
         </Column>
       )}
 
@@ -274,6 +350,42 @@ const VisualAnalytics = () => {
           title="Analytical output"
           subtitle="This view produces atlas coordinates / cluster summaries, point detail, metadata overlays, and cluster interpretation notes over the locally ingested / embedded evidence surface."
         />
+      </Column>
+
+      <Column>
+        <Tile className="visual-analytics-page__controls">
+          <PanelHeader
+            title="Embedding readiness review"
+            description="A review records whether prerequisites are met. Approval does not generate embeddings or start a projection job."
+            actions={<Tag type={readiness.ready_for_embedding ? 'green' : 'gray'}>{readiness.review?.status || 'not started'}</Tag>}
+          />
+          {readinessError && <InlineNotification lowContrast kind="error" title="Readiness review unavailable" subtitle={readinessError} />}
+          {readiness.review ? (
+            <div className="visual-analytics-page__scope-grid">
+              <p><strong>Review:</strong> {readiness.review.review_id}</p>
+              <p><strong>Corpus release:</strong> {readiness.review.corpus_release}</p>
+              <p><strong>Model:</strong> {readiness.review.embedding_model}</p>
+              <p><strong>Revision:</strong> {readiness.review.model_revision_or_checksum}</p>
+              <p><strong>Dimensions:</strong> {readiness.review.vector_dimensions}</p>
+              <p><strong>Reviewed by:</strong> {readiness.review.reviewed_by || 'Not approved'}</p>
+            </div>
+          ) : (
+            <div className="visual-analytics-page__controls-grid">
+              <Select id="readiness-status" labelText="Review decision" value={readinessForm.status} onChange={(event) => updateReadinessField('status', event.target.value)}>
+                <SelectItem value="draft" text="draft" />
+                <SelectItem value="blocked" text="blocked" />
+                <SelectItem value="approved" text="approved" />
+              </Select>
+              {readinessTextFields.map(([field, label]) => (
+                <TextInput key={field} id={`readiness-${field}`} labelText={label} value={readinessForm[field]} onChange={(event) => updateReadinessField(field, field === 'vector_dimensions' ? event.target.value.replace(/[^0-9]/g, '') : event.target.value)} />
+              ))}
+              {readinessLongFields.map(([field, label]) => (
+                <TextArea key={field} id={`readiness-${field}`} labelText={label} rows={3} value={readinessForm[field]} onChange={(event) => updateReadinessField(field, event.target.value)} />
+              ))}
+            </div>
+          )}
+          {!readiness.review && <div className="visual-analytics-page__controls-actions"><Button size="sm" onClick={handleSaveReadiness} disabled={savingReadiness}>Save readiness review</Button></div>}
+        </Tile>
       </Column>
 
       <Column>
@@ -341,7 +453,7 @@ const VisualAnalytics = () => {
             actions={(
               <div className="visual-analytics-page__panel-meta">
                 <Tag type="blue">Method: {projection.metadata.projectionMethod || 'none'}</Tag>
-                <Tag type="gray">Granite PDFs: {scope.ingestedGranitePdfs ?? 0}</Tag>
+                <Tag type="gray">Historical model PDFs: {scope.ingestedGranitePdfs ?? 0}</Tag>
               </div>
             )}
           />
@@ -369,6 +481,16 @@ const VisualAnalytics = () => {
         </Tile>
       </Column>
 
+      <Column lg={5} md={8} sm={4}>
+        <Tile className="visual-analytics-page__coverage-panel">
+          <PanelHeader
+            title="Evidence surface coverage"
+            description="These counts describe local technical representation. They do not measure archival completeness or historical absence."
+          />
+          <AtlasCoverageChart scope={scope} visiblePointCount={filteredPoints.length} />
+        </Tile>
+      </Column>
+
       <Column lg={8} md={8} sm={4}>
         <Tile className="visual-analytics-page__projection-panel">
           <PanelHeader
@@ -387,6 +509,7 @@ const VisualAnalytics = () => {
             errorState={errorState}
             selectedPoint={selectedPoint}
             highlightedTrace={highlightedTrace}
+            colorBy={filters.colorBy}
             onSelectPoint={setSelectedPoint}
           />
         </Tile>
@@ -397,6 +520,16 @@ const VisualAnalytics = () => {
           point={selectedPoint}
           onOpenCorpus={() => navigate(`/sources?${new URLSearchParams(selectedPoint?.documentId ? { documentId: selectedPoint.documentId } : selectedPoint?.pid ? { pid: selectedPoint.pid } : {}).toString()}`)}
           onTraceEvidence={() => navigate(`/source-interrogation?${new URLSearchParams(selectedPoint?.chunkId ? { chunkId: selectedPoint.chunkId } : selectedPoint?.pid ? { pid: selectedPoint.pid } : {}).toString()}`)}
+          onOpenAbsences={() => navigate(`/absences?${new URLSearchParams({
+            ...(selectedPoint?.documentId ? { sourceDocumentId: selectedPoint.documentId } : {}),
+            ...(selectedPoint?.chunkId ? { sourceChunkId: selectedPoint.chunkId } : {}),
+            ...(selectedPoint?.pid ? { pid: selectedPoint.pid } : {})
+          }).toString()}`)}
+          onOpenCrossReadings={() => navigate(`/cross-readings?${new URLSearchParams({
+            ...(selectedPoint?.documentId ? { sourceDocumentId: selectedPoint.documentId } : {}),
+            ...(selectedPoint?.chunkId ? { sourceChunkId: selectedPoint.chunkId } : {}),
+            ...(selectedPoint?.pid ? { pid: selectedPoint.pid } : {})
+          }).toString()}`)}
           onCopyPid={() => copyValue(selectedPoint?.pid)}
           onCopyExcerpt={() => copyValue(selectedPoint?.excerpt)}
           onAddToMemo={handleAddToMemo}

@@ -3,15 +3,18 @@ Visualization API - Data endpoints for D3.js visualizations
 Carbon Design System compatible data structures
 """
 from fastapi import APIRouter, HTTPException, Query
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from sqlalchemy import text
-from typing import List, Dict, Optional
+from typing import List, Dict, Literal, Optional
 from datetime import datetime
 import json
 import logging
 import re
+import uuid
 import numpy as np
 
 from app.core.database import LocalSessionLocal
+from app.models.research_outputs import EmbeddingReadinessReview, MissingnessEvent
 from app.services.corpus_status_service import get_corpus_status
 
 router = APIRouter()
@@ -36,6 +39,183 @@ SCOPED_MISSINGNESS_V02_BASELINE = {
     "no_asset_records": 1,
     "unknown_until_docling_records": 19,
 }
+
+ReadinessStatus = Literal["draft", "blocked", "approved"]
+
+
+class EmbeddingReadinessReviewRequest(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
+
+    status: ReadinessStatus
+    corpus_release: str
+    source_scope: str
+    exclusions: str
+    embedding_model: str
+    model_revision_or_checksum: str
+    vector_dimensions: int = Field(gt=0)
+    runtime_and_license: str
+    normalisation_chunking_version: str
+    capacity_retention_plan: str
+    fts_separation_plan: str
+    analytical_question: str
+    reviewed_by: Optional[str] = None
+
+    @field_validator(
+        "corpus_release", "source_scope", "exclusions", "embedding_model", "model_revision_or_checksum",
+        "runtime_and_license", "normalisation_chunking_version", "capacity_retention_plan", "fts_separation_plan",
+        "analytical_question",
+    )
+    @classmethod
+    def required_review_fields_must_not_be_blank(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("Readiness review fields must not be blank")
+        return value
+
+    @model_validator(mode="after")
+    def approved_review_requires_reviewer(self):
+        if self.status == "approved" and not (self.reviewed_by or "").strip():
+            raise ValueError("An approved readiness review requires the reviewing researcher")
+        return self
+
+
+class AtlasCoverageMissingnessRequest(BaseModel):
+    document_id: Optional[str] = None
+    chunk_id: Optional[str] = None
+    pid: Optional[str] = None
+    projection_id: Optional[str] = None
+
+    @model_validator(mode="after")
+    def requires_durable_source_identifier(self):
+        if not any((self.document_id, self.chunk_id, self.pid)):
+            raise ValueError("A document ID, chunk ID, or PID is required")
+        return self
+
+
+def serialize_readiness_review(review: EmbeddingReadinessReview) -> dict:
+    return {
+        "review_id": review.review_id,
+        "status": review.status,
+        "corpus_release": review.corpus_release,
+        "source_scope": review.source_scope,
+        "exclusions": review.exclusions,
+        "embedding_model": review.embedding_model,
+        "model_revision_or_checksum": review.model_revision_or_checksum,
+        "vector_dimensions": review.vector_dimensions,
+        "runtime_and_license": review.runtime_and_license,
+        "normalisation_chunking_version": review.normalisation_chunking_version,
+        "capacity_retention_plan": review.capacity_retention_plan,
+        "fts_separation_plan": review.fts_separation_plan,
+        "analytical_question": review.analytical_question,
+        "reviewed_by": review.reviewed_by,
+        "reviewed_at": review.reviewed_at.isoformat() if review.reviewed_at else None,
+        "created_at": review.created_at.isoformat() if review.created_at else None,
+    }
+
+
+@router.get("/embedding-readiness")
+async def get_embedding_readiness():
+    db = LocalSessionLocal()
+    try:
+        review = db.query(EmbeddingReadinessReview).order_by(EmbeddingReadinessReview.created_at.desc()).first()
+        if review:
+            return {"ready_for_embedding": review.status == "approved", "review": serialize_readiness_review(review)}
+        return {
+            "ready_for_embedding": False,
+            "review": None,
+            "message": "No readiness review has been recorded. The atlas remains inactive; this is a technical state, not evidence of historical absence.",
+        }
+    finally:
+        db.close()
+
+
+@router.post("/embedding-readiness", status_code=201)
+async def create_embedding_readiness_review(request: EmbeddingReadinessReviewRequest):
+    db = LocalSessionLocal()
+    try:
+        reviewed_by = request.reviewed_by.strip() if request.reviewed_by else None
+        review = EmbeddingReadinessReview(
+            review_id=f"embed-ready-{uuid.uuid4().hex[:12]}",
+            status=request.status,
+            corpus_release=request.corpus_release,
+            source_scope=request.source_scope,
+            exclusions=request.exclusions,
+            embedding_model=request.embedding_model,
+            model_revision_or_checksum=request.model_revision_or_checksum,
+            vector_dimensions=request.vector_dimensions,
+            runtime_and_license=request.runtime_and_license,
+            normalisation_chunking_version=request.normalisation_chunking_version,
+            capacity_retention_plan=request.capacity_retention_plan,
+            fts_separation_plan=request.fts_separation_plan,
+            analytical_question=request.analytical_question,
+            reviewed_by=reviewed_by,
+            reviewed_at=datetime.utcnow() if request.status == "approved" else None,
+        )
+        db.add(review)
+        db.commit()
+        db.refresh(review)
+        return {"ready_for_embedding": review.status == "approved", "review": serialize_readiness_review(review)}
+    finally:
+        db.close()
+
+
+@router.post("/atlas-coverage-missingness", status_code=201)
+async def create_atlas_coverage_missingness(request: AtlasCoverageMissingnessRequest):
+    """Record a researcher-confirmed computational coverage condition, never archival absence."""
+    db = LocalSessionLocal()
+    try:
+        source = db.execute(text("""
+            SELECT document_id, pid, title
+            FROM documents
+            WHERE (:document_id IS NOT NULL AND document_id = :document_id)
+               OR (:pid IS NOT NULL AND pid = :pid)
+               OR (:chunk_id IS NOT NULL AND document_id = (
+                   SELECT document_id FROM document_chunks WHERE chunk_id = :chunk_id
+               ))
+            LIMIT 1
+        """), request.model_dump()).mappings().first()
+        if not source:
+            raise HTTPException(status_code=404, detail="The nominated Atlas source is not available in the current document registry.")
+
+        projection = _get_completed_semantic_atlas_projection(db)
+        projection_id = request.projection_id or (projection or {}).get("projection_id")
+        if projection_id:
+            represented = db.execute(text("""
+                SELECT EXISTS(
+                    SELECT 1
+                    FROM semantic_atlas_projection_points point
+                    JOIN document_chunks chunk ON chunk.chunk_id = point.chunk_id
+                    WHERE point.projection_id = :projection_id
+                      AND chunk.document_id = :document_id
+                      AND (:chunk_id IS NULL OR chunk.chunk_id = :chunk_id)
+                )
+            """), {"projection_id": projection_id, "document_id": source["document_id"], "chunk_id": request.chunk_id}).scalar()
+            if represented:
+                raise HTTPException(status_code=409, detail="The nominated source is represented in the current Semantic Atlas projection.")
+
+        scope = f"projection {projection_id}" if projection_id else "the current Semantic Atlas embedding/projection configuration"
+        event = MissingnessEvent(
+            event_id=f"miss-{uuid.uuid4().hex[:12]}",
+            type="computational",
+            query_or_entity_or_field=f"Semantic Atlas coverage for {source['title'] or source['document_id']}",
+            evidence=(
+                f"Known source {source['document_id']} is not represented in {scope}. "
+                "This records a computational embedding or extracted-text coverage condition only; "
+                "it does not establish that the source is absent from the archive."
+            ),
+            source_document_id=source["document_id"],
+            source_chunk_id=request.chunk_id,
+            source_document_ids_json=[source["document_id"]],
+            source_chunk_ids_json=[request.chunk_id] if request.chunk_id else [],
+            status="open",
+            reviewer_note="Created from a researcher-selected Semantic Atlas coverage gap.",
+            follow_up_action="Review extracted text, embedding status, source access, and projection membership before reprocessing.",
+        )
+        db.add(event)
+        db.commit()
+        db.refresh(event)
+        return {"event_id": event.event_id, "document_id": event.source_document_id, "chunk_id": event.source_chunk_id, "type": event.type}
+    finally:
+        db.close()
 
 
 def _vector_to_list(value) -> List[float]:
@@ -507,6 +687,22 @@ def _empty_umap_response(point_type: str, message: str, source: str, total_candi
     }
 
 
+def _get_completed_semantic_atlas_projection(db):
+    try:
+        return db.execute(text("""
+            SELECT projection_id, embedding_set_id, algorithm, library_version,
+                   random_seed, parameters_json, input_count, input_ordering_sha256,
+                   numerical_tolerance, completed_at
+            FROM semantic_atlas_projections
+            WHERE status = 'completed'
+            ORDER BY completed_at DESC, created_at DESC
+            LIMIT 1
+        """)).mappings().first()
+    except Exception:
+        logger.info("Completed Semantic Atlas projection is not available; using legacy projection path")
+        return None
+
+
 @router.get("/document-network")
 async def get_document_network(
     min_similarity: float = Query(0.6, ge=0.0, le=1.0),
@@ -884,6 +1080,153 @@ async def get_umap_projection(
         document_chunk_columns = _get_table_columns(db, "document_chunks") if point_type == "chunks" else set()
         chunk_citation_select = "dc.citation" if "citation" in document_chunk_columns else "NULL::jsonb AS citation"
         chunk_title_expr = "COALESCE(d.title, dc.citation->>'title', 'Untitled trace')" if "citation" in document_chunk_columns else "COALESCE(d.title, 'Untitled trace')"
+
+        atlas_projection = _get_completed_semantic_atlas_projection(db) if point_type == "chunks" else None
+        if atlas_projection:
+            query = f"""
+            SELECT
+                dc.chunk_id AS point_id,
+                dc.document_id,
+                dc.chunk_id,
+                d.pid,
+                {chunk_title_expr} AS title,
+                COALESCE(dc.publication_year, d.publication_year) AS year,
+                d.file_type,
+                d.filename,
+                d.pdf_count,
+                d.extracted_text AS document_extracted_text,
+                d.authority_data,
+                d.processing_status,
+                d.has_diagrams,
+                d.doc_metadata,
+                dc.chunk_type,
+                {chunk_citation_select},
+                dc.key_concepts,
+                NULL::jsonb AS entities,
+                NULL::double precision AS confidence,
+                dc.drift_score,
+                dc.chunk_text,
+                dc.source_page,
+                dc.source_section,
+                pp.x,
+                pp.y
+            FROM semantic_atlas_projection_points pp
+            JOIN document_chunks dc ON dc.chunk_id = pp.chunk_id
+            JOIN documents d ON d.document_id = dc.document_id
+            WHERE pp.projection_id = :projection_id
+                AND d.pid IS NOT NULL
+            """
+            params = {"projection_id": atlas_projection["projection_id"], "limit": limit}
+            if year_min is not None:
+                query += " AND COALESCE(dc.publication_year, d.publication_year) >= :year_min"
+                params["year_min"] = year_min
+            if year_max is not None:
+                query += " AND COALESCE(dc.publication_year, d.publication_year) <= :year_max"
+                params["year_max"] = year_max
+            if theme:
+                query += " AND LOWER(COALESCE(dc.key_concepts::text, '')) LIKE LOWER(:theme_pattern)"
+                params["theme_pattern"] = f"%{theme}%"
+            query += " ORDER BY dc.chunk_id LIMIT :limit"
+            rows = db.execute(text(query), params).fetchall()
+            points = []
+            for row in rows:
+                concepts = _extract_key_concepts(row.key_concepts)
+                inferred_source_type = _infer_source_type(row.file_type, row.chunk_type, row.citation)
+                if source_type and inferred_source_type != source_type:
+                    continue
+                record = {
+                    "id": row.point_id,
+                    "document_id": row.document_id,
+                    "chunk_id": row.chunk_id,
+                    "pid": row.pid,
+                    "title": row.title or "Untitled trace",
+                    "year": int(row.year) if row.year is not None else None,
+                    "source_type": inferred_source_type,
+                    "themes": concepts,
+                    "entities": _extract_entities(row.entities),
+                    "confidence": float(row.confidence) if row.confidence is not None else None,
+                    "drift_score": float(row.drift_score) if row.drift_score is not None else None,
+                    "excerpt": _clean_excerpt(row.chunk_text),
+                    "filename": row.filename,
+                    "pdf_count": int(row.pdf_count or 0),
+                    "document_extracted_text": row.document_extracted_text,
+                    "authority_data": row.authority_data,
+                    "processing_status": row.processing_status,
+                    "has_diagrams": int(row.has_diagrams or 0),
+                    "doc_metadata": row.doc_metadata,
+                    "chunk_text": row.chunk_text,
+                    "source_page": row.source_page,
+                    "source_section": row.source_section,
+                }
+                evidence_surface = _infer_evidence_surface(record)
+                missingness = _build_missingness(record, evidence_surface) if include_missingness else None
+                cluster_label = concepts[0] if concepts else "Unclustered"
+                points.append(
+                    {
+                    "id": record["id"],
+                    "document_id": record["document_id"],
+                    "chunk_id": record["chunk_id"],
+                    "pid": record["pid"],
+                    "title": record["title"],
+                    "x": float(row.x),
+                    "y": float(row.y),
+                    "year": record["year"],
+                    "source_type": record["source_type"],
+                    "themes": record["themes"],
+                    "entities": record["entities"],
+                    "cluster_id": _slugify_cluster(cluster_label),
+                    "cluster_label": cluster_label,
+                    "confidence": record["confidence"],
+                    "drift_score": record["drift_score"],
+                    "excerpt": record["excerpt"],
+                    "evidence_surface": evidence_surface,
+                    "missingness": missingness,
+                    }
+                )
+            clusters = _summarize_clusters(points)
+            distinct_pids = len({point["pid"] for point in points if point.get("pid")})
+            atlas_document_count = db.execute(text("""
+                SELECT COUNT(DISTINCT document_id)
+                FROM semantic_chunk_embeddings
+                WHERE embedding_set_id = :embedding_set_id AND status = 'embedded'
+            """), {"embedding_set_id": atlas_projection["embedding_set_id"]}).scalar()
+            atlas_db_counts = {
+                **db_counts,
+                "embedded_chunks": int(atlas_projection["input_count"]),
+                "documents_with_embeddings": int(atlas_document_count or 0),
+                "documents_represented_by_chunks": int(atlas_document_count or 0),
+            }
+            interpretation_warnings = _build_interpretation_warnings()
+            interpretation_warnings.append(
+                "Coordinates come from a completed, versioned projection; proximity is a visual hypothesis, not evidence of a historical relationship."
+            )
+            return {
+                "points": points,
+                "clusters": clusters,
+                "metadata": {
+                    "embedding_model": "BAAI/bge-m3",
+                    "umap_model": "persisted-umap",
+                    "projection_method": atlas_projection["algorithm"],
+                    "generated_at": atlas_projection["completed_at"].isoformat() if atlas_projection["completed_at"] else None,
+                    "point_type": point_type,
+                    "is_demo": False,
+                    "source": "semantic_atlas_projection_points",
+                    "embedding_set_id": atlas_projection["embedding_set_id"],
+                    "projection_id": atlas_projection["projection_id"],
+                    "projection_parameters": atlas_projection["parameters_json"],
+                    "projection_library_version": atlas_projection["library_version"],
+                    "projection_random_seed": atlas_projection["random_seed"],
+                    "projection_input_ordering_sha256": atlas_projection["input_ordering_sha256"],
+                    "projection_numerical_tolerance": atlas_projection["numerical_tolerance"],
+                    "total_candidates": atlas_projection["input_count"],
+                    "returned_points": len(points),
+                    "distinct_pids_represented": distinct_pids,
+                    "evidence_surface_scope": _build_evidence_surface_scope(point_type, atlas_projection["input_count"], len(points), distinct_pids, atlas_db_counts),
+                    "interpretation_warnings": interpretation_warnings,
+                    "message": None,
+                },
+                "message": None,
+            }
 
         if point_type == "documents":
             if not _supports_document_embeddings(db):

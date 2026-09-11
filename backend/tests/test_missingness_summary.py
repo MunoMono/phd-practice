@@ -6,7 +6,7 @@ BACKEND_ROOT = Path(__file__).resolve().parents[1]
 if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
-from app.api.routes.missingness import calculate_metadata_coverage
+from app.api.routes.missingness import MissingnessUpdateRequest, calculate_metadata_coverage
 
 
 class MissingnessSummaryTests(unittest.TestCase):
@@ -23,3 +23,8 @@ class MissingnessSummaryTests(unittest.TestCase):
 
     def test_metadata_coverage_is_zero_without_local_documents(self):
         self.assertEqual(calculate_metadata_coverage(0, 0, 0, 0, 0), 0)
+
+    def test_reviewer_can_update_missingness_typology(self):
+        request = MissingnessUpdateRequest(type="computational")
+
+        self.assertEqual(request.type, "computational")

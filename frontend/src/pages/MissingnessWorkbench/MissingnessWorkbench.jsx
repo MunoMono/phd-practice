@@ -35,8 +35,10 @@ const headers = [
   { key: 'query_or_entity_or_field', header: 'Query / entity / field' },
   { key: 'evidence', header: 'Evidence' },
   { key: 'source_document_id', header: 'Source document' },
+  { key: 'source_chunk_id', header: 'Source chunk' },
   { key: 'status', header: 'Status' },
   { key: 'reviewer_note', header: 'Reviewer note' },
+    { key: 'follow_up_action', header: 'Follow-up action' },
   { key: 'created_at', header: 'Created' }
 ]
 
@@ -47,6 +49,9 @@ const getEventIdFromTableRow = (row) => {
 const MissingnessWorkbench = () => {
   const [searchParams] = useSearchParams()
   const requestedEventId = searchParams.get('eventId') || ''
+  const sourceDocumentId = searchParams.get('sourceDocumentId') || ''
+  const sourceChunkId = searchParams.get('sourceChunkId') || ''
+  const sourcePid = searchParams.get('pid') || ''
   const [filter, setFilter] = useState('all')
   const [summary, setSummary] = useState(null)
   const [events, setEvents] = useState([])
@@ -54,8 +59,10 @@ const MissingnessWorkbench = () => {
   const [error, setError] = useState('')
   const [selectionError, setSelectionError] = useState('')
   const [selectedEventId, setSelectedEventId] = useState('')
+  const [typeDrafts, setTypeDrafts] = useState({})
   const [statusDrafts, setStatusDrafts] = useState({})
   const [reviewerNoteDrafts, setReviewerNoteDrafts] = useState({})
+  const [followUpActionDrafts, setFollowUpActionDrafts] = useState({})
   const [savingEventId, setSavingEventId] = useState('')
   const [savedEventId, setSavedEventId] = useState('')
   const [saveError, setSaveError] = useState('')
@@ -70,7 +77,10 @@ const MissingnessWorkbench = () => {
       try {
         const [summaryPayload, eventsPayload] = await Promise.all([
           getMissingnessSummary(),
-          getMissingnessEvents(filter === 'all' ? {} : { type: filter })
+          getMissingnessEvents({
+            ...(filter === 'all' ? {} : { type: filter }),
+            ...(sourceDocumentId ? { source_document_id: sourceDocumentId } : {})
+          })
         ])
 
         if (isCancelled) {
@@ -114,7 +124,7 @@ const MissingnessWorkbench = () => {
     return () => {
       isCancelled = true
     }
-  }, [filter, requestedEventId])
+  }, [filter, requestedEventId, sourceDocumentId])
 
   const rows = useMemo(() => {
     return events.map((event) => ({ id: event.event_id, ...event }))
@@ -124,6 +134,12 @@ const MissingnessWorkbench = () => {
     () => events.find((event) => event.event_id === selectedEventId) || null,
     [events, selectedEventId]
   )
+
+  const draftType = selectedEvent
+    ? (Object.hasOwn(typeDrafts, selectedEvent.event_id)
+        ? typeDrafts[selectedEvent.event_id]
+        : selectedEvent.type)
+    : 'retrieval'
 
   const draftStatus = selectedEvent
     ? (Object.hasOwn(statusDrafts, selectedEvent.event_id)
@@ -137,9 +153,17 @@ const MissingnessWorkbench = () => {
         : selectedEvent.reviewer_note || '')
     : ''
 
+  const draftFollowUpAction = selectedEvent
+    ? (Object.hasOwn(followUpActionDrafts, selectedEvent.event_id)
+        ? followUpActionDrafts[selectedEvent.event_id]
+        : selectedEvent.follow_up_action || '')
+    : ''
+
   const isReviewDirty = Boolean(selectedEvent) && (
-    draftStatus !== (selectedEvent.status || 'open')
+    draftType !== selectedEvent.type
+    || draftStatus !== (selectedEvent.status || 'open')
     || draftReviewerNote !== (selectedEvent.reviewer_note || '')
+    || draftFollowUpAction !== (selectedEvent.follow_up_action || '')
   )
 
   const exportRows = rows.map((row) => ({
@@ -149,8 +173,12 @@ const MissingnessWorkbench = () => {
     query_or_entity_or_field: row.query_or_entity_or_field,
     evidence: row.evidence,
     source_document_id: row.source_document_id,
+    source_chunk_id: row.source_chunk_id,
+    source_document_ids: row.source_document_ids?.join(', ') || '',
+    source_chunk_ids: row.source_chunk_ids?.join(', ') || '',
     status: row.status,
     reviewer_note: row.reviewer_note,
+    follow_up_action: row.follow_up_action,
     created_at: row.created_at
   }))
 
@@ -172,8 +200,10 @@ const MissingnessWorkbench = () => {
 
     const saveTargetEventId = selectedEvent.event_id
     const savePayload = {
+      type: draftType,
       status: draftStatus,
-      reviewer_note: draftReviewerNote
+      reviewer_note: draftReviewerNote,
+      follow_up_action: draftFollowUpAction
     }
 
     setSavingEventId(saveTargetEventId)
@@ -186,11 +216,19 @@ const MissingnessWorkbench = () => {
       }
 
       setEvents((current) => current.map((event) => event.event_id === saveTargetEventId ? updated : event))
+      setTypeDrafts((current) => {
+        const { [saveTargetEventId]: _savedDraft, ...remaining } = current
+        return remaining
+      })
       setStatusDrafts((current) => {
         const { [saveTargetEventId]: _savedDraft, ...remaining } = current
         return remaining
       })
       setReviewerNoteDrafts((current) => {
+        const { [saveTargetEventId]: _savedDraft, ...remaining } = current
+        return remaining
+      })
+      setFollowUpActionDrafts((current) => {
         const { [saveTargetEventId]: _savedDraft, ...remaining } = current
         return remaining
       })
@@ -233,6 +271,17 @@ const MissingnessWorkbench = () => {
       {selectionError && (
         <Column>
           <InlineNotification lowContrast kind="warning" title="Missingness event unavailable" subtitle={selectionError} />
+        </Column>
+      )}
+
+      {(sourceDocumentId || sourceChunkId || sourcePid) && (
+        <Column>
+          <InlineNotification
+            lowContrast
+            kind="info"
+            title="Atlas source context"
+            subtitle={`Viewing scoped events for ${sourceDocumentId || 'a source without a document identifier'}${sourceChunkId ? `, chunk ${sourceChunkId}` : ''}${sourcePid ? `, PID ${sourcePid}` : ''}. This context records a technical or evidential limit; it is not proof of historical absence.`}
+          />
         </Column>
       )}
 
@@ -290,6 +339,7 @@ const MissingnessWorkbench = () => {
               <div key={entry.id} className="app-list-item">
                 <strong className="app-list-item__title">{entry.query}</strong>
                 {getResearchStateTag(events.find((event) => event.event_id === entry.id)) ? <Tag type={getResearchStateTag(events.find((event) => event.event_id === entry.id)).type} size="sm">{getResearchStateTag(events.find((event) => event.event_id === entry.id)).label}</Tag> : null}
+                {events.find((event) => event.event_id === entry.id)?.query_id && !getResearchStateTag(events.find((event) => event.event_id === entry.id)) ? <Tag type="blue" size="sm">Source interrogation</Tag> : null}
                 <p className="app-list-item__body">{entry.outcome}</p>
                 <p className="app-list-item__note">{entry.note}</p>
               </div>
@@ -304,14 +354,31 @@ const MissingnessWorkbench = () => {
           {selectedEvent ? (
             <>
               {getResearchStateTag(selectedEvent) ? <Tag type={getResearchStateTag(selectedEvent).type}>{getResearchStateTag(selectedEvent).label}</Tag> : null}
+              {selectedEvent.query_id && !getResearchStateTag(selectedEvent) ? <Tag type="blue">Source interrogation</Tag> : null}
               <p className="app-list-item__meta">Event ID: {selectedEvent.event_id}</p>
               <p className="app-list-item__meta">Typology: {selectedEvent.type}</p>
               <p><strong>{selectedEvent.query_or_entity_or_field}</strong></p>
               {selectedEvent.query_id && <p className="app-list-item__meta">Source run: {selectedEvent.query_id}</p>}
               {selectedEvent.source_document_id && <p className="app-list-item__meta">Source document: {selectedEvent.source_document_id}</p>}
               {selectedEvent.source_chunk_id && <p className="app-list-item__meta">Source chunk: {selectedEvent.source_chunk_id}</p>}
+                            {selectedEvent.source_document_ids?.length > 1 && <p className="app-list-item__meta">All source documents: {selectedEvent.source_document_ids.join(', ')}</p>}
+                            {selectedEvent.source_chunk_ids?.length > 1 && <p className="app-list-item__meta">All source chunks: {selectedEvent.source_chunk_ids.join(', ')}</p>}
               {selectedEvent.created_at && <p className="app-list-item__meta">Created: {selectedEvent.created_at}</p>}
               <p className="app-text-muted">{selectedEvent.evidence}</p>
+              <Select
+                id="selected-missingness-type"
+                labelText="Analytical typology"
+                helperText="Classify the condition under review; this does not change the underlying evidence."
+                value={draftType}
+                onChange={(event) => setTypeDrafts((current) => ({
+                  ...current,
+                  [selectedEvent.event_id]: event.target.value
+                }))}
+              >
+                {typologyOptions.filter((option) => option !== 'all').map((option) => (
+                  <SelectItem key={option} value={option} text={option} />
+                ))}
+              </Select>
               <Select
                 id="selected-missingness-status"
                 labelText="Researcher review status"
@@ -332,6 +399,16 @@ const MissingnessWorkbench = () => {
                 rows={5}
                 value={draftReviewerNote}
                 onChange={(event) => setReviewerNoteDrafts((current) => ({
+                  ...current,
+                  [selectedEvent.event_id]: event.target.value
+                }))}
+              />
+              <TextArea
+                id="selected-missingness-follow-up-action"
+                labelText="Follow-up action - changes remain local until saved"
+                rows={4}
+                value={draftFollowUpAction}
+                onChange={(event) => setFollowUpActionDrafts((current) => ({
                   ...current,
                   [selectedEvent.event_id]: event.target.value
                 }))}
@@ -394,6 +471,7 @@ const MissingnessWorkbench = () => {
                                 <div className="app-tag-row">
                                   <span>{cell.value}</span>
                                   {stateTag ? <Tag type={stateTag.type} size="sm">{stateTag.label}</Tag> : null}
+                                  {event?.query_id && !stateTag ? <Tag type="blue" size="sm">Source interrogation</Tag> : null}
                                 </div>
                               </TableCell>
                             )

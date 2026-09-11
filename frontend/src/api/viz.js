@@ -43,3 +43,15 @@ export const getUmapProjection = async (params = {}) => {
   const payload = await apiRequest('/api/viz/umap', { params })
   return normalizeUmapProjection(payload)
 }
+
+export const getEmbeddingReadiness = () => apiRequest('/api/viz/embedding-readiness')
+
+export const createEmbeddingReadinessReview = (payload) => apiRequest('/api/viz/embedding-readiness', {
+  method: 'POST',
+  body: payload
+})
+
+export const createAtlasCoverageMissingness = (payload) => apiRequest('/api/viz/atlas-coverage-missingness', {
+  method: 'POST',
+  body: payload
+})

@@ -228,6 +228,20 @@ export const normalizeEvidenceSource = (raw = {}) => {
     section: firstDefined(raw.section, raw.source_section, raw.sourceSection, raw.citation?.section) || null,
     excerpt: firstDefined(raw.excerpt, raw.chunk_text, raw.chunkText, raw.text, raw.chunk?.text) || null,
     score: firstDefined(toNumber(raw.score, null), toNumber(raw.similarity, null), toNumber(raw.rank, null), null),
+    textScore: toNumber(raw.text_score ?? raw.textScore, null),
+    metadataScore: toNumber(raw.metadata_score ?? raw.metadataScore, null),
+    sourceNominationScore: toNumber(raw.source_nomination_score ?? raw.sourceNominationScore, null),
+    passageScore: toNumber(raw.passage_score ?? raw.passageScore, null),
+    sourceNominationChannels: toArray(raw.source_nomination_channels || raw.sourceNominationChannels),
+    retrievalChannels: toArray(raw.retrieval_channels || raw.retrievalChannels),
+    passageEvidenceChannel: raw.passage_evidence_channel || raw.passageEvidenceChannel || null,
+    metadataMatches: toArray(raw.metadata_matches || raw.metadataMatches),
+    evidenceClassification: raw.evidence_classification || raw.evidenceClassification || null,
+    identity: {
+      recordPid: raw.archive_record_pid || raw.provenance?.archive_record_pid || null,
+      mediaPid: raw.attached_media_pid || raw.pid || null,
+      assetPid: raw.asset_pid || raw.provenance?.asset_pid || null,
+    },
     citation: raw.citation || parsedCitation.text || null,
     provenance: raw.provenance || null,
     provenanceStatus: raw.provenanceStatus || 'unavailable',
@@ -236,7 +250,7 @@ export const normalizeEvidenceSource = (raw = {}) => {
   }
 }
 
-export const normalizeGraniteAnalysis = (raw = {}) => {
+export const normalizeRuntimeAnalysis = (raw = {}) => {
   const sources = toArray(raw.sources || raw.context_chunks || raw.contextChunks || raw.evidence)
     .map(normalizeEvidenceSource)
 
@@ -253,7 +267,7 @@ export const normalizeGraniteAnalysis = (raw = {}) => {
 }
 
 export const normalizeEvidenceTrace = (raw = {}) => ({
-  ...normalizeGraniteAnalysis(raw),
+  ...normalizeRuntimeAnalysis(raw),
   sessionId: raw.sessionId || raw.session_id || null
 })
 
@@ -358,6 +372,7 @@ export const normalizeUmapProjection = (raw = {}) => ({
     embeddingModel: firstDefined(raw.metadata?.embeddingModel, raw.metadata?.embedding_model, null),
     umapModel: firstDefined(raw.metadata?.umapModel, raw.metadata?.umap_model, null),
     projectionMethod: firstDefined(raw.metadata?.projectionMethod, raw.metadata?.projection_method, 'none'),
+    projectionId: firstDefined(raw.metadata?.projectionId, raw.metadata?.projection_id, null),
     generatedAt: firstDefined(raw.metadata?.generatedAt, raw.metadata?.generated_at, null),
     pointType: firstDefined(raw.metadata?.pointType, raw.metadata?.point_type, 'chunks'),
     isDemo: Boolean(firstDefined(raw.metadata?.isDemo, raw.metadata?.is_demo, false)),

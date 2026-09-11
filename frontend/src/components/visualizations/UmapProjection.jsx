@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef } from 'react'
 import * as d3 from 'd3'
 import { chartColors, chartStyles, utils } from '../../utils/carbonD3Theme'
 
-const UmapProjection = ({ points, loading, errorState, selectedPoint, highlightedTrace, onSelectPoint }) => {
+const UmapProjection = ({ points, loading, errorState, selectedPoint, highlightedTrace, colorBy, onSelectPoint }) => {
   const svgRef = useRef(null)
   const tooltipRef = useRef(null)
 
@@ -45,10 +45,30 @@ const UmapProjection = ({ points, loading, errorState, selectedPoint, highlighte
       .domain(yExtent[0] === yExtent[1] ? [yExtent[0] - 1, yExtent[1] + 1] : yExtent)
       .range([height - margin.bottom, margin.top])
 
-    const color = utils.getClusterColorScale(
-      [...new Set(points.map((point) => point.clusterLabel || point.sourceType || 'unclustered'))],
-      (key) => key
-    )
+    const categoricalFields = {
+      cluster: (point) => point.clusterLabel || 'unclustered',
+      source_type: (point) => point.sourceType || 'unknown',
+      theme: (point) => point.themes?.[0] || 'unlabelled',
+    }
+    const numericFields = {
+      year: (point) => point.year,
+      confidence: (point) => point.confidence,
+      drift_score: (point) => point.driftScore,
+    }
+    const categoricalValue = categoricalFields[colorBy]
+    const numericValue = numericFields[colorBy]
+    const color = categoricalValue
+      ? utils.getClusterColorScale([...new Set(points.map(categoricalValue))], (key) => key)
+      : (() => {
+          const values = points.map(numericValue || categoricalFields.cluster).filter(Number.isFinite)
+          if (values.length === 0) {
+            return () => chartColors.plotStroke
+          }
+          const extent = d3.extent(values)
+          const domain = extent[0] === extent[1] ? [extent[0] - 1, extent[1] + 1] : extent
+          const scale = d3.scaleSequential(d3.interpolateTurbo).domain(domain)
+          return (point) => Number.isFinite(numericValue?.(point)) ? scale(numericValue(point)) : chartColors.plotStroke
+        })()
 
     const plot = root.append('g')
 
@@ -85,7 +105,7 @@ const UmapProjection = ({ points, loading, errorState, selectedPoint, highlighte
       .attr('cx', (point) => xScale(point.x))
       .attr('cy', (point) => yScale(point.y))
       .attr('r', (point) => (point.id === selectedPoint?.id ? 8 : point.id === highlightedPointId ? 7 : 5))
-      .attr('fill', (point) => color(point.clusterLabel || point.sourceType || 'unclustered'))
+      .attr('fill', (point) => categoricalValue ? color(categoricalValue(point)) : color(point))
       .attr('stroke', (point) => (point.id === selectedPoint?.id ? chartColors.selectionStroke : point.id === highlightedPointId ? chartColors.highlightStroke : chartColors.plotStroke))
       .attr('stroke-width', (point) => (point.id === selectedPoint?.id || point.id === highlightedPointId ? 2.5 : 1))
       .on('mouseenter', (event, point) => {
@@ -116,7 +136,7 @@ const UmapProjection = ({ points, loading, errorState, selectedPoint, highlighte
     return () => {
       tooltip.style('opacity', 0)
     }
-  }, [points, loading, errorState, selectedPoint, highlightedPointId, onSelectPoint])
+  }, [points, loading, errorState, selectedPoint, highlightedPointId, colorBy, onSelectPoint])
 
   if (loading) {
     return <div className="umap-projection__state">Loading UMAP projection…</div>

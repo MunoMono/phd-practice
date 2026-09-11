@@ -29,6 +29,7 @@ const EvidenceChain = ({
       {sources.map((source, index) => (
         <EvidenceSourceCard
           key={source.chunkId || `source-${index}`}
+          id={`source-${index + 1}`}
           source={source}
           index={index}
           onCopyCitation={() => onCopyCitation(source)}

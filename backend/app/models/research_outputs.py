@@ -18,10 +18,36 @@ class MissingnessEvent(LocalBase):
     query_id = Column(String(255), index=True)
     source_document_id = Column(String(255), index=True)
     source_chunk_id = Column(String(255), index=True)
+    source_document_ids_json = Column(JSONB)
+    source_chunk_ids_json = Column(JSONB)
+    cross_read_mapping_id = Column(String(255), index=True)
     status = Column(String(32), nullable=False, default="open", index=True)
     reviewer_note = Column(Text)
+    follow_up_action = Column(Text)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class EmbeddingReadinessReview(LocalBase):
+    __tablename__ = "embedding_readiness_reviews"
+
+    id = Column(Integer, primary_key=True, index=True)
+    review_id = Column(String(255), unique=True, nullable=False, index=True)
+    status = Column(String(32), nullable=False, index=True)
+    corpus_release = Column(String(255), nullable=False)
+    source_scope = Column(Text, nullable=False)
+    exclusions = Column(Text, nullable=False)
+    embedding_model = Column(String(255), nullable=False)
+    model_revision_or_checksum = Column(String(255), nullable=False)
+    vector_dimensions = Column(Integer, nullable=False)
+    runtime_and_license = Column(Text, nullable=False)
+    normalisation_chunking_version = Column(String(255), nullable=False)
+    capacity_retention_plan = Column(Text, nullable=False)
+    fts_separation_plan = Column(Text, nullable=False)
+    analytical_question = Column(Text, nullable=False)
+    reviewed_by = Column(String(255))
+    reviewed_at = Column(DateTime)
+    created_at = Column(DateTime, default=datetime.utcnow)
 
 
 class Claim(LocalBase):
@@ -116,6 +142,18 @@ class ExperimentRun(LocalBase):
     prompt_version = Column(String(64), nullable=False)
     system_prompt_version = Column(String(64), nullable=False)
     exact_research_question = Column(Text, nullable=False)
+    question_id = Column(String(64), index=True)
+    retrieval_protocol_version = Column(String(128))
+    retrieval_plan_id = Column(String(255))
+    retrieval_plan_version = Column(String(128))
+    retrieval_plan_approval_state = Column(String(32))
+    retrieval_plan_json = Column(JSONB)
+    retrieval_scope = Column(String(64))
+    retrieval_run_classification = Column(String(64))
+    recovery_of_run_id = Column(String(255))
+    recovery_category = Column(String(128))
+    formal_authorization_id = Column(String(255))
+    execution_environment = Column(String(64))
     corpus_version = Column(String(255))
     git_commit = Column(String(64))
     retrieval_method = Column(String(128), nullable=False)
@@ -136,7 +174,14 @@ class ExperimentRun(LocalBase):
     raw_model_response = Column(Text)
     repair_attempted = Column(Boolean, nullable=False, default=False)
     raw_repair_response = Column(Text)
+    generation_metadata_json = Column(JSONB)
+    repair_generation_metadata_json = Column(JSONB)
+    response_schema_json = Column(JSONB)
+    response_schema_version = Column(String(128))
+    response_schema_hash = Column(String(128))
     parse_status = Column(String(64), nullable=False)
+    parsed_response_json = Column(JSONB)
+    display_response_json = Column(JSONB)
     structured_response_json = Column(JSONB)
     provenance_validation_json = Column(JSONB)
     status = Column(String(64), nullable=False, index=True)
@@ -148,6 +193,44 @@ class ExperimentRun(LocalBase):
 
     evidence = relationship("ExperimentRunEvidence", back_populates="experiment_run", cascade="all, delete-orphan")
     assessment = relationship("ExperimentRunAssessment", back_populates="experiment_run", uselist=False, cascade="all, delete-orphan")
+
+
+class TurinRetrievalPlan(LocalBase):
+    """Versioned plan record; executed plans are locked by database trigger."""
+    __tablename__ = "turin_retrieval_plans"
+
+    id = Column(Integer, primary_key=True, index=True)
+    plan_id = Column(String(255), unique=True, nullable=False, index=True)
+    question_id = Column(String(64), nullable=False, index=True)
+    protocol_version = Column(String(128), nullable=False)
+    plan_version = Column(String(128), nullable=False)
+    researcher_approval_state = Column(String(32), nullable=False)
+    researcher_approved_at = Column(DateTime)
+    run_classification = Column(String(64), nullable=False)
+    supersedes_plan_id = Column(String(255))
+    plan_json = Column(JSONB, nullable=False)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+
+class TurinAuthorityDocumentLink(LocalBase):
+    """Approved DDR provenance relationship usable only by diagnostic retrieval plans."""
+    __tablename__ = "turin_authority_document_links"
+
+    id = Column(Integer, primary_key=True, index=True)
+    link_id = Column(String(255), unique=True, nullable=False, index=True)
+    authority_source = Column(String(255), nullable=False)
+    authority_type = Column(String(128), nullable=False)
+    authority_id = Column(String(255), nullable=False, index=True)
+    document_id = Column(String(255), nullable=False, index=True)
+    archive_record_pid = Column(String(255), nullable=False, index=True)
+    relationship_type = Column(String(128), nullable=False)
+    provenance_source = Column(Text, nullable=False)
+    rationale = Column(Text, nullable=False)
+    approval_state = Column(String(32), nullable=False)
+    approved_by = Column(String(255))
+    approved_at = Column(DateTime)
+    link_version = Column(String(128), nullable=False)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
 
 
 class ExperimentRunEvidence(LocalBase):
@@ -207,6 +290,10 @@ class CrossReadPassage(LocalBase):
     speaker_or_source = Column(String(255))
     passage_label = Column(String(255))
     source_type = Column(String(64), index=True)
+    source_reference = Column(Text)
+    source_date = Column(String(64))
+    access_status = Column(String(32), nullable=False, default="unknown", index=True)
+    ingestion_method = Column(String(32), nullable=False, default="researcher_entered")
     memory_position_note = Column(Text)
     status = Column(String(32), nullable=False, default="draft", index=True)
     created_at = Column(DateTime, default=datetime.utcnow)

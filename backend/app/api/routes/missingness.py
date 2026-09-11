@@ -32,11 +32,14 @@ class MissingnessCreateRequest(BaseModel):
     source_chunk_id: Optional[str] = None
     status: MissingnessStatus = "open"
     reviewer_note: Optional[str] = None
+    follow_up_action: Optional[str] = None
 
 
 class MissingnessUpdateRequest(BaseModel):
+    type: Optional[MissingnessType] = None
     status: Optional[MissingnessStatus] = None
     reviewer_note: Optional[str] = None
+    follow_up_action: Optional[str] = None
 
 
 def serialize_event(event: MissingnessEvent) -> dict:
@@ -49,8 +52,12 @@ def serialize_event(event: MissingnessEvent) -> dict:
         "query_id": event.query_id,
         "source_document_id": event.source_document_id,
         "source_chunk_id": event.source_chunk_id,
+        "source_document_ids": event.source_document_ids_json or [],
+        "source_chunk_ids": event.source_chunk_ids_json or [],
+        "cross_read_mapping_id": event.cross_read_mapping_id,
         "status": event.status,
         "reviewer_note": event.reviewer_note,
+        "follow_up_action": event.follow_up_action,
         "created_at": event.created_at.isoformat() if event.created_at else None,
         "updated_at": event.updated_at.isoformat() if event.updated_at else None,
     }
@@ -196,6 +203,7 @@ async def create_missingness_event(request: MissingnessCreateRequest):
             source_chunk_id=request.source_chunk_id,
             status=request.status,
             reviewer_note=request.reviewer_note,
+            follow_up_action=request.follow_up_action,
         )
         db.add(event)
         db.commit()
@@ -213,10 +221,14 @@ async def update_missingness_event(event_id: str, request: MissingnessUpdateRequ
         if not event:
             raise HTTPException(status_code=404, detail="Missingness event not found")
 
+        if request.type is not None:
+            event.type = request.type
         if request.status is not None:
             event.status = request.status
         if request.reviewer_note is not None:
             event.reviewer_note = request.reviewer_note
+        if request.follow_up_action is not None:
+            event.follow_up_action = request.follow_up_action
 
         db.commit()
         db.refresh(event)

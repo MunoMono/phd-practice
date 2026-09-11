@@ -11,12 +11,14 @@ import {
 } from '@carbon/react'
 import { ArrowsHorizontal, Download } from '@carbon/icons-react'
 import { useEffect, useMemo, useState } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   createCrossReadPassage,
   exportCrossReadCsv,
   exportCrossReadMarkdown,
   getCrossReadPassage,
   getCrossReadPassages,
+  nominateCrossReadMappingForMissingness,
   runCrossReadPassage,
   updateCrossReadMapping,
   updateCrossReadPassage
@@ -27,26 +29,37 @@ import { PageGrid, PageColumn as Column } from '../../components/layout/PageGrid
 import { downloadFile } from '../../utils/workbenchExport'
 import { getResearchStateTag } from '../../utils/researchState'
 
-const relationOptions = ['supports', 'complicates', 'contradicts', 'no-documentary-trace']
-const sourceTypeOptions = ['oral_history', 'interview', 'field_note', 'researcher_note', 'mock_dev']
+const relationOptions = ['unreviewed', 'convergence', 'contradiction', 'complication', 'contextual_relation', 'no_documentary_trace']
+const sourceTypeOptions = ['oral_history', 'interview', 'field_note', 'researcher_note']
 const statusOptions = ['draft', 'reviewing', 'mapped', 'unresolved']
+const accessStatusOptions = ['open', 'restricted', 'unknown']
+const ingestionMethodOptions = ['researcher_entered', 'imported']
 
 const createEmptyPassageForm = () => ({
   passage_text: '',
   speaker_or_source: '',
   passage_label: '',
   source_type: 'researcher_note',
+  source_reference: '',
+  source_date: '',
+  access_status: 'unknown',
+  ingestion_method: 'researcher_entered',
   memory_position_note: '',
   status: 'draft'
 })
 
 const createEmptyMappingForm = () => ({
-  relation_type: relationOptions[1],
+  relation_type: relationOptions[0],
   reviewer_note: '',
-  confidence_or_status: 'reviewing'
+  confidence_or_status: 'candidate'
 })
 
 const CrossReadWorkbench = () => {
+  const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const sourceDocumentId = searchParams.get('sourceDocumentId') || ''
+  const sourceChunkId = searchParams.get('sourceChunkId') || ''
+  const sourcePid = searchParams.get('pid') || ''
   const [passages, setPassages] = useState([])
   const [selectedPassageId, setSelectedPassageId] = useState('')
   const [selectedPassage, setSelectedPassage] = useState(null)
@@ -57,7 +70,9 @@ const CrossReadWorkbench = () => {
   const [savingPassage, setSavingPassage] = useState(false)
   const [runningProbe, setRunningProbe] = useState(false)
   const [savingMapping, setSavingMapping] = useState(false)
+  const [nominatingMissingness, setNominatingMissingness] = useState(false)
   const [error, setError] = useState('')
+  const [passageTextError, setPassageTextError] = useState('')
   const [notice, setNotice] = useState('')
   const [queryRunNotice, setQueryRunNotice] = useState('')
 
@@ -120,6 +135,10 @@ const CrossReadWorkbench = () => {
           speaker_or_source: payload.speaker_or_source || '',
           passage_label: payload.passage_label || '',
           source_type: payload.source_type || 'researcher_note',
+          source_reference: payload.source_reference || '',
+          source_date: payload.source_date || '',
+          access_status: payload.access_status || 'unknown',
+          ingestion_method: payload.ingestion_method || 'researcher_entered',
           memory_position_note: payload.memory_position_note || '',
           status: payload.status || 'draft'
         })
@@ -154,9 +173,9 @@ const CrossReadWorkbench = () => {
 
     setSelectedMappingId(selectedMapping.mapping_id)
     setMappingForm({
-      relation_type: selectedMapping.relation_type === 'no_documentary_trace' ? 'no-documentary-trace' : selectedMapping.relation_type,
+      relation_type: selectedMapping.relation_type,
       reviewer_note: selectedMapping.reviewer_note || '',
-      confidence_or_status: selectedMapping.confidence_or_status || 'reviewing'
+      confidence_or_status: selectedMapping.confidence_or_status || 'candidate'
     })
   }, [selectedMapping])
 
@@ -171,12 +190,13 @@ const CrossReadWorkbench = () => {
 
   const handleCreatePassage = async () => {
     if (!passageForm.passage_text.trim()) {
-      setError('Passage text is required before creating a passage.')
+      setPassageTextError('Passage text is required before creating a passage.')
       return
     }
 
     setSavingPassage(true)
     setError('')
+    setPassageTextError('')
     setNotice('')
 
     try {
@@ -185,6 +205,10 @@ const CrossReadWorkbench = () => {
         speaker_or_source: passageForm.speaker_or_source || null,
         passage_label: passageForm.passage_label || null,
         source_type: passageForm.source_type,
+        source_reference: passageForm.source_reference || null,
+        source_date: passageForm.source_date || null,
+        access_status: passageForm.access_status,
+        ingestion_method: passageForm.ingestion_method,
         memory_position_note: passageForm.memory_position_note || null,
         status: passageForm.status
       })
@@ -211,6 +235,11 @@ const CrossReadWorkbench = () => {
         passage_text: passageForm.passage_text,
         speaker_or_source: passageForm.speaker_or_source || null,
         passage_label: passageForm.passage_label || null,
+        source_type: passageForm.source_type,
+        source_reference: passageForm.source_reference || null,
+        source_date: passageForm.source_date || null,
+        access_status: passageForm.access_status,
+        ingestion_method: passageForm.ingestion_method,
         memory_position_note: passageForm.memory_position_note || null,
         status: passageForm.status
       })
@@ -258,7 +287,7 @@ const CrossReadWorkbench = () => {
 
     try {
       const payload = await updateCrossReadMapping(selectedMapping.mapping_id, {
-        relation_type: mappingForm.relation_type.replace(/-/g, '_'),
+        relation_type: mappingForm.relation_type,
         reviewer_note: mappingForm.reviewer_note || null,
         confidence_or_status: mappingForm.confidence_or_status || null
       })
@@ -271,6 +300,26 @@ const CrossReadWorkbench = () => {
       setError(saveError.message || 'Failed to update testimony-record mapping.')
     } finally {
       setSavingMapping(false)
+    }
+  }
+
+  const handleNominateMissingness = async () => {
+    if (!selectedMapping?.mapping_id || selectedMapping.relation_type !== 'no_documentary_trace' || !mappingForm.reviewer_note.trim()) {
+      return
+    }
+
+    setNominatingMissingness(true)
+    setError('')
+    try {
+      const nomination = await nominateCrossReadMappingForMissingness(selectedMapping.mapping_id, {
+        confirmed: true,
+        reviewer_note: mappingForm.reviewer_note
+      })
+      navigate(`/absences?eventId=${encodeURIComponent(nomination.event_id)}`)
+    } catch (nominationError) {
+      setError(nominationError.message || 'The missingness event could not be nominated.')
+    } finally {
+      setNominatingMissingness(false)
     }
   }
 
@@ -330,6 +379,17 @@ const CrossReadWorkbench = () => {
         />
       </Column>
 
+      {(sourceDocumentId || sourceChunkId || sourcePid) && (
+        <Column>
+          <InlineNotification
+            lowContrast
+            kind="info"
+            title="Atlas source context"
+            subtitle={`The Atlas handed off ${sourceDocumentId || 'a source without a document identifier'}${sourceChunkId ? `, chunk ${sourceChunkId}` : ''}${sourcePid ? `, PID ${sourcePid}` : ''}. Open the source before creating a testimony passage; an archival point is not testimony.`}
+          />
+        </Column>
+      )}
+
       {error && (
         <Column>
           <InlineNotification lowContrast kind="error" title="Cross-readings unavailable" subtitle={error} />
@@ -369,7 +429,15 @@ const CrossReadWorkbench = () => {
             labelText="Passage text"
             rows={8}
             value={passageForm.passage_text}
-            onChange={(event) => setPassageForm((current) => ({ ...current, passage_text: event.target.value }))}
+            invalid={Boolean(passageTextError)}
+            invalidText={passageTextError}
+            onChange={(event) => {
+              const value = event.target.value
+              setPassageForm((current) => ({ ...current, passage_text: value }))
+              if (value.trim()) {
+                setPassageTextError('')
+              }
+            }}
           />
           <TextInput
             id="cross-read-source"
@@ -379,6 +447,29 @@ const CrossReadWorkbench = () => {
           />
           <Select id="cross-read-source-type" labelText="Source type" value={passageForm.source_type} onChange={(event) => setPassageForm((current) => ({ ...current, source_type: event.target.value }))}>
             {sourceTypeOptions.map((option) => (
+              <SelectItem key={option} value={option} text={option} />
+            ))}
+          </Select>
+          <TextInput
+            id="cross-read-source-reference"
+            labelText="Durable source reference"
+            helperText="Required for oral-history and interview passages."
+            value={passageForm.source_reference}
+            onChange={(event) => setPassageForm((current) => ({ ...current, source_reference: event.target.value }))}
+          />
+          <TextInput
+            id="cross-read-source-date"
+            labelText="Source date"
+            value={passageForm.source_date}
+            onChange={(event) => setPassageForm((current) => ({ ...current, source_date: event.target.value }))}
+          />
+          <Select id="cross-read-access-status" labelText="Access status" value={passageForm.access_status} onChange={(event) => setPassageForm((current) => ({ ...current, access_status: event.target.value }))}>
+            {accessStatusOptions.map((option) => (
+              <SelectItem key={option} value={option} text={option} />
+            ))}
+          </Select>
+          <Select id="cross-read-ingestion-method" labelText="Ingestion method" value={passageForm.ingestion_method} onChange={(event) => setPassageForm((current) => ({ ...current, ingestion_method: event.target.value }))}>
+            {ingestionMethodOptions.map((option) => (
               <SelectItem key={option} value={option} text={option} />
             ))}
           </Select>
@@ -395,7 +486,7 @@ const CrossReadWorkbench = () => {
             onChange={(event) => setPassageForm((current) => ({ ...current, memory_position_note: event.target.value }))}
           />
           <div className="app-actions-row app-actions-row--comfortable cross-read-workbench__action-group">
-            <Button size="sm" onClick={handleCreatePassage} disabled={savingPassage || !passageForm.passage_text.trim()}>
+            <Button size="sm" onClick={handleCreatePassage} disabled={savingPassage}>
               Create passage
             </Button>
             <Button kind="secondary" size="sm" onClick={handleSavePassage} disabled={!selectedPassageId || savingPassage}>
@@ -434,7 +525,7 @@ const CrossReadWorkbench = () => {
                   <div className="app-tag-row">
                     <Tag type="blue">{metadata.pid || 'PID unavailable'}</Tag>
                     <Tag type="gray">{mapping.chunk_id || 'No chunk returned'}</Tag>
-                    <Tag type="purple">{mapping.relation_type === 'no_documentary_trace' ? 'no-documentary-trace' : mapping.relation_type}</Tag>
+                    <Tag type="purple">{mapping.relation_type.replace(/_/g, '-')}</Tag>
                   </div>
                   <p className="app-list-item__note">
                     Query run: {mapping.query_id || 'Unavailable'}
@@ -476,6 +567,14 @@ const CrossReadWorkbench = () => {
           </div>
           <div className="app-actions-row app-actions-row--comfortable cross-read-workbench__action-group">
             <Button size="sm" onClick={handleSaveMapping} disabled={!selectedMapping?.mapping_id || savingMapping}>Save mapping annotation</Button>
+            <Button
+              kind="tertiary"
+              size="sm"
+              onClick={handleNominateMissingness}
+              disabled={selectedMapping?.relation_type !== 'no_documentary_trace' || !mappingForm.reviewer_note.trim() || nominatingMissingness}
+            >
+              Nominate retrieval condition for Absences
+            </Button>
             {selectedMapping?.citation_text && <Tag type="gray">Citation stored</Tag>}
             {selectedMapping?.provenance_json ? <Tag type="green">Provenance stored</Tag> : <Tag type="gray">Provenance unavailable</Tag>}
           </div>

@@ -57,6 +57,9 @@ class QueryRunClaimRequest(BaseModel):
 
 class QueryRunMissingnessRequest(BaseModel):
     reviewer_note: Optional[str] = None
+    evidence_note: Optional[str] = None
+    scope_note: Optional[str] = None
+    follow_up_action: Optional[str] = None
 
 
 def stringify_caveats(caveats: Optional[list[str] | str]) -> Optional[str]:
@@ -258,6 +261,29 @@ def build_missingness_evidence(run: QueryRun) -> str:
     return " ".join(part.strip() for part in evidence_parts if part).strip()
 
 
+def build_missingness_event_values(run: QueryRun, request: QueryRunMissingnessRequest) -> dict[str, Any]:
+    document_ids = list(dict.fromkeys(chunk.document_id for chunk in run.chunks if chunk.document_id))
+    chunk_ids = list(dict.fromkeys(chunk.chunk_id for chunk in run.chunks if chunk.chunk_id))
+    scope_note = request.scope_note or (
+        "This records a limitation of the current digitised corpus and retrieval run only; "
+        "it does not establish that evidence never existed or that the people concerned did not respond."
+    )
+    evidence_note = request.evidence_note or build_missingness_evidence(run)
+    return {
+        "type": "retrieval",
+        "query_or_entity_or_field": run.prompt,
+        "evidence": f"{evidence_note.strip()} Scope/limit: {scope_note.strip()}",
+        "query_id": run.query_id,
+        "source_document_id": document_ids[0] if document_ids else None,
+        "source_chunk_id": chunk_ids[0] if chunk_ids else None,
+        "source_document_ids_json": document_ids,
+        "source_chunk_ids_json": chunk_ids,
+        "status": "open",
+        "reviewer_note": request.reviewer_note or "Created from failed/partial Source Interrogation run.",
+        "follow_up_action": request.follow_up_action,
+    }
+
+
 @router.get("")
 @router.get("/")
 async def list_query_runs():
@@ -445,17 +471,9 @@ async def create_missingness_event_from_query_run(query_id: str, request: QueryR
                 detail="This query run is not marked as failed/partial and cannot be classified as retrieval missingness.",
             )
 
-        reviewer_note = request.reviewer_note or "Created from failed/partial Source Interrogation run."
         event = MissingnessEvent(
             event_id=f"miss-{uuid.uuid4().hex[:12]}",
-            type="retrieval",
-            query_or_entity_or_field=run.prompt,
-            evidence=build_missingness_evidence(run),
-            query_id=run.query_id,
-            source_document_id=None,
-            source_chunk_id=None,
-            status="open",
-            reviewer_note=reviewer_note,
+            **build_missingness_event_values(run, request),
         )
         db.add(event)
         db.commit()
@@ -470,8 +488,11 @@ async def create_missingness_event_from_query_run(query_id: str, request: QueryR
             "evidence": event.evidence,
             "source_document_id": event.source_document_id,
             "source_chunk_id": event.source_chunk_id,
+            "source_document_ids": event.source_document_ids_json or [],
+            "source_chunk_ids": event.source_chunk_ids_json or [],
             "status": event.status,
             "reviewer_note": event.reviewer_note,
+            "follow_up_action": event.follow_up_action,
             "created_at": event.created_at.isoformat() if event.created_at else None,
             "updated_at": event.updated_at.isoformat() if event.updated_at else None,
         }

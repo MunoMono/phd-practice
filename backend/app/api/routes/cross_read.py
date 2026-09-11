@@ -5,20 +5,32 @@ from typing import Any, Literal, Optional
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import PlainTextResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator, model_validator
 from sqlalchemy import text
 
 from app.api.routes.analysis import build_expanded_query
 from app.core.database import LocalSessionLocal
-from app.models.research_outputs import CrossReadMapping, CrossReadPassage, QueryRun, QueryRunChunk
+from app.models.research_outputs import CrossReadMapping, CrossReadPassage, MissingnessEvent, QueryRun, QueryRunChunk
 from app.services.provenance_service import ProvenanceService
 
 router = APIRouter()
 provenance_service = ProvenanceService()
 
-RelationType = Literal["supports", "complicates", "contradicts", "no_documentary_trace"]
+RelationType = Literal[
+    "unreviewed",
+    "convergence",
+    "contradiction",
+    "complication",
+    "contextual_relation",
+    "no_documentary_trace",
+    "supports",
+    "complicates",
+    "contradicts",
+]
 PassageStatus = Literal["draft", "reviewing", "mapped", "unresolved"]
-SourceType = Literal["oral_history", "interview", "field_note", "researcher_note", "mock_dev"]
+SourceType = Literal["oral_history", "interview", "field_note", "researcher_note"]
+AccessStatus = Literal["open", "restricted", "unknown"]
+IngestionMethod = Literal["researcher_entered", "imported"]
 
 
 class CrossReadPassageCreateRequest(BaseModel):
@@ -26,21 +38,45 @@ class CrossReadPassageCreateRequest(BaseModel):
     speaker_or_source: Optional[str] = None
     passage_label: Optional[str] = None
     source_type: Optional[SourceType] = "researcher_note"
+    source_reference: Optional[str] = None
+    source_date: Optional[str] = None
+    access_status: AccessStatus = "unknown"
+    ingestion_method: IngestionMethod = "researcher_entered"
     memory_position_note: Optional[str] = None
     status: PassageStatus = "draft"
+
+    @field_validator("passage_text")
+    @classmethod
+    def passage_text_must_not_be_blank(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("Passage text must not be blank")
+        return value
+
+    @model_validator(mode="after")
+    def attributable_testimony_requires_provenance(self):
+        if self.source_type in {"oral_history", "interview"}:
+            if not (self.speaker_or_source or "").strip():
+                raise ValueError("Oral-history and interview passages require a speaker or source")
+            if not (self.source_reference or "").strip():
+                raise ValueError("Oral-history and interview passages require a durable source reference")
+        return self
 
 
 class CrossReadPassageUpdateRequest(BaseModel):
     passage_text: Optional[str] = None
     speaker_or_source: Optional[str] = None
     passage_label: Optional[str] = None
+    source_type: Optional[SourceType] = None
+    source_reference: Optional[str] = None
+    source_date: Optional[str] = None
+    access_status: Optional[AccessStatus] = None
+    ingestion_method: Optional[IngestionMethod] = None
     memory_position_note: Optional[str] = None
     status: Optional[PassageStatus] = None
 
 
 class CrossReadRunRequest(BaseModel):
     reviewer_note: Optional[str] = None
-    relation_type: Optional[RelationType] = None
     num_context_chunks: int = 3
 
 
@@ -48,6 +84,18 @@ class CrossReadMappingUpdateRequest(BaseModel):
     relation_type: Optional[RelationType] = None
     reviewer_note: Optional[str] = None
     confidence_or_status: Optional[str] = None
+
+
+class CrossReadMissingnessNominationRequest(BaseModel):
+    confirmed: Literal[True]
+    reviewer_note: str
+
+    @field_validator("reviewer_note")
+    @classmethod
+    def reviewer_note_must_not_be_blank(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("A researcher note is required to nominate a missingness event")
+        return value
 
 
 def serialize_mapping(mapping: CrossReadMapping) -> dict[str, Any]:
@@ -78,6 +126,10 @@ def serialize_passage(passage: CrossReadPassage, include_mappings: bool = False)
         "speaker_or_source": passage.speaker_or_source,
         "passage_label": passage.passage_label,
         "source_type": passage.source_type,
+        "source_reference": passage.source_reference,
+        "source_date": passage.source_date,
+        "access_status": passage.access_status,
+        "ingestion_method": passage.ingestion_method,
         "memory_position_note": passage.memory_position_note,
         "status": passage.status,
         "created_at": passage.created_at.isoformat() if passage.created_at else None,
@@ -208,9 +260,9 @@ def build_mapping_payload(chunk: Optional[dict[str, Any]], relation_type: Relati
             "chunk_id": None,
             "document_id": None,
             "page_range": None,
-            "relation_type": "no_documentary_trace",
-            "confidence_or_status": "unresolved",
-            "reviewer_note": reviewer_note or "No documentary trace returned for this passage retrieval probe.",
+            "relation_type": relation_type,
+            "confidence_or_status": "candidate_no_result",
+            "reviewer_note": reviewer_note or "This retrieval probe returned no candidate records; researcher review is required before recording a relation.",
             "citation_text": None,
             "provenance_json": None,
             "source_metadata_json": {
@@ -260,7 +312,7 @@ def build_mapping_payload(chunk: Optional[dict[str, Any]], relation_type: Relati
         "document_id": chunk.get("document_id"),
         "page_range": chunk.get("page_range"),
         "relation_type": relation_type,
-        "confidence_or_status": "reviewing",
+        "confidence_or_status": "candidate",
         "reviewer_note": reviewer_note,
         "citation_text": citation_text,
         "provenance_json": provenance_json,
@@ -278,6 +330,12 @@ def get_export_rows(db) -> list[dict[str, Any]]:
                     "passage_id": passage.passage_id,
                     "passage_label": passage.passage_label,
                     "speaker_or_source": passage.speaker_or_source,
+                    "source_type": passage.source_type,
+                    "source_reference": passage.source_reference,
+                    "source_date": passage.source_date,
+                    "access_status": passage.access_status,
+                    "ingestion_method": passage.ingestion_method,
+                    "memory_position_note": passage.memory_position_note,
                     "passage_text_excerpt": (passage.passage_text or "")[:180],
                     "relation_type": mapping.relation_type,
                     "chunk_id": mapping.chunk_id,
@@ -287,6 +345,7 @@ def get_export_rows(db) -> list[dict[str, Any]]:
                     "reviewer_note": mapping.reviewer_note,
                     "query_id": mapping.query_id,
                     "created_at": mapping.created_at.isoformat() if mapping.created_at else None,
+                    "updated_at": mapping.updated_at.isoformat() if mapping.updated_at else None,
                 }
             )
     return rows
@@ -317,6 +376,10 @@ async def create_passage(request: CrossReadPassageCreateRequest):
             speaker_or_source=request.speaker_or_source,
             passage_label=request.passage_label,
             source_type=request.source_type,
+            source_reference=request.source_reference,
+            source_date=request.source_date,
+            access_status=request.access_status,
+            ingestion_method=request.ingestion_method,
             memory_position_note=request.memory_position_note,
             status=request.status,
         )
@@ -349,10 +412,26 @@ async def update_passage(passage_id: str, request: CrossReadPassageUpdateRequest
             passage.speaker_or_source = request.speaker_or_source
         if request.passage_label is not None:
             passage.passage_label = request.passage_label
+        if request.source_type is not None:
+            passage.source_type = request.source_type
+        if request.source_reference is not None:
+            passage.source_reference = request.source_reference
+        if request.source_date is not None:
+            passage.source_date = request.source_date
+        if request.access_status is not None:
+            passage.access_status = request.access_status
+        if request.ingestion_method is not None:
+            passage.ingestion_method = request.ingestion_method
         if request.memory_position_note is not None:
             passage.memory_position_note = request.memory_position_note
         if request.status is not None:
             passage.status = request.status
+
+        if passage.source_type in {"oral_history", "interview"}:
+            if not (passage.speaker_or_source or "").strip():
+                raise HTTPException(status_code=422, detail="Oral-history and interview passages require a speaker or source")
+            if not (passage.source_reference or "").strip():
+                raise HTTPException(status_code=422, detail="Oral-history and interview passages require a durable source reference")
 
         db.commit()
         db.refresh(passage)
@@ -366,7 +445,6 @@ async def run_passage_probe(passage_id: str, request: CrossReadRunRequest):
     db = LocalSessionLocal()
     try:
         passage = get_passage_or_404(db, passage_id)
-        relation_type = request.relation_type or "complicates"
         candidate_chunks = fetch_candidate_chunks(db, passage.passage_text, request.num_context_chunks)
         query_run = create_query_run_for_probe(db, passage, candidate_chunks)
 
@@ -376,13 +454,13 @@ async def run_passage_probe(passage_id: str, request: CrossReadRunRequest):
 
         if candidate_chunks:
             mapping_rows = [
-                CrossReadMapping(passage_id=passage.passage_id, **build_mapping_payload(chunk, relation_type, request.reviewer_note, query_run.query_id))
+                CrossReadMapping(passage_id=passage.passage_id, **build_mapping_payload(chunk, "unreviewed", request.reviewer_note, query_run.query_id))
                 for chunk in candidate_chunks
             ]
             passage.status = "mapped"
         else:
             mapping_rows = [
-                CrossReadMapping(passage_id=passage.passage_id, **build_mapping_payload(None, "no_documentary_trace", request.reviewer_note, query_run.query_id))
+                CrossReadMapping(passage_id=passage.passage_id, **build_mapping_payload(None, "unreviewed", request.reviewer_note, query_run.query_id))
             ]
             passage.status = "unresolved"
 
@@ -429,6 +507,59 @@ async def update_mapping(mapping_id: str, request: CrossReadMappingUpdateRequest
         db.close()
 
 
+def build_missingness_nomination_values(mapping: CrossReadMapping, reviewer_note: str) -> dict[str, Any]:
+    document_ids = [mapping.document_id] if mapping.document_id else []
+    chunk_ids = [mapping.chunk_id] if mapping.chunk_id else []
+    return {
+        "event_id": f"miss-{uuid.uuid4().hex[:12]}",
+        "type": "retrieval",
+        "query_or_entity_or_field": f"Cross-reading retrieval scope for passage {mapping.passage_id}",
+        "evidence": (
+            "Researcher-confirmed nomination from Cross-readings mapping "
+            f"{mapping.mapping_id}; probe {mapping.query_id or 'unavailable'} returned no documentary candidate. "
+            "This records a scoped retrieval condition, not historical absence."
+        ),
+        "query_id": mapping.query_id,
+        "source_document_id": mapping.document_id,
+        "source_chunk_id": mapping.chunk_id,
+        "source_document_ids_json": document_ids,
+        "source_chunk_ids_json": chunk_ids,
+        "cross_read_mapping_id": mapping.mapping_id,
+        "status": "reviewing",
+        "reviewer_note": reviewer_note,
+        "follow_up_action": "Review the probe scope and search additional digitised sources before drawing any historical conclusion.",
+    }
+
+
+@router.post("/mappings/{mapping_id}/nominate-missingness", status_code=201)
+async def nominate_mapping_for_missingness(mapping_id: str, request: CrossReadMissingnessNominationRequest):
+    db = LocalSessionLocal()
+    try:
+        mapping = get_mapping_or_404(db, mapping_id)
+        if mapping.relation_type != "no_documentary_trace":
+            raise HTTPException(status_code=422, detail="Only a researcher-confirmed no_documentary_trace mapping can nominate missingness")
+
+        existing = db.query(MissingnessEvent).filter(MissingnessEvent.cross_read_mapping_id == mapping.mapping_id).first()
+        if existing:
+            return serialize_missingness_nomination(existing)
+
+        event = MissingnessEvent(**build_missingness_nomination_values(mapping, request.reviewer_note))
+        db.add(event)
+        db.commit()
+        db.refresh(event)
+        return serialize_missingness_nomination(event)
+    finally:
+        db.close()
+
+
+def serialize_missingness_nomination(event: MissingnessEvent) -> dict[str, Any]:
+    return {
+        "event_id": event.event_id,
+        "cross_read_mapping_id": event.cross_read_mapping_id,
+        "status": event.status,
+    }
+
+
 @router.get("/map")
 async def get_cross_read_map():
     db = LocalSessionLocal()
@@ -454,6 +585,12 @@ async def export_cross_read_csv():
                 "passage_id",
                 "passage_label",
                 "speaker_or_source",
+                "source_type",
+                "source_reference",
+                "source_date",
+                "access_status",
+                "ingestion_method",
+                "memory_position_note",
                 "passage_text_excerpt",
                 "relation_type",
                 "chunk_id",
@@ -463,6 +600,7 @@ async def export_cross_read_csv():
                 "reviewer_note",
                 "query_id",
                 "created_at",
+                "updated_at",
             ],
         )
         writer.writeheader()
@@ -510,6 +648,11 @@ async def export_cross_read_markdown():
                     f"## {passage.passage_id}",
                     f"- Passage label: {passage.passage_label or 'Unlabelled passage'}",
                     f"- Speaker/source: {passage.speaker_or_source or 'Unavailable'}",
+                    f"- Source type: {passage.source_type or 'Unavailable'}",
+                    f"- Source reference: {passage.source_reference or 'Unavailable'}",
+                    f"- Source date: {passage.source_date or 'Unavailable'}",
+                    f"- Access status: {passage.access_status or 'unknown'}",
+                    f"- Ingestion method: {passage.ingestion_method or 'researcher_entered'}",
                     f"- Status: {passage.status}",
                     "",
                     "### Passage text",
