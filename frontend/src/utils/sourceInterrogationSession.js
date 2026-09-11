@@ -5,7 +5,11 @@ export const loadSourceInterrogationSession = () => {
     const stored = window.sessionStorage.getItem(SESSION_KEY)
     if (!stored) return null
     const session = JSON.parse(stored)
-    return session?.traceData ? session : null
+    if (!session?.traceData || typeof session.traceData !== 'object' || !Array.isArray(session.traceData.sources)) {
+      window.sessionStorage.removeItem(SESSION_KEY)
+      return null
+    }
+    return session
   } catch {
     return null
   }

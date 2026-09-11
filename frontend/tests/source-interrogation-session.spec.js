@@ -60,3 +60,18 @@ test('active Source Interrogation result survives analysis navigation until inte
   await page.goto('/source-interrogation')
   await expect(page.getByText('No answer returned yet. Submit a query to begin evidence tracing.')).toBeVisible()
 })
+
+test('a malformed saved Source Interrogation trace is discarded before rendering', async ({ page }) => {
+  await page.addInitScript(() => {
+    window.sessionStorage.setItem('innovation-design.source-interrogation.active.v1', JSON.stringify({
+      query: 'Interrupted query',
+      mode: 'runtime',
+      traceData: { answer: 'Partial response without a source stack.' }
+    }))
+  })
+
+  await page.goto('/source-interrogation')
+
+  await expect(page.getByText('No answer returned yet. Submit a query to begin evidence tracing.')).toBeVisible()
+  await expect.poll(() => page.evaluate(() => window.sessionStorage.getItem('innovation-design.source-interrogation.active.v1'))).toBeNull()
+})
