@@ -161,7 +161,7 @@ const UmapProjection = ({ points, loading, errorState, selectedPoint, highlighte
 
   return (
     <div className="umap-projection">
-      <p className="umap-projection__coordinate-note"><strong>Reading the map:</strong> each dot is an archival passage. The horizontal and vertical values are UMAP dimensions: learned coordinates that place semantically similar passages nearer together. They are not historical variables, timelines, or measures of importance.</p>
+      <p className="umap-projection__coordinate-note"><strong>Reading the map:</strong> each dot is an archival passage. The horizontal and vertical values are UMAP dimensions: learned coordinates that place semantically similar passages nearer together. They are not historical variables, timelines, or measures of importance. The evidence scope is January 1965 to July 1985; an item from 1985 is included only when its full date establishes that it falls within this period.</p>
       <div className="umap-projection__legend" aria-label={`Colour legend: ${colorBy.replace('_', ' ')}`}>
         {categoricalValue && categories.slice(0, 12).map((category) => <span className="umap-projection__legend-item" key={category}><i style={{ backgroundColor: categoricalColor(category) }} />{category}</span>)}
         {categories.length > 12 && <span className="umap-projection__legend-overflow">+{categories.length - 12} categories</span>}

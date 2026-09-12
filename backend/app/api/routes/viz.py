@@ -14,6 +14,7 @@ import uuid
 import numpy as np
 
 from app.core.database import LocalSessionLocal
+from app.core.ddr_temporal_scope import DDR_DOCUMENT_SQL_SCOPE
 from app.models.research_outputs import EmbeddingReadinessReview, MissingnessEvent
 from app.services.corpus_status_service import get_corpus_status
 
@@ -144,6 +145,7 @@ def _semantic_neighbour_query(where_clause: str, citation_select: str) -> str:
         WHERE sce.embedding_set_id = :embedding_set_id
             AND sce.status = 'embedded'
             AND d.pid IS NOT NULL
+            AND {DDR_DOCUMENT_SQL_SCOPE}
         ORDER BY sce.embedding <=> CAST(:query_vector AS vector)
         LIMIT :size
     """
@@ -882,6 +884,7 @@ async def challenge_umap_projection(request: UmapChallengeRequest):
             WHERE sce.embedding_set_id = :embedding_set_id
               AND sce.status = 'embedded'
               AND d.pid IS NOT NULL
+                            AND {DDR_DOCUMENT_SQL_SCOPE}
             ORDER BY dc.chunk_id
             LIMIT :sample_size
         """), {"embedding_set_id": projection["embedding_set_id"], "sample_size": request.sample_size}).fetchall()
@@ -1346,6 +1349,7 @@ async def get_umap_projection(
             JOIN documents d ON d.document_id = dc.document_id
             WHERE pp.projection_id = :projection_id
                 AND d.pid IS NOT NULL
+                AND {DDR_DOCUMENT_SQL_SCOPE}
             """
             params = {"projection_id": atlas_projection["projection_id"], "limit": limit}
             if year_min is not None:
@@ -1495,6 +1499,7 @@ async def get_umap_projection(
             FROM documents d
             WHERE d.embeddings IS NOT NULL
                 AND d.pid IS NOT NULL
+                AND {DDR_DOCUMENT_SQL_SCOPE}
             """
             params = {"limit": limit}
             source = "documents.embeddings"
@@ -1542,6 +1547,7 @@ async def get_umap_projection(
             JOIN documents d ON d.document_id = dc.document_id
             WHERE dc.embedding_vector IS NOT NULL
                 AND d.pid IS NOT NULL
+                AND {DDR_DOCUMENT_SQL_SCOPE}
             """
             params = {"limit": limit}
             source = "document_chunks.embedding_vector"

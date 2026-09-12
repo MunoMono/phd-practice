@@ -7,7 +7,9 @@ from fastapi import APIRouter, UploadFile, File, Form, HTTPException
 from typing import Optional
 import uuid
 from datetime import datetime
+from sqlalchemy import and_, or_
 
+from app.core.ddr_temporal_scope import DDR_END_DATE, DDR_START_DATE, is_within_ddr_scope, parse_publication_date
 from app.services.docling_processor import DoclingProcessor
 from app.services.embedding_service import EmbeddingService
 from app.core.database import LocalSessionLocal
@@ -45,11 +47,15 @@ async def upload_document(
         Upload receipt with queued processing status
     """
     try:
-        # Validate publication year (testamentary traces temporal boundary)
-        if publication_year < 1965 or publication_year > 1985:
+        try:
+            parsed_publication_date = parse_publication_date(publication_date)
+        except ValueError as error:
+            raise HTTPException(status_code=400, detail="Publication date must use ISO format YYYY-MM-DD") from error
+
+        if not is_within_ddr_scope(publication_year, parsed_publication_date):
             raise HTTPException(
                 status_code=400,
-                detail="Publication year must be between 1965 and 1985"
+                detail=f"DDR research data must fall between {DDR_START_DATE.isoformat()} and {DDR_END_DATE.isoformat()}; 1985 records require a full publication date."
             )
         
         # Validate file type (PDF or TIFF only)
@@ -89,6 +95,7 @@ async def upload_document(
                 authority_id=authority_id,
                 title=title or file.filename,
                 publication_year=publication_year,
+                publication_date=datetime.combine(parsed_publication_date, datetime.min.time()) if parsed_publication_date else None,
                 filename=file.filename,
                 file_type=file_type,
                 file_size_bytes=len(content),
@@ -158,7 +165,16 @@ async def list_documents(
     """List all documents with optional filters"""
     db = LocalSessionLocal()
     try:
-        query = db.query(Document)
+        query = db.query(Document).filter(
+            or_(
+                Document.publication_year.between(1965, 1984),
+                and_(
+                    Document.publication_year == 1985,
+                    Document.publication_date >= datetime(1985, 1, 1),
+                    Document.publication_date < datetime(1985, 8, 1),
+                ),
+            )
+        )
         
         if year:
             query = query.filter(Document.publication_year == year)
