@@ -7,7 +7,7 @@ from fastapi import APIRouter, UploadFile, File, Form, HTTPException
 from typing import Optional
 import uuid
 from datetime import datetime
-from sqlalchemy import and_, or_
+import json
 
 from app.core.ddr_temporal_scope import DDR_END_DATE, DDR_START_DATE, is_within_ddr_scope, parse_publication_date
 from app.services.docling_processor import DoclingProcessor
@@ -32,6 +32,7 @@ async def upload_document(
     title: Optional[str] = Form(None),
     publication_year: int = Form(...),
     publication_date: Optional[str] = Form(None),
+    source_type: Optional[str] = Form(None),
     authority_id: Optional[str] = Form(None),  # DDR Archive authority ID
     metadata: Optional[str] = Form("{}")
 ):
@@ -51,11 +52,19 @@ async def upload_document(
             parsed_publication_date = parse_publication_date(publication_date)
         except ValueError as error:
             raise HTTPException(status_code=400, detail="Publication date must use ISO format YYYY-MM-DD") from error
+        try:
+            document_metadata = json.loads(metadata or "{}")
+        except json.JSONDecodeError as error:
+            raise HTTPException(status_code=400, detail="Metadata must be valid JSON") from error
+        if not isinstance(document_metadata, dict):
+            raise HTTPException(status_code=400, detail="Metadata must be a JSON object")
+        if source_type:
+            document_metadata["source_type"] = source_type.strip().lower()
 
-        if not is_within_ddr_scope(publication_year, parsed_publication_date):
+        if not is_within_ddr_scope(publication_year, parsed_publication_date, source_type=source_type, metadata=document_metadata):
             raise HTTPException(
                 status_code=400,
-                detail=f"DDR research data must fall between {DDR_START_DATE.isoformat()} and {DDR_END_DATE.isoformat()}; 1985 records require a full publication date."
+                detail=f"Non-oral-history DDR research data must fall between {DDR_START_DATE.isoformat()} and {DDR_END_DATE.isoformat()}; 1985 records require a full publication date."
             )
         
         # Validate file type (PDF or TIFF only)
@@ -96,6 +105,7 @@ async def upload_document(
                 title=title or file.filename,
                 publication_year=publication_year,
                 publication_date=datetime.combine(parsed_publication_date, datetime.min.time()) if parsed_publication_date else None,
+                doc_metadata=document_metadata,
                 filename=file.filename,
                 file_type=file_type,
                 file_size_bytes=len(content),
@@ -165,23 +175,18 @@ async def list_documents(
     """List all documents with optional filters"""
     db = LocalSessionLocal()
     try:
-        query = db.query(Document).filter(
-            or_(
-                Document.publication_year.between(1965, 1984),
-                and_(
-                    Document.publication_year == 1985,
-                    Document.publication_date >= datetime(1985, 1, 1),
-                    Document.publication_date < datetime(1985, 8, 1),
-                ),
-            )
-        )
+        query = db.query(Document)
         
         if year:
             query = query.filter(Document.publication_year == year)
         if status:
             query = query.filter(Document.processing_status == status)
         
-        docs = query.order_by(Document.publication_year).all()
+        docs = [
+            document
+            for document in query.order_by(Document.publication_year).all()
+            if is_within_ddr_scope(document.publication_year, document.publication_date, metadata=document.doc_metadata)
+        ]
         docs = select_source_documents(docs)
         
         return {

@@ -13,3 +13,9 @@ def test_excludes_data_outside_the_documented_ddr_boundary():
     assert not is_within_ddr_scope(1985)
     assert not is_within_ddr_scope(1985, date(1985, 8, 1))
     assert not is_within_ddr_scope(1986, date(1986, 1, 1))
+
+
+def test_allows_explicitly_classified_oral_histories_outside_the_ddr_period():
+    assert is_within_ddr_scope(2018, date(2018, 5, 1), source_type="oral_history")
+    assert is_within_ddr_scope(2026, metadata={"document_type": "oral history"})
+    assert not is_within_ddr_scope(2026, metadata={"document_type": "report"})
