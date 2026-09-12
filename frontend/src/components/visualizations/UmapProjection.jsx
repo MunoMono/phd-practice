@@ -2,6 +2,18 @@ import { useEffect, useMemo, useRef } from 'react'
 import * as d3 from 'd3'
 import { chartColors, chartStyles, utils } from '../../utils/carbonD3Theme'
 
+const categoricalFields = {
+  cluster: (point) => point.clusterLabel || 'unclustered',
+  source_type: (point) => point.sourceType || 'unknown',
+  theme: (point) => point.themes?.[0] || 'unlabelled',
+}
+
+const numericFields = {
+  year: (point) => point.year,
+  confidence: (point) => point.confidence,
+  drift_score: (point) => point.driftScore,
+}
+
 const UmapProjection = ({ points, loading, errorState, selectedPoint, highlightedTrace, colorBy, onSelectPoint }) => {
   const svgRef = useRef(null)
   const tooltipRef = useRef(null)
@@ -45,16 +57,6 @@ const UmapProjection = ({ points, loading, errorState, selectedPoint, highlighte
       .domain(yExtent[0] === yExtent[1] ? [yExtent[0] - 1, yExtent[1] + 1] : yExtent)
       .range([height - margin.bottom, margin.top])
 
-    const categoricalFields = {
-      cluster: (point) => point.clusterLabel || 'unclustered',
-      source_type: (point) => point.sourceType || 'unknown',
-      theme: (point) => point.themes?.[0] || 'unlabelled',
-    }
-    const numericFields = {
-      year: (point) => point.year,
-      confidence: (point) => point.confidence,
-      drift_score: (point) => point.driftScore,
-    }
     const categoricalValue = categoricalFields[colorBy]
     const numericValue = numericFields[colorBy]
     const color = categoricalValue
@@ -150,8 +152,20 @@ const UmapProjection = ({ points, loading, errorState, selectedPoint, highlighte
     return <div className="umap-projection__state">No UMAP projection is available yet. This requires embedded chunks or documents from the DDR corpus.</div>
   }
 
+  const categoricalValue = categoricalFields[colorBy]
+  const numericValue = numericFields[colorBy]
+  const categories = categoricalValue ? [...new Set(points.map(categoricalValue))] : []
+  const categoricalColor = categoricalValue ? utils.getClusterColorScale(categories, (key) => key) : null
+  const numericValues = numericValue ? points.map(numericValue).filter(Number.isFinite) : []
+  const numericExtent = numericValues.length ? d3.extent(numericValues) : null
+
   return (
     <div className="umap-projection">
+      <div className="umap-projection__legend" aria-label={`Colour legend: ${colorBy.replace('_', ' ')}`}>
+        {categoricalValue && categories.slice(0, 12).map((category) => <span className="umap-projection__legend-item" key={category}><i style={{ backgroundColor: categoricalColor(category) }} />{category}</span>)}
+        {categories.length > 12 && <span className="umap-projection__legend-overflow">+{categories.length - 12} categories</span>}
+        {numericExtent && <span className="umap-projection__legend-scale"><i />{numericExtent[0]} to {numericExtent[1]}</span>}
+      </div>
       <svg ref={svgRef} className="umap-projection__svg" />
       <div ref={tooltipRef} className="viz-tooltip umap-projection__tooltip" />
     </div>

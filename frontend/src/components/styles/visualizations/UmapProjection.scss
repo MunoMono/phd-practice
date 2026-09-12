@@ -4,6 +4,38 @@
 .umap-projection {
   position: relative;
 
+  &__legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    align-items: center;
+    margin: 0 0 1rem;
+    color: var(--cds-text-secondary);
+    @include type-style('label-01');
+  }
+
+  &__legend-item,
+  &__legend-scale,
+  &__legend-overflow {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+  }
+
+  &__legend-item i {
+    width: 0.75rem;
+    height: 0.75rem;
+    border: 1px solid var(--cds-border-subtle);
+    border-radius: 50%;
+  }
+
+  &__legend-scale i {
+    width: 5rem;
+    height: 0.625rem;
+    border: 1px solid var(--cds-border-subtle);
+    background: linear-gradient(90deg, #30123b, #4675ed, #1ae4b6, #e5e419, #f05b12, #7a0403);
+  }
+
   &__svg {
     width: 100%;
     min-height: 32rem;
