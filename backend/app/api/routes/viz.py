@@ -121,12 +121,12 @@ def _semantic_point_payload(row) -> dict:
     }
 
 
-def _semantic_neighbour_query(where_clause: str) -> str:
+def _semantic_neighbour_query(where_clause: str, citation_select: str) -> str:
     return f"""
         SELECT
             dc.document_id, dc.chunk_id, d.pid, d.title,
             COALESCE(dc.publication_year, d.publication_year) AS year,
-            d.file_type, dc.chunk_type, dc.citation, dc.key_concepts,
+            d.file_type, dc.chunk_type, {citation_select}, dc.key_concepts,
             dc.chunk_text, dc.source_page, dc.source_section,
             pp.x, pp.y, {where_clause} AS similarity
         FROM semantic_chunk_embeddings sce
@@ -782,7 +782,9 @@ async def get_semantic_neighbourhood(request: SemanticNeighbourhoodRequest):
         """), {"embedding_set_id": projection["embedding_set_id"], "chunk_id": request.focal_chunk_id}).mappings().first()
         if not focal:
             raise HTTPException(status_code=404, detail="The selected source is not represented in the completed embedding set.")
-        rows = db.execute(text(_semantic_neighbour_query("1 - (sce.embedding <=> CAST(:query_vector AS vector))")), {
+        chunk_columns = _get_table_columns(db, "document_chunks")
+        citation_select = "dc.citation" if "citation" in chunk_columns else "NULL::jsonb AS citation"
+        rows = db.execute(text(_semantic_neighbour_query("1 - (sce.embedding <=> CAST(:query_vector AS vector))", citation_select)), {
             "embedding_set_id": projection["embedding_set_id"],
             "projection_id": projection["projection_id"],
             "query_vector": focal["embedding"],
@@ -821,7 +823,9 @@ async def run_critical_probe(request: CriticalProbeRequest):
         query_vector = _load_probe_embedding(embedding_set["model_name"], request.concept.strip())
         if len(query_vector) != embedding_set["vector_dimensions"]:
             raise HTTPException(status_code=503, detail="The critical probe model does not match the completed embedding dimensions.")
-        rows = db.execute(text(_semantic_neighbour_query("1 - (sce.embedding <=> CAST(:query_vector AS vector))")), {
+        chunk_columns = _get_table_columns(db, "document_chunks")
+        citation_select = "dc.citation" if "citation" in chunk_columns else "NULL::jsonb AS citation"
+        rows = db.execute(text(_semantic_neighbour_query("1 - (sce.embedding <=> CAST(:query_vector AS vector))", citation_select)), {
             "embedding_set_id": projection["embedding_set_id"],
             "projection_id": projection["projection_id"],
             "query_vector": "[" + ",".join(str(value) for value in query_vector) + "]",
