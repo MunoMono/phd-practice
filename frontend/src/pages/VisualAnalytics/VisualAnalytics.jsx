@@ -17,6 +17,7 @@ import PageHeader from '../../components/layout/PageHeader'
 import { PageGrid, PageColumn as Column } from '../../components/layout/PageGrid'
 import UmapProjection from '../../components/visualizations/UmapProjection'
 import UmapPointDetail from '../../components/visualizations/UmapPointDetail'
+import UmapEvidenceTable from '../../components/visualizations/UmapEvidenceTable'
 import ClusterPanel from '../../components/visualizations/ClusterPanel'
 import ConceptBridge from '../../components/visualizations/ConceptBridge'
 import AtlasCoverageChart from '../../components/visualizations/AtlasCoverageChart'
@@ -534,6 +535,13 @@ const VisualAnalytics = () => {
           onCopyExcerpt={() => copyValue(selectedPoint?.excerpt)}
           onAddToMemo={handleAddToMemo}
         />
+      </Column>
+
+      <Column>
+        <Tile className="visual-analytics-page__projection-panel">
+          <PanelHeader title="Visible archival evidence" description="Sort the current evidence surface and select a row to inspect its archival source." />
+          <UmapEvidenceTable points={filteredPoints} onInspect={setSelectedPoint} />
+        </Tile>
       </Column>
 
       <Column lg={5} md={8} sm={4}>

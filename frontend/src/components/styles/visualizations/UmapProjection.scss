@@ -4,6 +4,13 @@
 .umap-projection {
   position: relative;
 
+  &__coordinate-note {
+    max-width: 62rem;
+    margin: 0 0 1rem;
+    color: var(--cds-text-secondary);
+    @include type-style('body-compact-01');
+  }
+
   &__legend {
     display: flex;
     flex-wrap: wrap;
