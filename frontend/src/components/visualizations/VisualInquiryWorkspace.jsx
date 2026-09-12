@@ -61,7 +61,7 @@ const VisualInquiryWorkspace = ({ mode }) => {
   const [selectedPoint, setSelectedPoint] = useState(null)
   const [neighbourhoodSize, setNeighbourhoodSize] = useState('25')
   const [neighbourhood, setNeighbourhood] = useState([])
-  const [comparisonField, setComparisonField] = useState('source_type')
+  const [comparisonField, setComparisonField] = useState('year')
   const [yearBoundary, setYearBoundary] = useState('')
   const [lens, setLens] = useState(probeLenses[0])
   const [concept, setConcept] = useState('')
@@ -162,7 +162,7 @@ const VisualInquiryWorkspace = ({ mode }) => {
           {mode === 'comparative' && <>
             <PanelHeader title="Metadata comparison" description="Colour the shared UMAP evidence surface through available archive metadata." />
             <Select id="comparison-field" labelText="Comparison overlay" value={comparisonField} onChange={(event) => setComparisonField(event.target.value)}>
-              <SelectItem value="source_type" text="Source type" /><SelectItem value="year" text="Year" /><SelectItem value="theme" text="Theme" /><SelectItem value="cluster" text="Cluster" />
+              <SelectItem value="year" text="Year" /><SelectItem value="source_type" text="Source type" /><SelectItem value="theme" text="Theme" /><SelectItem value="cluster" text="Cluster" />
             </Select>
           </>}
           {mode === 'temporal' && <>
