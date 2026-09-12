@@ -12,6 +12,7 @@ const SemanticNeighbourhoods = lazy(() => import('./pages/VisualAnalytics/Semant
 const ComparativeViews = lazy(() => import('./pages/VisualAnalytics/ComparativeViews'))
 const TemporalDocumentaryChange = lazy(() => import('./pages/VisualAnalytics/TemporalDocumentaryChange'))
 const CriticalInquiry = lazy(() => import('./pages/VisualAnalytics/CriticalInquiry'))
+const ChallengeMap = lazy(() => import('./pages/VisualAnalytics/ChallengeMap'))
 const MissingnessWorkbench = lazy(() => import('./pages/MissingnessWorkbench/MissingnessWorkbench'))
 const CrossReadWorkbench = lazy(() => import('./pages/CrossReadWorkbench/CrossReadWorkbench'))
 const ClaimsWorkbench = lazy(() => import('./pages/ClaimsWorkbench/ClaimsWorkbench'))
@@ -74,6 +75,7 @@ function App() {
                   <Route path="/comparative-views" element={<ComparativeViews />} />
                   <Route path="/temporal-documentary-change" element={<TemporalDocumentaryChange />} />
                   <Route path="/critical-inquiry" element={<CriticalInquiry />} />
+                  <Route path="/challenge-map" element={<ChallengeMap />} />
                   <Route path="/claims-evidence" element={<ClaimsWorkbench />} />
                   <Route path="/provenance" element={<AuditWorkbench />} />
                   <Route path="/research-runs" element={<ResearchRuns />} />

@@ -101,6 +101,13 @@ class CriticalProbeRequest(BaseModel):
     size: int = Field(default=25, ge=1, le=50)
 
 
+class UmapChallengeRequest(BaseModel):
+    random_seed: int = Field(default=42, ge=0, le=9999)
+    n_neighbors: int = Field(default=15, ge=2, le=100)
+    min_dist: float = Field(default=0.1, ge=0.0, le=0.99)
+    sample_size: int = Field(default=500, ge=50, le=1000)
+
+
 def _semantic_point_payload(row) -> dict:
     concepts = _extract_key_concepts(row.key_concepts)
     return {
@@ -534,7 +541,13 @@ def _build_missingness(record: Dict, evidence_surface: Dict) -> Dict:
     return missingness
 
 
-def _project_vectors(vectors: List[List[float]]):
+def _project_vectors(
+    vectors: List[List[float]],
+    *,
+    random_seed: int = 42,
+    n_neighbors: int = 15,
+    min_dist: float = 0.1,
+):
     if len(vectors) == 0:
         return [], "none"
 
@@ -545,10 +558,11 @@ def _project_vectors(vectors: List[List[float]]):
 
     if umap is not None:
         reducer = umap.UMAP(
-            n_neighbors=min(15, max(2, len(vectors) - 1)),
+            n_neighbors=min(n_neighbors, max(2, len(vectors) - 1)),
             n_components=2,
             metric="cosine",
-            random_state=42,
+            min_dist=min_dist,
+            random_state=random_seed,
         )
         projection = reducer.fit_transform(matrix)
         return projection.tolist(), "umap"
@@ -840,6 +854,80 @@ async def run_critical_probe(request: CriticalProbeRequest):
                 "embedding_set_id": projection["embedding_set_id"],
                 "projection_id": projection["projection_id"],
                 "interpretation_limit": "Critical lens supplied by researcher. Computational proximity indicates material for investigation, not confirmation of the proposition.",
+            },
+        }
+    finally:
+        db.close()
+
+
+@router.post("/umap/challenge")
+async def challenge_umap_projection(request: UmapChallengeRequest):
+    """Generate a temporary, parameterised projection without altering the persisted Atlas."""
+    db = LocalSessionLocal()
+    try:
+        projection = _get_completed_semantic_atlas_projection(db)
+        if not projection:
+            raise HTTPException(status_code=404, detail="No completed Semantic Atlas projection is available.")
+        chunk_columns = _get_table_columns(db, "document_chunks")
+        citation_select = "dc.citation" if "citation" in chunk_columns else "NULL::jsonb AS citation"
+        rows = db.execute(text(f"""
+            SELECT dc.document_id, dc.chunk_id, d.pid, d.title,
+                   COALESCE(dc.publication_year, d.publication_year) AS year,
+                   d.file_type, dc.chunk_type, {citation_select}, dc.key_concepts,
+                   dc.chunk_text, dc.source_page, dc.source_section,
+                   sce.embedding::text AS embedding
+            FROM semantic_chunk_embeddings sce
+            JOIN document_chunks dc ON dc.chunk_id = sce.chunk_id
+            JOIN documents d ON d.document_id = dc.document_id
+            WHERE sce.embedding_set_id = :embedding_set_id
+              AND sce.status = 'embedded'
+              AND d.pid IS NOT NULL
+            ORDER BY dc.chunk_id
+            LIMIT :sample_size
+        """), {"embedding_set_id": projection["embedding_set_id"], "sample_size": request.sample_size}).fetchall()
+        vectors = [_vector_to_list(row.embedding) for row in rows]
+        valid_rows_and_vectors = [(row, vector) for row, vector in zip(rows, vectors) if vector]
+        if len(valid_rows_and_vectors) < 3:
+            raise HTTPException(status_code=409, detail="At least three embedded passages are required to challenge this map.")
+        valid_rows, valid_vectors = zip(*valid_rows_and_vectors)
+        coordinates, method = _project_vectors(
+            list(valid_vectors),
+            random_seed=request.random_seed,
+            n_neighbors=request.n_neighbors,
+            min_dist=request.min_dist,
+        )
+        points = []
+        for row, coordinates_pair in zip(valid_rows, coordinates):
+            concepts = _extract_key_concepts(row.key_concepts)
+            cluster_label = concepts[0] if concepts else "Unclustered"
+            points.append({
+                "id": row.chunk_id,
+                "document_id": row.document_id,
+                "chunk_id": row.chunk_id,
+                "pid": row.pid,
+                "title": row.title or "Untitled trace",
+                "x": float(coordinates_pair[0]),
+                "y": float(coordinates_pair[1]),
+                "year": int(row.year) if row.year is not None else None,
+                "source_type": _infer_source_type(row.file_type, row.chunk_type, row.citation),
+                "themes": concepts,
+                "cluster_id": _slugify_cluster(cluster_label),
+                "cluster_label": cluster_label,
+                "excerpt": _clean_excerpt(row.chunk_text),
+                "source_page": row.source_page,
+                "source_section": row.source_section,
+            })
+        return {
+            "points": points,
+            "metadata": {
+                "projection_method": method,
+                "embedding_set_id": projection["embedding_set_id"],
+                "source_projection_id": projection["projection_id"],
+                "random_seed": request.random_seed,
+                "n_neighbors": min(request.n_neighbors, max(2, len(points) - 1)),
+                "min_dist": request.min_dist,
+                "sample_size": len(points),
+                "interpretation_limit": "This temporary projection tests computational sensitivity. Apparent relationships must be checked against source evidence and other parameter settings.",
             },
         }
     finally:

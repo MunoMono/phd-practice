@@ -65,3 +65,8 @@ export const runCriticalProbe = (payload) => apiRequest('/api/viz/critical-probe
   method: 'POST',
   body: payload
 })
+
+export const challengeUmapProjection = (payload) => apiRequest('/api/viz/umap/challenge', {
+  method: 'POST',
+  body: payload
+})

@@ -154,3 +154,32 @@
     }
   }
 }
+
+.challenge-map-page {
+  &__controls,
+  &__apparatus,
+  &__projection {
+    background-color: $layer-01;
+    border: 1px solid $border-subtle-01;
+  }
+
+  &__grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: $spacing-05;
+    margin: $spacing-05 0;
+
+    p {
+      margin: 0;
+    }
+
+    @include breakpoint-down(md) {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  &__apparatus,
+  &__projection {
+    margin-top: $spacing-05;
+  }
+}
