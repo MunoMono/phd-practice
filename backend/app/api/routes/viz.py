@@ -91,6 +91,68 @@ class AtlasCoverageMissingnessRequest(BaseModel):
         return self
 
 
+class SemanticNeighbourhoodRequest(BaseModel):
+    focal_chunk_id: str = Field(min_length=1, max_length=255)
+    size: int = Field(default=25, ge=1, le=50)
+
+
+class CriticalProbeRequest(BaseModel):
+    concept: str = Field(min_length=2, max_length=500)
+    size: int = Field(default=25, ge=1, le=50)
+
+
+def _semantic_point_payload(row) -> dict:
+    concepts = _extract_key_concepts(row.key_concepts)
+    return {
+        "id": row.chunk_id,
+        "document_id": row.document_id,
+        "chunk_id": row.chunk_id,
+        "pid": row.pid,
+        "title": row.title or "Untitled trace",
+        "year": int(row.year) if row.year is not None else None,
+        "source_type": _infer_source_type(row.file_type, row.chunk_type, row.citation),
+        "themes": concepts,
+        "excerpt": _clean_excerpt(row.chunk_text),
+        "source_page": row.source_page,
+        "source_section": row.source_section,
+        "similarity": round(float(row.similarity), 5),
+        "x": float(row.x) if row.x is not None else None,
+        "y": float(row.y) if row.y is not None else None,
+    }
+
+
+def _semantic_neighbour_query(where_clause: str) -> str:
+    return f"""
+        SELECT
+            dc.document_id, dc.chunk_id, d.pid, d.title,
+            COALESCE(dc.publication_year, d.publication_year) AS year,
+            d.file_type, dc.chunk_type, dc.citation, dc.key_concepts,
+            dc.chunk_text, dc.source_page, dc.source_section,
+            pp.x, pp.y, {where_clause} AS similarity
+        FROM semantic_chunk_embeddings sce
+        JOIN document_chunks dc ON dc.chunk_id = sce.chunk_id
+        JOIN documents d ON d.document_id = dc.document_id
+        LEFT JOIN semantic_atlas_projection_points pp
+            ON pp.chunk_id = sce.chunk_id AND pp.projection_id = :projection_id
+        WHERE sce.embedding_set_id = :embedding_set_id
+            AND sce.status = 'embedded'
+            AND d.pid IS NOT NULL
+        ORDER BY sce.embedding <=> CAST(:query_vector AS vector)
+        LIMIT :size
+    """
+
+
+def _load_probe_embedding(model_name: str, concept: str) -> list[float]:
+    try:
+        from sentence_transformers import SentenceTransformer
+        model = SentenceTransformer(model_name, trust_remote_code=True)
+        vector = model.encode(concept, normalize_embeddings=True)
+        return np.asarray(vector, dtype=float).tolist()
+    except Exception as error:
+        logger.exception("Critical concept probe embedding failed")
+        raise HTTPException(status_code=503, detail="A compatible semantic embedding model is unavailable for this concept probe.") from error
+
+
 def serialize_readiness_review(review: EmbeddingReadinessReview) -> dict:
     return {
         "review_id": review.review_id,
@@ -701,6 +763,83 @@ def _get_completed_semantic_atlas_projection(db):
     except Exception:
         logger.info("Completed Semantic Atlas projection is not available; using legacy projection path")
         return None
+
+
+@router.post("/semantic-neighbourhood")
+async def get_semantic_neighbourhood(request: SemanticNeighbourhoodRequest):
+    """Return nearest archival passages for one focal embedded chunk."""
+    db = LocalSessionLocal()
+    try:
+        projection = _get_completed_semantic_atlas_projection(db)
+        if not projection:
+            raise HTTPException(status_code=404, detail="No completed Semantic Atlas projection is available.")
+        focal = db.execute(text("""
+            SELECT embedding::text AS embedding
+            FROM semantic_chunk_embeddings
+            WHERE embedding_set_id = :embedding_set_id
+                AND chunk_id = :chunk_id
+                AND status = 'embedded'
+        """), {"embedding_set_id": projection["embedding_set_id"], "chunk_id": request.focal_chunk_id}).mappings().first()
+        if not focal:
+            raise HTTPException(status_code=404, detail="The selected source is not represented in the completed embedding set.")
+        rows = db.execute(text(_semantic_neighbour_query("1 - (sce.embedding <=> CAST(:query_vector AS vector))")), {
+            "embedding_set_id": projection["embedding_set_id"],
+            "projection_id": projection["projection_id"],
+            "query_vector": focal["embedding"],
+            "size": request.size + 1,
+        }).fetchall()
+        points = [_semantic_point_payload(row) for row in rows if row.chunk_id != request.focal_chunk_id][:request.size]
+        return {
+            "focal_chunk_id": request.focal_chunk_id,
+            "neighbours": points,
+            "metadata": {
+                "embedding_set_id": projection["embedding_set_id"],
+                "projection_id": projection["projection_id"],
+                "method": "cosine similarity in the completed embedding space",
+                "interpretation_limit": "Computational proximity identifies passages for archival investigation; it does not establish a historical relationship.",
+            },
+        }
+    finally:
+        db.close()
+
+
+@router.post("/critical-probe")
+async def run_critical_probe(request: CriticalProbeRequest):
+    """Return archival passages nearest to a researcher-supplied critical concept."""
+    db = LocalSessionLocal()
+    try:
+        projection = _get_completed_semantic_atlas_projection(db)
+        if not projection:
+            raise HTTPException(status_code=404, detail="No completed Semantic Atlas projection is available.")
+        embedding_set = db.execute(text("""
+            SELECT model_name, vector_dimensions
+            FROM semantic_embedding_sets
+            WHERE embedding_set_id = :embedding_set_id AND status = 'completed'
+        """), {"embedding_set_id": projection["embedding_set_id"]}).mappings().first()
+        if not embedding_set:
+            raise HTTPException(status_code=404, detail="The completed embedding set is unavailable.")
+        query_vector = _load_probe_embedding(embedding_set["model_name"], request.concept.strip())
+        if len(query_vector) != embedding_set["vector_dimensions"]:
+            raise HTTPException(status_code=503, detail="The critical probe model does not match the completed embedding dimensions.")
+        rows = db.execute(text(_semantic_neighbour_query("1 - (sce.embedding <=> CAST(:query_vector AS vector))")), {
+            "embedding_set_id": projection["embedding_set_id"],
+            "projection_id": projection["projection_id"],
+            "query_vector": "[" + ",".join(str(value) for value in query_vector) + "]",
+            "size": request.size,
+        }).fetchall()
+        return {
+            "concept": request.concept.strip(),
+            "passages": [_semantic_point_payload(row) for row in rows],
+            "metadata": {
+                "embedding_model": embedding_set["model_name"],
+                "vector_dimensions": embedding_set["vector_dimensions"],
+                "embedding_set_id": projection["embedding_set_id"],
+                "projection_id": projection["projection_id"],
+                "interpretation_limit": "Critical lens supplied by researcher. Computational proximity indicates material for investigation, not confirmation of the proposition.",
+            },
+        }
+    finally:
+        db.close()
 
 
 @router.get("/document-network")

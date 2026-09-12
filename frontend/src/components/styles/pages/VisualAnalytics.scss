@@ -13,7 +13,8 @@
   &__framing-card,
   &__controls,
   &__projection-panel,
-  &__scope-panel {
+  &__scope-panel,
+  &__coverage-panel {
     background-color: $layer-01;
     border: 1px solid $border-subtle-01;
   }
@@ -35,7 +36,8 @@
 
   &__controls,
   &__projection-panel,
-  &__scope-panel {
+  &__scope-panel,
+  &__coverage-panel {
     margin-top: $spacing-05;
   }
 
@@ -87,6 +89,68 @@
       padding-left: $spacing-04;
       border-left: 2px solid $support-warning;
       color: $text-secondary;
+    }
+  }
+}
+
+.atlas-coverage-chart {
+  margin-top: $spacing-05;
+}
+
+.visual-inquiry-page {
+  &__controls,
+  &__projection,
+  &__chart,
+  &__results {
+    background-color: $layer-01;
+    border: 1px solid $border-subtle-01;
+  }
+
+  &__control-row {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    align-items: end;
+    gap: $spacing-05;
+    margin-top: $spacing-05;
+
+    @include breakpoint-down(md) {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  &__projection,
+  &__chart,
+  &__results {
+    margin-top: $spacing-05;
+  }
+
+  &__result {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 7rem 5rem;
+    width: 100%;
+    gap: $spacing-04;
+    padding: $spacing-04 0;
+    border: 0;
+    border-bottom: 1px solid $border-subtle-01;
+    background: transparent;
+    color: $text-primary;
+    cursor: pointer;
+    text-align: left;
+
+    span:last-child {
+      text-align: right;
+    }
+
+    &:hover {
+      color: $link-primary;
+    }
+
+    @include breakpoint-down(md) {
+      grid-template-columns: 1fr;
+
+      span:last-child {
+        text-align: left;
+      }
     }
   }
 }

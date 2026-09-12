@@ -55,3 +55,13 @@ export const createAtlasCoverageMissingness = (payload) => apiRequest('/api/viz/
   method: 'POST',
   body: payload
 })
+
+export const getSemanticNeighbourhood = (payload) => apiRequest('/api/viz/semantic-neighbourhood', {
+  method: 'POST',
+  body: payload
+})
+
+export const runCriticalProbe = (payload) => apiRequest('/api/viz/critical-probe', {
+  method: 'POST',
+  body: payload
+})

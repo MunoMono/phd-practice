@@ -31,6 +31,10 @@ export const SECONDARY_SECTIONS = {
   ],
   'visual-analytics': [
     { key: 'semantic-atlas', label: 'Semantic atlas', path: '/semantic-atlas', icon: DataVis_4, matches: ['/semantic-atlas', '/clusters', '/visual-analytics'] },
+    { key: 'semantic-neighbourhoods', label: 'Semantic neighbourhoods', path: '/semantic-neighbourhoods', icon: Search, matches: ['/semantic-neighbourhoods'] },
+    { key: 'comparative-views', label: 'Comparative views', path: '/comparative-views', icon: ArrowsHorizontal, matches: ['/comparative-views'] },
+    { key: 'temporal-documentary-change', label: 'Temporal change', path: '/temporal-documentary-change', icon: DataVis_4, matches: ['/temporal-documentary-change'] },
+    { key: 'critical-inquiry', label: 'Critical inquiry', path: '/critical-inquiry', icon: WarningAlt, matches: ['/critical-inquiry'] },
   ],
   evidence: [
     { key: 'claims-evidence', label: 'Claims and evidence', path: '/claims-evidence', icon: CheckmarkOutline, matches: ['/claims-evidence', '/claims'] },
@@ -47,7 +51,7 @@ const PRIMARY_ROUTE_MATCHERS = [
   { key: 'workbench', matches: ['/', '/workbench', '/dashboard'] },
   { key: 'sources', matches: ['/sources', '/corpus'] },
   { key: 'analysis', matches: ['/source-interrogation', '/ask', '/tracer', '/absences', '/missingness', '/cross-readings', '/cross-read'] },
-  { key: 'visual-analytics', matches: ['/semantic-atlas', '/clusters', '/visual-analytics'] },
+  { key: 'visual-analytics', matches: ['/semantic-atlas', '/clusters', '/visual-analytics', '/semantic-neighbourhoods', '/comparative-views', '/temporal-documentary-change', '/critical-inquiry'] },
   { key: 'evidence', matches: ['/claims-evidence', '/claims', '/research-runs', '/experiments', '/provenance', '/audit', '/sessions', '/ml-dashboard'] },
   { key: 'documentation', matches: ['/documentation'] },
 ]

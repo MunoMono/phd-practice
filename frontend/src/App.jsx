@@ -8,6 +8,10 @@ const Dashboard = lazy(() => import('./pages/Dashboard/Dashboard'))
 const CorpusExplorer = lazy(() => import('./pages/CorpusExplorer/CorpusExplorer'))
 const EvidenceTracer = lazy(() => import('./pages/EvidenceTracer/EvidenceTracer'))
 const VisualAnalytics = lazy(() => import('./pages/VisualAnalytics/VisualAnalytics'))
+const SemanticNeighbourhoods = lazy(() => import('./pages/VisualAnalytics/SemanticNeighbourhoods'))
+const ComparativeViews = lazy(() => import('./pages/VisualAnalytics/ComparativeViews'))
+const TemporalDocumentaryChange = lazy(() => import('./pages/VisualAnalytics/TemporalDocumentaryChange'))
+const CriticalInquiry = lazy(() => import('./pages/VisualAnalytics/CriticalInquiry'))
 const MissingnessWorkbench = lazy(() => import('./pages/MissingnessWorkbench/MissingnessWorkbench'))
 const CrossReadWorkbench = lazy(() => import('./pages/CrossReadWorkbench/CrossReadWorkbench'))
 const ClaimsWorkbench = lazy(() => import('./pages/ClaimsWorkbench/ClaimsWorkbench'))
@@ -66,6 +70,10 @@ function App() {
                   <Route path="/absences" element={<MissingnessWorkbench />} />
                   <Route path="/cross-readings" element={<CrossReadWorkbench />} />
                   <Route path="/semantic-atlas" element={<VisualAnalytics />} />
+                  <Route path="/semantic-neighbourhoods" element={<SemanticNeighbourhoods />} />
+                  <Route path="/comparative-views" element={<ComparativeViews />} />
+                  <Route path="/temporal-documentary-change" element={<TemporalDocumentaryChange />} />
+                  <Route path="/critical-inquiry" element={<CriticalInquiry />} />
                   <Route path="/claims-evidence" element={<ClaimsWorkbench />} />
                   <Route path="/provenance" element={<AuditWorkbench />} />
                   <Route path="/research-runs" element={<ResearchRuns />} />
