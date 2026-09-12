@@ -94,11 +94,11 @@ const VisualInquiryWorkspace = ({ mode }) => {
     counts[year].passages += 1
     return counts
   }, {})).sort((left, right) => Number(left.year) - Number(right.year)), [temporalPoints])
-  const visiblePoints = mode === 'neighbourhood' && neighbourhood.length ? neighbourhood : mode === 'critical' && probeResults.length ? probeResults : mode === 'temporal' ? temporalPoints : projection.points
+  const visiblePoints = mode === 'neighbourhoods' && neighbourhood.length ? neighbourhood : mode === 'critical' && probeResults.length ? probeResults : mode === 'temporal' ? temporalPoints : projection.points
 
   const inspectPoint = (point) => {
     setSelectedPoint(point)
-    if (mode === 'neighbourhood') setNeighbourhood([])
+    if (mode === 'neighbourhoods') setNeighbourhood([])
   }
 
   const runNeighbourhood = async () => {
@@ -150,7 +150,7 @@ const VisualInquiryWorkspace = ({ mode }) => {
       {error && <Column><InlineNotification lowContrast kind="error" title="Visual inquiry unavailable" subtitle={error} /></Column>}
       <Column>
         <Tile className="visual-inquiry-page__controls">
-          {mode === 'neighbourhood' && <>
+          {mode === 'neighbourhoods' && <>
             <PanelHeader title="Focal source and neighbourhood" description="Select an embedded archival passage from the map, then retrieve its closest passages in the evaluated vector space." />
             <div className="visual-inquiry-page__control-row">
               <Select id="neighbourhood-size" labelText="Nearest passages" value={neighbourhoodSize} onChange={(event) => setNeighbourhoodSize(event.target.value)}>
@@ -185,7 +185,7 @@ const VisualInquiryWorkspace = ({ mode }) => {
         <Tile className="visual-inquiry-page__projection"><PanelHeader title="Inspectable evidence surface" description="Select a point to inspect its source and return to the underlying archival record." actions={<Tag type="gray">Visible: {visiblePoints.length}</Tag>} /><UmapProjection points={visiblePoints} loading={loading} errorState={error} selectedPoint={selectedPoint} highlightedTrace={null} colorBy={mode === 'comparative' ? comparisonField : 'cluster'} onSelectPoint={inspectPoint} /></Tile>
       </Column>
       <Column lg={6} md={8} sm={4}><UmapPointDetail point={selectedPoint} {...sourceActions} /></Column>
-      {(mode === 'neighbourhood' || mode === 'critical') && <Column lg={10} md={8} sm={4}><Tile className="visual-inquiry-page__results"><PanelHeader title={mode === 'critical' ? 'Nearest archival passages' : 'Neighbourhood evidence list'} description="Open a passage to inspect its archival evidence; similarity is computational, not historical." />{visiblePoints.slice(mode === 'neighbourhood' ? 1 : 0).map((point) => <button className="visual-inquiry-page__result" key={point.id} type="button" onClick={() => setSelectedPoint(point)}><span>{point.title}</span><span>{point.sourcePage ? `p. ${point.sourcePage}` : 'page unavailable'}</span><span>{point.similarity?.toFixed(3) ?? 'mapped point'}</span></button>)}</Tile></Column>}
+      {(mode === 'neighbourhoods' || mode === 'critical') && <Column lg={10} md={8} sm={4}><Tile className="visual-inquiry-page__results"><PanelHeader title={mode === 'critical' ? 'Nearest archival passages' : 'Neighbourhood evidence list'} description="Open a passage to inspect its archival evidence; similarity is computational, not historical." />{visiblePoints.slice(mode === 'neighbourhoods' ? 1 : 0).map((point) => <button className="visual-inquiry-page__result" key={point.id} type="button" onClick={() => setSelectedPoint(point)}><span>{point.title}</span><span>{point.sourcePage ? `p. ${point.sourcePage}` : 'page unavailable'}</span><span>{point.similarity?.toFixed(3) ?? 'mapped point'}</span></button>)}</Tile></Column>}
     </PageGrid>
   )
 }
