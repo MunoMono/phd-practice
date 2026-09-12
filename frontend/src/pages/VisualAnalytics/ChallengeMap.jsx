@@ -6,6 +6,7 @@ import PanelHeader from '../../components/layout/PanelHeader'
 import PageHeader from '../../components/layout/PageHeader'
 import { PageGrid, PageColumn as Column } from '../../components/layout/PageGrid'
 import UmapPointDetail from '../../components/visualizations/UmapPointDetail'
+import UmapEvidenceTable from '../../components/visualizations/UmapEvidenceTable'
 import UmapProjection from '../../components/visualizations/UmapProjection'
 import { normalizeUmapProjection } from '../../utils/normalizers'
 
@@ -60,6 +61,7 @@ const ChallengeMap = () => {
         </Column>
         <Column lg={10} md={8} sm={4}><Tile className="challenge-map-page__projection"><PanelHeader title="Temporary UMAP variant" description="Select a point to inspect the same archival evidence behind this alternative representation." actions={<Tag type="gray">Points: {projection.points.length}</Tag>} /><UmapProjection points={projection.points} loading={loading} errorState={error} selectedPoint={selectedPoint} highlightedTrace={null} colorBy="cluster" onSelectPoint={setSelectedPoint} /></Tile></Column>
         <Column lg={6} md={8} sm={4}><UmapPointDetail point={selectedPoint} onOpenCorpus={() => navigate(`/sources?documentId=${encodeURIComponent(selectedPoint?.documentId || '')}`)} onTraceEvidence={() => navigate(`/source-interrogation?chunkId=${encodeURIComponent(selectedPoint?.chunkId || '')}`)} onOpenAbsences={() => navigate(`/absences?sourceDocumentId=${encodeURIComponent(selectedPoint?.documentId || '')}&sourceChunkId=${encodeURIComponent(selectedPoint?.chunkId || '')}`)} onOpenCrossReadings={() => navigate(`/cross-readings?sourceDocumentId=${encodeURIComponent(selectedPoint?.documentId || '')}&sourceChunkId=${encodeURIComponent(selectedPoint?.chunkId || '')}`)} onCopyPid={() => navigator.clipboard?.writeText(selectedPoint?.pid || '')} onCopyExcerpt={() => navigator.clipboard?.writeText(selectedPoint?.excerpt || '')} onAddToMemo={() => {}} /></Column>
+        <Column><Tile className="challenge-map-page__projection"><PanelHeader title="Variant archival evidence" description="Sort this temporary projection's sampled evidence and select a row to inspect its source." /><UmapEvidenceTable points={projection.points} onInspect={setSelectedPoint} /></Tile></Column>
       </>}
     </PageGrid>
   )
