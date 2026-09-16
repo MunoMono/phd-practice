@@ -1,5 +1,5 @@
 import { Accordion, AccordionItem, Button, InlineNotification, Search, Select, SelectItem, Slider, Tag, TextArea, TextInput, Tile } from '@carbon/react'
-import { Add, DataVis_4, Renew, Save, View, WarningAlt } from '@carbon/icons-react'
+import { Add, DataVis_4, Pause, Play, Renew, Save, View, WarningAlt } from '@carbon/icons-react'
 import * as d3 from 'd3'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
@@ -165,6 +165,7 @@ const VisualAnalyticsWorkbench = () => {
   const [dimensions, setDimensions] = useState(() => savedWorkspace.dimensions || '3d')
   const [azimuth, setAzimuth] = useState(() => savedWorkspace.azimuth || 25)
   const [elevation, setElevation] = useState(() => savedWorkspace.elevation || 18)
+  const [autoRotate, setAutoRotate] = useState(() => savedWorkspace.autoRotate || false)
   const [panels, setPanels] = useState({ controls: true, inspector: true })
 
   useEffect(() => {
@@ -178,8 +179,8 @@ const VisualAnalyticsWorkbench = () => {
   }, [filters.pointType])
 
   useEffect(() => {
-    sessionStorage.setItem(WORKSPACE_STORAGE_KEY, JSON.stringify({ view, filters, search, selectedIds, anchorId, neighbourCount, comparisonA, comparisonB, note, dimensions, azimuth, elevation }))
-  }, [view, filters, search, selectedIds, anchorId, neighbourCount, comparisonA, comparisonB, note, dimensions, azimuth, elevation])
+    sessionStorage.setItem(WORKSPACE_STORAGE_KEY, JSON.stringify({ view, filters, search, selectedIds, anchorId, neighbourCount, comparisonA, comparisonB, note, dimensions, azimuth, elevation, autoRotate }))
+  }, [view, filters, search, selectedIds, anchorId, neighbourCount, comparisonA, comparisonB, note, dimensions, azimuth, elevation, autoRotate])
 
   const visiblePoints = useMemo(() => projection.points.filter((point) => (
     matchesSearch(point, search)
@@ -198,6 +199,12 @@ const VisualAnalyticsWorkbench = () => {
   const has3dProjection = projection.points.some((point) => Number.isFinite(point.z))
   const activeDimensions = dimensions === '3d' && !has3dProjection ? '2d' : dimensions
 
+  useEffect(() => {
+    if (!autoRotate || activeDimensions !== '3d') return undefined
+    const timer = window.setInterval(() => setAzimuth((current) => current >= 180 ? -180 : current + 1), 40)
+    return () => window.clearInterval(timer)
+  }, [autoRotate, activeDimensions])
+
   const updateFilter = (field, value) => setFilters((current) => ({ ...current, [field]: value }))
   const selectPoint = (point, event) => {
     if (!point) { if (!(event?.shiftKey || event?.metaKey)) setSelectedIds([]); return }
@@ -213,7 +220,7 @@ const VisualAnalyticsWorkbench = () => {
       setAnchorId(anchor.id)
     } catch (requestError) { setError(requestError.message || 'Embedding neighbours could not be loaded.') }
   }
-  const resetWorkspace = () => { sessionStorage.removeItem(WORKSPACE_STORAGE_KEY); setFilters(DEFAULT_FILTERS); setSearch(''); setSelectedIds([]); setAnchorId(null); setEmbeddingNeighbours([]); setComparisonA([]); setComparisonB([]); setNote(''); setDimensions('3d'); setAzimuth(25); setElevation(18); setView('atlas') }
+  const resetWorkspace = () => { sessionStorage.removeItem(WORKSPACE_STORAGE_KEY); setFilters(DEFAULT_FILTERS); setSearch(''); setSelectedIds([]); setAnchorId(null); setEmbeddingNeighbours([]); setComparisonA([]); setComparisonB([]); setNote(''); setDimensions('3d'); setAzimuth(25); setElevation(18); setAutoRotate(false); setView('atlas') }
   const handoff = (path) => {
     const params = new URLSearchParams()
     if (selectedPoints[0]?.documentId) params.set(path === '/absences' || path === '/cross-readings' ? 'sourceDocumentId' : 'documentId', selectedPoints[0].documentId)
@@ -263,7 +270,7 @@ const VisualAnalyticsWorkbench = () => {
             <SelectItem value="2d" text="2D" />
             <SelectItem value="3d" text={has3dProjection ? '3D' : '3D (no stored coordinate)'} disabled={!has3dProjection} />
           </Select>
-          {activeDimensions === '3d' && <><Slider id="projection-azimuth" labelText="Horizontal orbit" min={-180} max={180} value={azimuth} onChange={({ value }) => setAzimuth(value)} /><Slider id="projection-elevation" labelText="Vertical orbit" min={-80} max={80} value={elevation} onChange={({ value }) => setElevation(value)} /></>}
+          {activeDimensions === '3d' && <><Button className="visual-analytics-workbench__orbit-toggle" kind="ghost" size="sm" hasIconOnly renderIcon={autoRotate ? Pause : Play} iconDescription={autoRotate ? 'Pause 3D orbit' : 'Start 3D orbit'} tooltipPosition="right" onClick={() => setAutoRotate((current) => !current)} /><Slider id="projection-azimuth" labelText="Horizontal orbit" min={-180} max={180} value={azimuth} onChange={({ value }) => setAzimuth(value)} /><Slider id="projection-elevation" labelText="Vertical orbit" min={-80} max={80} value={elevation} onChange={({ value }) => setElevation(value)} /></>}
         </AccordionItem>
         {view === 'neighbourhoods' && <AccordionItem title="Semantic neighbourhood" open>
           <Select id="neighbour-count" labelText="Embedding neighbours" value={neighbourCount} onChange={(event) => setNeighbourCount(event.target.value)}>{['5', '10', '25', '50'].map((value) => <SelectItem key={value} value={value} text={value} />)}</Select>
