@@ -63,11 +63,16 @@ const EmbeddingCanvas = ({ points, emptyMessage, dimensions, azimuth, elevation,
     const context = canvas.getContext('2d')
     const azimuthRadians = azimuth * Math.PI / 180
     const elevationRadians = elevation * Math.PI / 180
+    const coordinateSpan = Math.max(
+      d3.max(points, (point) => Math.max(Math.abs(point.x), Math.abs(point.y), Math.abs(point.z || 0))) || 1,
+      1,
+    )
     const renderedPoints = points.map((point) => {
       if (dimensions !== '3d') return { ...point, renderX: point.x, renderY: point.y, depth: 0 }
       const rotatedX = point.x * Math.cos(azimuthRadians) - point.z * Math.sin(azimuthRadians)
       const depth = point.x * Math.sin(azimuthRadians) + point.z * Math.cos(azimuthRadians)
-      return { ...point, renderX: rotatedX, renderY: point.y * Math.cos(elevationRadians) - depth * Math.sin(elevationRadians), depth }
+      const perspective = 1 + (depth / coordinateSpan) * 0.22
+      return { ...point, renderX: rotatedX * perspective, renderY: (point.y * Math.cos(elevationRadians) - depth * Math.sin(elevationRadians)) * perspective, depth }
     })
     const xExtent = d3.extent(renderedPoints, (point) => point.renderX)
     const yExtent = d3.extent(renderedPoints, (point) => point.renderY)
@@ -95,7 +100,8 @@ const EmbeddingCanvas = ({ points, emptyMessage, dimensions, azimuth, elevation,
         const anchored = point.id === anchorId
         context.beginPath()
         context.arc(xScale(point.renderX), yScale(point.renderY), (selected || anchored ? 5.5 : 3) + (dimensions === '3d' ? Math.max(-1, Math.min(1, point.depth)) : 0), 0, Math.PI * 2)
-        context.globalAlpha = selected || anchored || searched || inA || inB || selectedIds.length === 0 ? 0.9 : 0.18
+        const depthAlpha = dimensions === '3d' ? 0.48 + ((point.depth / coordinateSpan + 1) / 2) * 0.42 : 0.9
+        context.globalAlpha = selected || anchored || searched || inA || inB || selectedIds.length === 0 ? depthAlpha : 0.18
         context.fillStyle = anchored ? '#ff832b' : inA && inB ? '#a56eff' : inA ? '#42be65' : inB ? '#78a9ff' : pointColour(point, colorBy, colourScale)
         context.fill()
         if (selected || searched || anchored) {
@@ -165,7 +171,7 @@ const VisualAnalyticsWorkbench = () => {
   const [dimensions, setDimensions] = useState(() => savedWorkspace.dimensions || '3d')
   const [azimuth, setAzimuth] = useState(() => savedWorkspace.azimuth || 25)
   const [elevation, setElevation] = useState(() => savedWorkspace.elevation || 18)
-  const [autoRotate, setAutoRotate] = useState(() => savedWorkspace.autoRotate || false)
+  const [autoRotate, setAutoRotate] = useState(() => savedWorkspace.orbitVersion === 1 ? savedWorkspace.autoRotate : true)
   const [panels, setPanels] = useState({ controls: true, inspector: true })
 
   useEffect(() => {
@@ -179,7 +185,7 @@ const VisualAnalyticsWorkbench = () => {
   }, [filters.pointType])
 
   useEffect(() => {
-    sessionStorage.setItem(WORKSPACE_STORAGE_KEY, JSON.stringify({ view, filters, search, selectedIds, anchorId, neighbourCount, comparisonA, comparisonB, note, dimensions, azimuth, elevation, autoRotate }))
+    sessionStorage.setItem(WORKSPACE_STORAGE_KEY, JSON.stringify({ view, filters, search, selectedIds, anchorId, neighbourCount, comparisonA, comparisonB, note, dimensions, azimuth, elevation, autoRotate, orbitVersion: 1 }))
   }, [view, filters, search, selectedIds, anchorId, neighbourCount, comparisonA, comparisonB, note, dimensions, azimuth, elevation, autoRotate])
 
   const visiblePoints = useMemo(() => projection.points.filter((point) => (
@@ -220,7 +226,7 @@ const VisualAnalyticsWorkbench = () => {
       setAnchorId(anchor.id)
     } catch (requestError) { setError(requestError.message || 'Embedding neighbours could not be loaded.') }
   }
-  const resetWorkspace = () => { sessionStorage.removeItem(WORKSPACE_STORAGE_KEY); setFilters(DEFAULT_FILTERS); setSearch(''); setSelectedIds([]); setAnchorId(null); setEmbeddingNeighbours([]); setComparisonA([]); setComparisonB([]); setNote(''); setDimensions('3d'); setAzimuth(25); setElevation(18); setAutoRotate(false); setView('atlas') }
+  const resetWorkspace = () => { sessionStorage.removeItem(WORKSPACE_STORAGE_KEY); setFilters(DEFAULT_FILTERS); setSearch(''); setSelectedIds([]); setAnchorId(null); setEmbeddingNeighbours([]); setComparisonA([]); setComparisonB([]); setNote(''); setDimensions('3d'); setAzimuth(25); setElevation(18); setAutoRotate(true); setView('atlas') }
   const handoff = (path) => {
     const params = new URLSearchParams()
     if (selectedPoints[0]?.documentId) params.set(path === '/absences' || path === '/cross-readings' ? 'sourceDocumentId' : 'documentId', selectedPoints[0].documentId)
