@@ -266,6 +266,8 @@ export const normalizeRuntimeAnalysis = (raw = {}) => {
   }
 }
 
+export const normalizeGraniteAnalysis = normalizeRuntimeAnalysis
+
 export const normalizeEvidenceTrace = (raw = {}) => ({
   ...normalizeRuntimeAnalysis(raw),
   sessionId: raw.sessionId || raw.session_id || null
