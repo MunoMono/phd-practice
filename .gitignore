@@ -54,6 +54,8 @@ artifacts/turin-controlled-corpus-sources/
 artifacts/turin-controlled-pilot-sources/
 backups/
 docs/turin_experiment/old_and_ignore/
+.runtime/
+docs/turin_experiment/turin_paper/uat_screens/**/*.mhtml
 
 # Wealth management app (now independent repo)
 wealth-management/
