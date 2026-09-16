@@ -1400,7 +1400,7 @@ async def get_umap_projection(
                     "entities": _extract_entities(row.entities),
                     "confidence": float(row.confidence) if row.confidence is not None else None,
                     "drift_score": float(row.drift_score) if row.drift_score is not None else None,
-                    "excerpt": _clean_excerpt(row.chunk_text),
+                    "excerpt": row.excerpt,
                     "filename": row.filename,
                     "pdf_count": int(row.pdf_count or 0),
                     "has_diagrams": int(row.has_diagrams or 0),
