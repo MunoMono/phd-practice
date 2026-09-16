@@ -11,7 +11,7 @@ from typing import Any, Dict, List, Optional
 import httpx
 import psutil
 
-from app.services.metadata_roles import format_inference_source_block
+from app.services.metadata_roles import format_granite_source_block
 
 logger = logging.getLogger(__name__)
 
@@ -401,7 +401,7 @@ class InferenceService:
         context_parts = []
         for i, chunk in enumerate(context_chunks, 1):
             if chunk.get('provenance') or chunk.get('catalogue_metadata'):
-                context_parts.append(format_inference_source_block(i, chunk))
+                context_parts.append(format_granite_source_block(i, chunk))
                 continue
 
             text = chunk.get("text", "")
