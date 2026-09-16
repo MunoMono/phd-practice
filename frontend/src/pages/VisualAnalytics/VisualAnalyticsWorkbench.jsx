@@ -170,7 +170,7 @@ const VisualAnalyticsWorkbench = () => {
   useEffect(() => {
     let cancelled = false
     setLoading(true)
-    getUmapProjection({ point_type: filters.pointType, include_missingness: true, limit: 5000 })
+    getUmapProjection({ point_type: filters.pointType, include_missingness: true, limit: 1000 })
       .then((payload) => { if (!cancelled) setProjection(payload) })
       .catch((requestError) => { if (!cancelled) setError(requestError.message || 'The embedding projection could not be loaded.') })
       .finally(() => { if (!cancelled) setLoading(false) })
