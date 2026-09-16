@@ -157,7 +157,7 @@ export const DOCUMENTATION_ENTRIES = [
             headers: ['Component', 'AI leverage', 'What it produces'],
             rows: [
               ['Source-linked semantic search', 'Embeddings plus vector search across PDFs, metadata and keywords.', 'Finds passages by conceptual relation, not only by keyword.'],
-              ['RAG answer generation', 'Local LLM / Granite / citation-bound prompting.', 'Produces provisional answers grounded in retrieved records.'],
+              ['RAG answer generation', 'Local Ollama model / citation-bound prompting.', 'Produces provisional answers grounded in retrieved records.'],
               ['Archival query trails', 'Store prompt, retrieved chunks, metadata and response.', 'Makes the interpretive process auditable.'],
               ['Chunk-level provenance', 'Attach PDF ID, page, OCR status, date, author, project and rights/access condition.', 'Keeps the archive visible inside the generated answer.'],
               ['Comparative retrieval', 'Run the same question across people, projects, decades and themes.', 'Enables archive cross-reading.'],

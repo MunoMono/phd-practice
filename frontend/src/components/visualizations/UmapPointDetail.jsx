@@ -1,6 +1,6 @@
 import { Button, Tag, Tile } from '@carbon/react'
 
-const UmapPointDetail = ({ point, onOpenCorpus, onTraceEvidence, onCopyPid, onCopyExcerpt, onAddToMemo }) => {
+const UmapPointDetail = ({ point, onOpenCorpus, onTraceEvidence, onOpenAbsences, onOpenCrossReadings, onCopyPid, onCopyExcerpt, onAddToMemo }) => {
   if (!point) {
     return (
       <Tile className="umap-point-detail">
@@ -70,6 +70,8 @@ const UmapPointDetail = ({ point, onOpenCorpus, onTraceEvidence, onCopyPid, onCo
       <div className="umap-point-detail__actions">
         <Button kind="ghost" size="sm" onClick={onOpenCorpus}>Open in sources</Button>
         <Button kind="ghost" size="sm" onClick={onTraceEvidence}>Open in source interrogation</Button>
+        <Button kind="ghost" size="sm" onClick={onOpenAbsences}>Open scoped absences</Button>
+        <Button kind="ghost" size="sm" onClick={onOpenCrossReadings}>Open cross-readings</Button>
         <Button kind="ghost" size="sm" onClick={onCopyPid}>Copy PID</Button>
         <Button kind="ghost" size="sm" onClick={onCopyExcerpt}>Copy excerpt</Button>
         <Button kind="secondary" size="sm" onClick={onAddToMemo}>Add to research memo</Button>

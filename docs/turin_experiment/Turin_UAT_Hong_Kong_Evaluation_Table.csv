@@ -1,0 +1,13 @@
+UAT,Result,Interpretation
+111,PASS,Immutable saved-run identity preserved; run selection is exact by run_id and no silent substitution occurs.
+118,PASS,Researcher assessment workflow is bounded; assessment remains separate from immutable run evidence.
+135,PASS,Documentation navigation corrected; return action resolves to the intended expanded abstract identity.
+076,BLOCKED,Cross-readings capability intentionally deferred; no approved testimony activation in Turin v1.
+077,PASS,Blank passage validation added; empty content cannot be persisted.
+078,BLOCKED,Cross-readings creation remains deferred pending approved testimony provenance model.
+081,BLOCKED,Cross-reading probe activation deferred; retrieval scope and relation semantics require future design.
+086,BLOCKED,Semantic Atlas intentionally inactive; no approved embeddings or projection available.
+087,BLOCKED,Atlas filtering controls verified but no projection exists to evaluate research output.
+093,PASS,Evidence surface scope remains explicit and prevents projection absence being confused with archive absence.
+104,BLOCKED,Claims workspace remains development-seed only; not activated as Turin evidence.
+110,PASS,Claims exports function as scaffold exports; development seed boundary preserved.

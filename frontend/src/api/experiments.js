@@ -2,14 +2,6 @@ import apiRequest from './client'
 
 export const listExperimentRuns = () => apiRequest('/api/experiments')
 
-export const interrogateTurin = (researchQuestion, options = {}) => apiRequest('/api/experiments/interrogate', {
-	method: 'POST',
-	body: {
-		research_question: researchQuestion,
-		...options
-	}
-})
-
 export const interrogateExploratory = (query, options = {}) => apiRequest('/api/analysis/interrogate', {
 	method: 'POST',
 	timeoutMs: 1200000,

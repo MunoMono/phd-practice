@@ -37,7 +37,7 @@ class GraniteService:
         self.max_new_tokens = int(os.getenv("GRANITE_MAX_TOKENS", "384"))
         self.temperature = float(os.getenv("GRANITE_TEMPERATURE", "0.2"))
         self.max_input_chars = int(os.getenv("GRANITE_MAX_INPUT_CHARS", "6000"))
-        self.timeout_seconds = int(os.getenv("GRANITE_TIMEOUT_SECONDS", "180"))
+        self.timeout_seconds = int(os.getenv("GRANITE_TIMEOUT_SECONDS", "600"))
         self.load_timeout_seconds = int(os.getenv("OLLAMA_LOAD_TIMEOUT_SECONDS", "600"))
         self.load_retry_count = int(os.getenv("OLLAMA_LOAD_RETRY_COUNT", "3"))
         self.load_retry_delay_seconds = int(os.getenv("OLLAMA_LOAD_RETRY_DELAY_SECONDS", "5"))
@@ -130,10 +130,10 @@ class GraniteService:
         temperature: Optional[float] = None,
         top_p: Optional[float] = None,
         do_sample: Optional[bool] = None,
-        response_format: Optional[str] = None,
-    ) -> str:
+        response_format: Optional[str | Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
         """Generate text via Ollama local HTTP API."""
-        generation_max_tokens = min(max_tokens or self.max_new_tokens, 512)
+        generation_max_tokens = min(max_tokens or self.max_new_tokens, 1500)
         generation_temperature = self.temperature if temperature is None else temperature
 
         payload = {
@@ -150,7 +150,7 @@ class GraniteService:
         if response_format:
             payload["format"] = response_format
 
-        timeout = httpx.Timeout(self.timeout_seconds)
+        timeout = httpx.Timeout(connect=10.0, read=self.timeout_seconds, write=30.0, pool=30.0)
         async with httpx.AsyncClient(timeout=timeout) as client:
             response = await client.post(f"{self.ollama_base_url}/api/generate", json=payload)
             response.raise_for_status()
@@ -159,11 +159,11 @@ class GraniteService:
         generated = data.get("response", "")
         if not generated:
             raise RuntimeError("Empty response from Ollama /api/generate")
-        return generated.strip()
+        return {"raw_response": generated.strip(), "generation": data}
 
     async def generate_experiment(
         self, prompt: str, max_tokens: int = 512, temperature: float = 0.0,
-        top_p: float = 1.0, do_sample: bool = False,
+        top_p: float = 1.0, do_sample: bool = False, response_schema: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """Generate one bounded local experiment response without rebuilding context."""
         if not self.get_load_status()["model_ready"]:
@@ -172,13 +172,22 @@ class GraniteService:
             raise RuntimeError(f"Experiment prompt exceeds Granite input budget ({self.max_input_chars} chars).")
         started = time.monotonic()
         async with self._lock:
-            raw_response = await asyncio.wait_for(
-                self._generate_via_ollama(prompt, max_tokens, temperature, top_p, do_sample),
+            ollama_result = await asyncio.wait_for(
+                self._generate_via_ollama(prompt, max_tokens, temperature, top_p, do_sample, response_schema),
                 timeout=self.timeout_seconds,
             )
         return {
-            "raw_response": raw_response,
-            "generation": {"temperature": temperature, "top_p": top_p, "max_tokens": min(max_tokens, 512), "do_sample": do_sample, "input_characters": len(prompt), "duration_seconds": time.monotonic() - started},
+            "raw_response": ollama_result["raw_response"],
+            "generation": {
+                "temperature": temperature,
+                "top_p": top_p,
+                "max_tokens": min(max_tokens, 1500),
+                "do_sample": do_sample,
+                "granite_timeout_seconds": self.timeout_seconds,
+                "input_characters": len(prompt),
+                "duration_seconds": time.monotonic() - started,
+                **ollama_result["generation"],
+            },
         }
 
     async def generate_analysis(
@@ -230,6 +239,7 @@ class GraniteService:
                     ),
                     timeout=self.timeout_seconds,
                 )
+                generated_text = generated_text["raw_response"]
             except asyncio.TimeoutError as exc:
                 raise RuntimeError(
                     f"Granite inference timed out after {self.timeout_seconds}s"

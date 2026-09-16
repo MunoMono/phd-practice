@@ -8,7 +8,7 @@ import { PageGrid, PageColumn as Column } from '../../components/layout/PageGrid
 import apiRequest from '../../api/client'
 import { exportClaimsCsv, exportClaimsMarkdown, getClaims } from '../../api/claims'
 import { exportCrossReadCsv, exportCrossReadMarkdown, getCrossReadMap } from '../../api/crossRead'
-import { getGraniteLoadStatus } from '../../api/granite'
+import { getRuntimeLoadStatus } from '../../api/runtime'
 import { getMissingnessEvents, getMissingnessSummary } from '../../api/missingness'
 import { exportQueryRunJson, exportQueryRunMarkdown, getQueryRun, getQueryRuns } from '../../api/queryRuns'
 import { getResearchStateTag } from '../../utils/researchState'
@@ -16,7 +16,7 @@ import { downloadFile } from '../../utils/workbenchExport'
 
 const AuditWorkbench = () => {
   const [backendHealth, setBackendHealth] = useState(null)
-  const [graniteStatus, setGraniteStatus] = useState(null)
+  const [runtimeStatus, setRuntimeStatus] = useState(null)
   const [queryRuns, setQueryRuns] = useState([])
   const [selectedQueryId, setSelectedQueryId] = useState('')
   const [selectedQueryRun, setSelectedQueryRun] = useState(null)
@@ -36,9 +36,9 @@ const AuditWorkbench = () => {
       setError('')
 
       try {
-        const [healthPayload, granitePayload, queryRunPayload, missingnessPayload, missingnessSummaryPayload, crossReadPayload, claimsPayload, authorityPayload] = await Promise.all([
+        const [healthPayload, runtimePayload, queryRunPayload, missingnessPayload, missingnessSummaryPayload, crossReadPayload, claimsPayload, authorityPayload] = await Promise.all([
           apiRequest('/health'),
-          getGraniteLoadStatus(),
+          getRuntimeLoadStatus(),
           getQueryRuns(),
           getMissingnessEvents(),
           getMissingnessSummary(),
@@ -55,7 +55,7 @@ const AuditWorkbench = () => {
         const nextSelectedQueryId = nextQueryRuns[0]?.query_id || ''
 
         setBackendHealth(healthPayload)
-        setGraniteStatus(granitePayload)
+        setRuntimeStatus(runtimePayload)
         setQueryRuns(nextQueryRuns)
         setSelectedQueryId(nextSelectedQueryId)
         setMissingnessEvents(missingnessPayload.events || [])
@@ -122,9 +122,19 @@ const AuditWorkbench = () => {
         note: loading ? 'Checking deployment health surface' : backendHealthAvailable ? 'Live /health status' : 'Health endpoint is not exposed through the current deployment.',
       },
       {
-        label: 'Granite readiness',
-        value: loading ? 'Loading...' : graniteStatus?.model_status || 'Unavailable',
-        note: loading ? 'Checking model state' : graniteStatus?.model_ready ? 'Model ready' : 'Model not ready',
+        label: 'Runtime readiness',
+        value: loading ? 'Loading...' : runtimeStatus?.model_status || 'Unavailable',
+        note: loading ? 'Checking model state' : runtimeStatus?.model_ready ? 'Qwen3 8B ready' : 'Qwen3 8B unavailable',
+      },
+      {
+        label: 'Semantic reranker',
+        value: 'BAAI/bge-small-en-v1.5',
+        note: '384-dimensional local Mac embeddings; cosine reranks provenance-valid documentary passages only, with no whole-corpus vector index.',
+      },
+      {
+        label: 'Relevance reranker',
+        value: 'cross-encoder/ms-marco-MiniLM-L-6-v2',
+        note: 'Local Mac joint question-passage scoring over provenance-valid documentary candidates; it does not generate historical claims.',
       },
       {
         label: 'Query runs',
@@ -152,7 +162,7 @@ const AuditWorkbench = () => {
         note: loading ? 'Checking authority register state' : authoritySummary ? `${authoritySummary.totalRecords} records / ${authoritySummary.count} types` : 'Authority register not available.',
       },
     ]
-  }, [authoritySummary, backendHealth, claims, crossReadMap, graniteStatus, loading, missingnessEvents.length, queryRuns.length])
+  }, [authoritySummary, backendHealth, claims, crossReadMap, runtimeStatus, loading, missingnessEvents.length, queryRuns.length])
 
   const selectedQueryRunExportsEnabled = Boolean(selectedQueryId)
 

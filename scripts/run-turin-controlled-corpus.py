@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import subprocess
 import sys
 from datetime import datetime, timezone
@@ -87,8 +88,12 @@ def load_checkpoint(args: argparse.Namespace, pilot_result: dict) -> dict:
 
 def run_worker(args: argparse.Namespace, document_id: str, output_path: Path) -> tuple[int, str]:
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    command = [
-        "docker", "compose", "--profile", "docling", "run", "--rm", "--no-deps",
+    command = ["docker", "compose"]
+    compose_file = os.getenv("TURIN_COMPOSE_FILE")
+    if compose_file:
+        command.extend(["-f", compose_file])
+    command.extend([
+        "--profile", "docling", "run", "--rm", "--no-deps",
         "--entrypoint", "python", "-e", f"POSTGRES_DB={args.database}",
         "-v", f"{ROOT / 'artifacts'}:/artifacts", "docling-worker",
         "scripts/ingest_turin_pilot.py",
@@ -98,7 +103,7 @@ def run_worker(args: argparse.Namespace, document_id: str, output_path: Path) ->
         "--classification", "TURIN CONTROLLED-INGESTION FULL CORPUS",
         "--download-dir", "/artifacts/turin-controlled-corpus-sources",
         "--output", f"/artifacts/turin-phase2a/full-corpus-results/{document_id}.json",
-    ]
+    ])
     completed = subprocess.run(command, cwd=ROOT, text=True, capture_output=True)
     return completed.returncode, (completed.stdout + completed.stderr)[-8000:]
 
@@ -108,11 +113,11 @@ def main() -> int:
     manifest = json.loads(args.manifest.read_text(encoding="utf-8"))
     pilot_result = json.loads(args.pilot_result.read_text(encoding="utf-8"))
     checkpoint = load_checkpoint(args, pilot_result)
-    eligible = [row for row in manifest if row["ml_policy_status"] in {"eligible_unrestricted", "eligible_page_restricted"}]
-    if len(eligible) != 97 or any(row["corpus_version"] != CORPUS_VERSION for row in eligible):
-        raise ValueError("Authoritative manifest does not contain the expected frozen eligible corpus.")
+    materialisable = [row for row in manifest if row.get("source_uri")]
+    if len(materialisable) != 109 or any(row["corpus_version"] != CORPUS_VERSION for row in materialisable):
+        raise ValueError("Authoritative manifest does not contain the expected frozen source corpus.")
 
-    for row in eligible:
+    for row in materialisable:
         document_id = row["document_id"]
         existing = checkpoint["documents"].get(document_id, {})
         if existing.get("status") == "completed" or existing.get("checkpoint_status") == "pilot_completed":

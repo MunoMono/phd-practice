@@ -1,0 +1,242 @@
+// Custom application styles on top of Carbon
+// Carbon base styles are imported in main.jsx
+
+@use '@carbon/react';
+@use '@carbon/react/scss/spacing' as *;
+@use '@carbon/react/scss/theme' as *;
+@use '@carbon/react/scss/type' as *;
+@use '@carbon/react/scss/breakpoint' as *;
+
+html {
+  scroll-behavior: smooth;
+  background-color: var(--cds-background);
+  --app-shadow-premium-rest:
+    0 2px 8px color-mix(in srgb, black 5%, transparent),
+    0 8px 24px color-mix(in srgb, var(--cds-link-primary) 8%, transparent);
+  --app-shadow-premium-hover:
+    0 4px 16px color-mix(in srgb, black 8%, transparent),
+    0 12px 32px color-mix(in srgb, var(--cds-link-primary) 15%, transparent);
+  --app-shadow-overlay: 0 8px 24px color-mix(in srgb, black 20%, transparent);
+  --app-shadow-card-hover: 0 4px 12px color-mix(in srgb, black 15%, transparent);
+  --app-shadow-popover: 0 2px 6px color-mix(in srgb, black 10%, transparent);
+  --app-shadow-popover-hover: 0 2px 4px color-mix(in srgb, black 10%, transparent);
+  --app-shadow-login: 0 8px 32px color-mix(in srgb, black 40%, transparent);
+  --app-shadow-particle-glow: 0 0 20px var(--cds-interactive-01);
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  min-width: 20rem;
+  min-height: 100vh;
+  background-color: var(--cds-background);
+  color: var(--cds-text-primary);
+  @include type-style('body-01');
+  font-feature-settings: 'liga' 1, 'calt' 1;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden; // Prevent horizontal scroll on mobile
+}
+
+#root {
+  width: 100%;
+  min-height: 100vh;
+  background-color: var(--cds-background);
+  overflow-x: hidden; // Prevent horizontal scroll on mobile
+}
+
+// Global premium enhancements
+* {
+  box-sizing: border-box;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+p,
+ul,
+ol,
+dl,
+blockquote,
+figure {
+  margin-top: 0;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  color: var(--cds-text-primary);
+  text-wrap: balance;
+}
+
+p,
+li,
+dd {
+  color: var(--cds-text-primary);
+}
+
+small,
+.secondary-copy {
+  color: var(--cds-text-secondary);
+}
+
+a {
+  color: var(--cds-link-primary);
+  text-decoration-color: transparent;
+  text-underline-offset: 0.125rem;
+  transition: color 120ms ease, text-decoration-color 120ms ease;
+
+  &:hover {
+    color: var(--cds-link-primary-hover);
+    text-decoration-color: currentColor;
+  }
+}
+
+// Enhanced focus states
+*:focus-visible {
+  outline: 2px solid var(--cds-focus);
+  outline-offset: 2px;
+}
+
+// Selection styling
+::selection {
+  background-color: var(--cds-highlight);
+  color: var(--cds-text-primary);
+}
+
+// IBM Carbon list styling - use dashes for bullets
+ul {
+  list-style-type: none;
+  padding-left: 0;
+  
+  li {
+    position: relative;
+    padding-left: 1.25rem;
+    
+    &::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      color: var(--cds-text-primary);
+      font-weight: 600;
+    }
+  }
+}
+
+ol {
+  padding-left: 1.25rem;
+}
+
+// Custom scrollbar (webkit browsers)
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--cds-layer-01);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--cds-border-subtle);
+  border-radius: 4px;
+  
+  &:hover {
+    background: var(--cds-border-strong);
+  }
+}
+
+// Animated gradient text utility
+.gradient-text {
+  background: linear-gradient(
+    135deg,
+    var(--cds-link-primary),
+    var(--cds-support-info),
+    var(--cds-icon-info)
+  );
+  background-size: 200% 200%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: gradient-shift 8s ease infinite;
+}
+
+@keyframes gradient-shift {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+// Premium card elevation
+.premium-elevation {
+  box-shadow: var(--app-shadow-premium-rest);
+  transition: all 0.3s cubic-bezier(0.2, 0, 0.38, 0.9);
+  
+  &:hover {
+    box-shadow: var(--app-shadow-premium-hover);
+    transform: translateY(-2px);
+  }
+}
+
+.app-kicker {
+  @include type-style('label-02');
+  color: var(--cds-text-secondary);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.app-section-title {
+  @include type-style('heading-04');
+  color: var(--cds-text-primary);
+}
+
+.app-body-copy {
+  @include type-style('body-01');
+  color: var(--cds-text-secondary);
+}
+
+.app-caption {
+  @include type-style('helper-text-01');
+  color: var(--cds-text-secondary);
+}
+
+.viz-tooltip {
+  position: absolute;
+  z-index: 1000;
+  max-width: 20rem;
+  padding: $spacing-04;
+  border: 1px solid var(--cds-border-subtle);
+  border-radius: 0.5rem;
+  background-color: var(--cds-layer-inverse);
+  color: var(--cds-text-inverse);
+  box-shadow: var(--app-shadow-overlay);
+  pointer-events: none;
+  @include type-style('body-compact-01');
+
+  strong {
+    color: var(--cds-text-inverse);
+  }
+}
+
+// Loading shimmer effect
+@keyframes shimmer {
+  0% { background-position: -1000px 0; }
+  100% { background-position: 1000px 0; }
+}
+
+.shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--cds-layer-01) 0%,
+    var(--cds-layer-02) 50%,
+    var(--cds-layer-01) 100%
+  );
+  background-size: 1000px 100%;
+  animation: shimmer 2s infinite;
+}

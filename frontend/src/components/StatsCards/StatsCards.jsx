@@ -422,7 +422,7 @@ const StatsCards = () => {
             </div>
             <div className="stats-card__label">Experiments</div>
             <div className="stats-card__breakdown">
-              <Tag type="warm-gray" size="sm">Granite fine-tuning</Tag>
+              <Tag type="warm-gray" size="sm">Historical model fine-tuning</Tag>
               <div className="stats-card__meta">
                 {formatNumber(stats?.local_table_counts?.research_sessions || 0)} inference sessions
               </div>

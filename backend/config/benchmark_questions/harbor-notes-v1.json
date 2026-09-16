@@ -1,0 +1,53 @@
+{
+  "schema_version": "archival-evidence-benchmark-v1",
+  "collection_id": "harbor-notes-fixture",
+  "corpus_version": "fixture-harbor-v1",
+  "temporal_boundaries": [
+    {"id": "project-end", "end_date": "1978-12-31", "rule": "Selected evidence cannot establish Harbour Survey activity after December 1978."}
+  ],
+  "questions": [
+    {
+      "id": "HR1",
+      "research_case": "known_relationship",
+      "question": "What documentary evidence connects Asha Bell and Martin Cole in the Harbour Survey?",
+      "triggers": ["asha bell", "martin cole", "harbour survey"],
+      "entity_anchors": [{"aliases": ["Asha Bell"]}, {"aliases": ["Martin Cole"]}],
+      "reservation": {"type": "CONFIGURED_DOCUMENTARY_RESERVATION", "chunk_ids": ["harbor-minute-1"]},
+      "permitted_evidence_layers": ["DIRECT_DOCUMENTARY", "ARCHIVAL_METADATA", "MISSINGNESS"],
+      "prohibited_inference_classes": ["collaboration", "co_authorship"],
+      "temporal_boundary_ids": ["project-end"]
+    },
+    {
+      "id": "HC1",
+      "research_case": "contested_interpretation",
+      "question": "How do the Harbour Survey field report and later interview differ over the proposed pier?",
+      "triggers": ["harbour survey", "field report", "later interview", "proposed pier"],
+      "reservation": {"type": "TEMPORAL_COMPARISON", "chunk_ids": ["harbor-report-2", "harbor-interview-4"]},
+      "permitted_evidence_layers": ["DIRECT_DOCUMENTARY", "MISSINGNESS"],
+      "prohibited_inference_classes": ["retrospective_as_contemporary_fact"],
+      "temporal_boundary_ids": ["project-end"]
+    },
+    {
+      "id": "HM1",
+      "research_case": "scoped_missingness",
+      "question": "Does the digitised Harbour Survey corpus establish why the pier proposal was withdrawn?",
+      "triggers": ["digitised harbour survey corpus", "pier proposal", "withdrawn"],
+      "reservation": {"type": "SCOPED_MISSINGNESS", "chunk_ids": ["harbor-minute-7", "harbor-interview-4"]},
+      "permitted_evidence_layers": ["DIRECT_DOCUMENTARY", "MISSINGNESS"],
+      "prohibited_inference_classes": ["decision_rationale", "causation"],
+      "expected_missingness": ["decision rationale", "contemporaneous explanation"],
+      "temporal_boundary_ids": ["project-end"],
+      "synthesis_guard": {
+        "claim_templates": {
+          "harbor-minute-7": "A 1978 committee minute records that the pier proposal was withdrawn, without recording a rationale.",
+          "harbor-interview-4": "In a 1998 interview, Martin Cole recalls budget pressure but marks the account as personal recollection rather than a contemporaneous decision record."
+        },
+        "not_established": [
+          "The digitised corpus does not establish the decision rationale, who decided to withdraw the proposal, or a contemporaneous explanation.",
+          "The selected evidence cannot establish Harbour Survey activity after December 1978."
+        ],
+        "answer": "The digitised Harbour Survey corpus does not establish why the pier proposal was withdrawn. A 1978 committee minute records the withdrawal but no decision rationale. Martin Cole's 1998 interview recalls budget pressure as personal retrospective testimony, not a contemporaneous decision record. The sources do not establish the decision-maker, decision rationale, or contemporaneous explanation."
+      }
+    }
+  ]
+}

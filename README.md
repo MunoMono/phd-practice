@@ -165,6 +165,14 @@ Rules for the daily refresh flow:
 - Offline or image-only workflows are fallback-only and must stay explicit.
 - Do not start development unless the command ends with `READY FOR DEVELOPMENT`.
 
+### Turin Development Preflight
+
+```bash
+./scripts/turin-dev-start.sh
+```
+
+Expected result: `TURIN DEVELOPMENT ENVIRONMENT: READY`.
+
 ### Frontend Development
 ```bash
 cd frontend

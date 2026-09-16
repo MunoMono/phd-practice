@@ -1,0 +1,212 @@
+@use '@carbon/react/scss/spacing' as *;
+@use '@carbon/react/scss/theme' as *;
+@use '@carbon/react/scss/type' as *;
+
+.stats-cards {
+  margin: $spacing-07 0;
+}
+
+.stats-card {
+  display: flex;
+  align-items: center;
+  gap: $spacing-06;
+  padding: $spacing-06;
+  min-height: 140px;
+  transition: all 0.2s ease;
+  background-color: $layer-01;
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--app-shadow-card-hover);
+  }
+
+  &__icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    border: 1px solid $border-subtle-01;
+    background: transparent;
+    color: $icon-interactive;
+    flex-shrink: 0;
+  }
+
+  &__content {
+    flex: 1;
+  }
+
+  &__number {
+    @include type-style('heading-05');
+    margin-bottom: $spacing-03;
+    background: linear-gradient(135deg, $link-primary, $support-info);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  &__label {
+    @include type-style('label-02');
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--cds-text-secondary);
+    margin-bottom: $spacing-03;
+  }
+
+  &__breakdown {
+    @include type-style('helper-text-01');
+    color: var(--cds-text-secondary);
+    margin-top: $spacing-04;
+    display: flex;
+    flex-wrap: wrap;
+    gap: $spacing-03;
+    align-items: center;
+
+    div {
+      margin: 0;
+    }
+  }
+
+  &__meta {
+    @include type-style('helper-text-01');
+    color: var(--cds-text-secondary);
+    margin-top: $spacing-03;
+  }
+
+  &__recent {
+    @include type-style('helper-text-01');
+    color: var(--cds-text-secondary);
+    margin-top: $spacing-03;
+  }
+
+  &__recent-title {
+    font-weight: 600;
+    margin-bottom: $spacing-02;
+  }
+
+  &__recent-item {
+    padding-left: 1.75rem;
+    text-indent: -1rem;
+    margin-bottom: $spacing-03;
+  }
+
+  &__recent-item--mono {
+    font-family: 'IBM Plex Mono', 'Menlo', 'DejaVu Sans Mono', 'Bitstream Vera Sans Mono', Courier, monospace;
+  }
+
+  &__recent-meta {
+    margin-left: $spacing-03;
+    color: var(--cds-text-helper);
+    font-size: 0.7rem;
+  }
+
+  &__recent-subtle {
+    opacity: 0.6;
+  }
+
+  &__recent-overflow {
+    padding-left: 1.25rem;
+    font-style: italic;
+  }
+
+  &__progress {
+    margin-top: $spacing-05;
+
+    &-label {
+      @include type-style('helper-text-01');
+      color: var(--cds-text-secondary);
+      margin-top: $spacing-03;
+    }
+  }
+
+  &__note {
+    font-size: 0.75rem;
+    color: var(--cds-text-secondary);
+    font-style: italic;
+    margin-top: 0.5rem;
+  }
+
+  // Color variants
+  &--database {
+    .stats-card__icon {
+      background: transparent;
+      color: $icon-interactive;
+    }
+  }
+
+  &--storage {
+    .stats-card__icon {
+      background: transparent;
+      color: $icon-interactive;
+    }
+
+    .stats-card__number {
+      background: linear-gradient(135deg, $support-success, $support-success-inverse);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+  }
+
+  &--total {
+    .stats-card__icon {
+      background: transparent;
+      color: $icon-interactive;
+    }
+
+    .stats-card__number {
+      background: linear-gradient(135deg, $support-info, $icon-info);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+  }
+
+  &--experiments {
+    .stats-card__icon {
+      background: transparent;
+      color: $icon-interactive;
+    }
+
+    .stats-card__number {
+      background: linear-gradient(135deg, $support-warning, $support-warning-inverse);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+  }
+
+  &--loading {
+    min-height: 140px;
+  }
+
+  &--error {
+    border-left: 4px solid $support-error;
+    background: $background;
+
+    p {
+      color: $support-error;
+      font-weight: 500;
+    }
+  }
+}
+
+// Responsive adjustments
+@media (max-width: 672px) {
+  .stats-card {
+    &__number {
+      font-size: 2rem;
+    }
+
+    &__icon {
+      width: 48px;
+      height: 48px;
+
+      svg {
+        width: 24px;
+        height: 24px;
+      }
+    }
+  }
+}

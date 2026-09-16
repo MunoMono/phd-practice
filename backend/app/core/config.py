@@ -46,11 +46,17 @@ class Settings(BaseSettings):
             return ""
         return f"postgresql://{self.DDR_POSTGRES_USER}:{self.DDR_POSTGRES_PASSWORD}@{self.DDR_POSTGRES_HOST}:{self.DDR_POSTGRES_PORT}/{self.DDR_POSTGRES_DB}"
     
-    # Granite Model
-    GRANITE_MODEL_PATH: str = "ibm-granite/granite-3.1-2b-instruct"
-    GRANITE_DEVICE: str = "cpu"
-    MAX_TOKENS: int = 384
-    TEMPERATURE: float = 0.2
+    # Active Turin local inference runtime
+    TURIN_MODEL: str = os.getenv("TURIN_MODEL", "qwen3:8b-q4_K_M")
+    TURIN_RUNTIME_VERSION: str = "turin-runtime-v2"
+    TURIN_QWEN_NUM_CTX: int = int(os.getenv("TURIN_QWEN_NUM_CTX", "16384"))
+    TURIN_QWEN_SOURCE_ANALYSIS_MAX_TOKENS: int = int(os.getenv("TURIN_QWEN_SOURCE_ANALYSIS_MAX_TOKENS", "1000"))
+    TURIN_QWEN_CROSS_SOURCE_MAX_TOKENS: int = int(os.getenv("TURIN_QWEN_CROSS_SOURCE_MAX_TOKENS", "1000"))
+    TURIN_QWEN_FINAL_SYNTHESIS_MAX_TOKENS: int = int(os.getenv("TURIN_QWEN_FINAL_SYNTHESIS_MAX_TOKENS", "768"))
+    TURIN_QWEN_TEMPERATURE: float = float(os.getenv("TURIN_QWEN_TEMPERATURE", "0.2"))
+    TURIN_ARCHIVE_FIRST_CORPUS_VERSION: str = os.getenv(
+        "TURIN_ARCHIVE_FIRST_CORPUS_VERSION", "corpus_f40d78dbce52"
+    )
     
     # Vector DB
     EMBEDDING_MODEL: str = "sentence-transformers/all-MiniLM-L6-v2"

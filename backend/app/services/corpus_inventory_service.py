@@ -150,12 +150,21 @@ class CorpusInventoryService:
                 labels.append(text)
         return labels
 
+    @classmethod
+    def _extract_controlled_labels(cls, *values: Any) -> List[str]:
+        labels: List[str] = []
+        for value in values:
+            labels.extend(cls._extract_keyword_labels(value or []))
+        return list(dict.fromkeys(labels))
+
     @staticmethod
     def _match_digital_asset(media_item: Dict[str, Any], pdf_file: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        filename = str(pdf_file.get('filename') or '')
+        asset_stem = filename.split('__', 1)[0].rsplit('.', 1)[0]
         for asset in media_item.get('digital_assets') or []:
             if asset.get('role') != 'pdf_master':
                 continue
-            if asset.get('filename') == pdf_file.get('filename'):
+            if asset.get('filename') == filename or asset.get('assetId') == asset_stem:
                 return asset
         return None
 
@@ -174,6 +183,15 @@ class CorpusInventoryService:
         records = self.authority_service.fetch_published_records(status=status)
         return self.flatten_records_pdf_sources(records, include_non_ml=include_non_ml, ingestion_version=ingestion_version)
 
+    def flatten_complete_archive_pdf_sources(
+        self,
+        include_non_ml: bool = False,
+        ingestion_version: str = DEFAULT_INGESTION_VERSION,
+    ) -> List[Dict[str, Any]]:
+        """Flatten the complete public record surface through direct record lookups."""
+        records = self.authority_service.fetch_complete_record_surface()
+        return self.flatten_records_pdf_sources(records, include_non_ml=include_non_ml, ingestion_version=ingestion_version)
+
     def flatten_records_pdf_sources(
         self,
         records: Iterable[Dict[str, Any]],
@@ -187,11 +205,17 @@ class CorpusInventoryService:
             for media_item in attached_media:
                 pdf_files = [
                     pdf_file for pdf_file in (media_item.get('pdf_files') or [])
-                    if pdf_file.get('role') == 'pdf_master'
+                    if pdf_file.get('role') in {'pdf_master', 'pdf_display'}
                 ]
-
+                pdf_files.sort(key=lambda item: (item.get('role') != 'pdf_master', str(item.get('filename') or '')))
+                seen_asset_ids = set()
                 for pdf_file in pdf_files:
                     asset = self._match_digital_asset(media_item, pdf_file)
+                    asset_identity = (asset or {}).get('assetId') or (asset or {}).get('pid')
+                    if asset_identity and asset_identity in seen_asset_ids:
+                        continue
+                    if asset_identity:
+                        seen_asset_ids.add(asset_identity)
                     asset_use_for_ml = asset.get('use_for_ml') if asset else None
                     asset_identifier = self._first_non_empty(
                         asset.get('assetId') if asset else None,
@@ -212,6 +236,16 @@ class CorpusInventoryService:
                     title = self._first_non_empty(pdf_file.get('label'), asset.get('label') if asset else None, media_item.get('title'), record.get('title'))
                     asset_keywords = self._extract_keyword_labels(asset.get('keywords') if asset else None)
                     media_keywords = self._extract_keyword_labels(media_item.get('keywords'))
+                    controlled_people = self._extract_controlled_labels(
+                        asset.get('people') if asset else None, asset.get('controlled_people') if asset else None,
+                        media_item.get('people'), media_item.get('controlled_people'),
+                        record.get('people'), record.get('controlled_people'),
+                    )
+                    controlled_aliases = self._extract_controlled_labels(
+                        asset.get('controlled_aliases') if asset else None, asset.get('aliases') if asset else None,
+                        media_item.get('controlled_aliases'), media_item.get('aliases'),
+                        record.get('controlled_aliases'), record.get('aliases'),
+                    )
                     row = {
                         'document_id': build_stable_document_id(
                             pid,
@@ -288,6 +322,8 @@ class CorpusInventoryService:
                         'abstract': media_item.get('abstract'),
                         'caption': self._first_non_empty(asset.get('label') if asset else None, media_item.get('caption'), media_item.get('title')),
                         'keywords': asset_keywords or media_keywords,
+                        'people': controlled_people,
+                        'controlled_aliases': controlled_aliases,
                         'subjects': media_item.get('subjects') or [],
                         'parent_collection': media_item.get('parent_collection'),
                         'language_codes': self._first_non_empty(asset.get('language_codes') if asset else None, media_item.get('language_codes'), record.get('language_codes')),

@@ -26,7 +26,7 @@ from app.models.document import Document
 from app.services.corpus_identity import compute_sha256
 from app.services.corpus_inventory_service import CorpusInventoryService
 from app.services.docling_processor import DoclingProcessor
-from app.services.turin_pilot_ingestion import CHUNKING_VERSION, chunks_for_page, deterministic_chunk_id, permitted_pages
+from app.services.turin_pilot_ingestion import CHUNKING_VERSION, chunks_for_page, deterministic_chunk_id, extraction_pages
 
 
 INGESTION_VERSION = "turin-controlled-pilot-v1"
@@ -159,16 +159,18 @@ def run(args: argparse.Namespace) -> dict:
             source_path = download_source(row, args.download_dir)
             source_checksum = compute_sha256(source_path)
             reader = PdfReader(str(source_path))
-            allowed_pages = permitted_pages(len(reader.pages), row["ml_policy_status"], row["ml_page_scope"])
+            allowed_pages = extraction_pages(len(reader.pages), row["ml_policy_status"], row["ml_page_scope"])
             all_chunks: list[dict] = []
+            extracted_pages: list[str] = []
             sequence = 0
             for page_number in allowed_pages:
                 markdown = extract_page_markdown(source_path, page_number, processor)
+                extracted_pages.append(markdown)
                 page_chunks = chunks_for_page(markdown, page_number, sequence)
                 sequence += len(page_chunks)
                 all_chunks.extend(page_chunks)
             inserted, duplicates = insert_chunks(db, row, source_checksum, all_chunks)
-            db.execute(text("UPDATE documents SET checksum_sha256 = :checksum, page_count = :page_count, source_path = :source_path, ocr_status = 'docling_completed', processing_status = 'completed', ingestion_version = :ingestion_version WHERE document_id = :document_id"), {"checksum": source_checksum, "page_count": len(reader.pages), "source_path": str(source_path), "ingestion_version": INGESTION_VERSION, "document_id": row["document_id"]})
+            db.execute(text("UPDATE documents SET checksum_sha256 = :checksum, page_count = :page_count, source_path = :source_path, extracted_text = :extracted_text, ocr_status = 'docling_completed', processing_status = 'completed', ingestion_version = :ingestion_version WHERE document_id = :document_id"), {"checksum": source_checksum, "page_count": len(reader.pages), "source_path": str(source_path), "extracted_text": "\n\n".join(extracted_pages), "ingestion_version": INGESTION_VERSION, "document_id": row["document_id"]})
             db.commit()
             fts_ready = db.execute(text("SELECT COUNT(*) = COUNT(*) FILTER (WHERE search_tsv IS NOT NULL) FROM document_chunks WHERE document_id = :document_id AND corpus_version = :corpus_version"), {"document_id": row["document_id"], "corpus_version": row["corpus_version"]}).scalar_one()
             entry.update({"status": "completed", "source_path": str(source_path), "source_checksum_sha256": source_checksum, "file_size_bytes": source_path.stat().st_size, "available_page_count": len(reader.pages), "permitted_pages": allowed_pages, "processed_page_count": len(allowed_pages), "excluded_page_count": len(reader.pages) - len(allowed_pages), "chunk_count": len(all_chunks), "inserted_chunk_count": inserted, "duplicate_chunk_count": duplicates, "fts_ready": bool(fts_ready)})

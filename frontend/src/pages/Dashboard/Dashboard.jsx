@@ -9,15 +9,19 @@ import { PageGrid, PageColumn as Column } from '../../components/layout/PageGrid
 import SectionHeading from '../../components/layout/SectionHeading'
 import { getClaims } from '../../api/claims'
 import { fetchDashboardAnalyticalSurface, fetchDashboardStats } from '../../api/viz'
-import { getGraniteModelInfo } from '../../api/granite'
+import { getRetrievalHealth, getRuntimeHealth, getRuntimeModelInfo } from '../../api/runtime'
 import DashboardAnalyticalSurface from './DashboardAnalyticalSurface'
+import { deriveRuntimeStatus } from '../../utils/runtimeStatus'
 
 const formatMetricValue = (value, fallback = 'Not yet recorded') => (value === null || value === undefined ? fallback : value)
 const formatCount = (value, fallback = 0) => Number(value ?? fallback).toLocaleString()
+const formatTokens = (value) => (value === null || value === undefined ? 'N/A' : `${Number(value).toLocaleString()} tokens`)
 
 const Dashboard = () => {
   const navigate = useNavigate()
-  const [graniteInfo, setGraniteInfo] = useState(null)
+  const [runtimeInfo, setRuntimeInfo] = useState(null)
+  const [runtimeHealth, setRuntimeHealth] = useState(null)
+  const [retrievalHealth, setRetrievalHealth] = useState(null)
   const [stats, setStats] = useState(null)
   const [authoritySummary, setAuthoritySummary] = useState(null)
   const [inventorySummary, setInventorySummary] = useState(null)
@@ -31,8 +35,10 @@ const Dashboard = () => {
 
     const loadDashboard = async () => {
       try {
-        const [granitePayload, statsPayload, authorityPayload, inventoryPayload, analyticalResult, claimsPayload] = await Promise.all([
-          getGraniteModelInfo().catch(() => null),
+        const [runtimePayload, runtimeHealthPayload, retrievalHealthPayload, statsPayload, authorityPayload, inventoryPayload, analyticalResult, claimsPayload] = await Promise.all([
+          getRuntimeModelInfo().catch(() => null),
+          getRuntimeHealth().catch(() => null),
+          getRetrievalHealth().catch(() => null),
           fetchDashboardStats().catch(() => null),
           getAuthoritySummary().catch(() => null),
           getDocumentInventorySummary().catch(() => null),
@@ -46,7 +52,9 @@ const Dashboard = () => {
           return
         }
 
-        setGraniteInfo(granitePayload)
+        setRuntimeInfo(runtimePayload)
+        setRuntimeHealth(runtimeHealthPayload)
+        setRetrievalHealth(retrievalHealthPayload)
         setStats(statsPayload)
         setAuthoritySummary(authorityPayload)
         setInventorySummary(inventoryPayload)
@@ -78,6 +86,8 @@ const Dashboard = () => {
       }
     ]
   }, [analyticalSurface, stats])
+
+  const runtimeStatus = deriveRuntimeStatus(runtimeHealth, retrievalHealth)
 
   const archiveLocalStatus = useMemo(() => {
     const overview = stats?.overview || {}
@@ -126,7 +136,7 @@ const Dashboard = () => {
         detail: `${item.count} recent event${item.count === 1 ? '' : 's'}`
       }))
     : [
-        { label: 'Granite retrieval path', detail: 'Healthy on the local Granite model.' },
+        { label: 'Local inference runtime', detail: 'Qwen-powered source analysis is available when the active model is ready.' },
         { label: 'Frozen corpus', detail: '95 controlled-ingestible source documents and 12,884 current chunks are available for retrieval.' },
         { label: 'Immutable experiments', detail: 'Saved runs preserve retrieval, supplied evidence, model configuration, and export history.' }
       ]
@@ -151,37 +161,55 @@ const Dashboard = () => {
 
       <PageGrid>
         <Column>
-          <Tile className="dashboard__granite-hero-content">
-            <div className="dashboard__granite-hero-badge">
+          <Tile className="dashboard__runtime-hero-content">
+            <div className="dashboard__runtime-hero-badge">
               <Tag type="blue" size="md">
-                <Chip size={20} /> Granite status
+                <Chip size={20} /> Runtime status
               </Tag>
-              {graniteInfo && (
-                <Tag type={graniteInfo.loaded ? 'green' : 'gray'} size="md">
-                  {graniteInfo.loaded ? <Checkmark size={16} /> : <InProgress size={16} />}
-                  {graniteInfo.loaded ? ' Active' : ' Standby'}
-                </Tag>
-              )}
+              <Tag type={runtimeStatus.type} size="md">
+                {runtimeStatus.ready ? <Checkmark size={16} /> : <InProgress size={16} />}
+                {` ${runtimeStatus.label}`}
+              </Tag>
             </div>
-            <h2 className="dashboard__granite-hero-title">Research apparatus status</h2>
-            <p className="dashboard__granite-hero-description">Live retrieval is available alongside frozen corpus controls, immutable research runs, provenance tracing, and human-authored assessment.</p>
-            {graniteInfo && (
-              <div className="dashboard__granite-hero-specs">
-                <div className="dashboard__granite-hero-spec">
-                  <span className="dashboard__granite-hero-spec-label">Model</span>
-                  <span className="dashboard__granite-hero-spec-value">{graniteInfo.model_name || 'Unavailable'}</span>
+            <h2 className="dashboard__runtime-hero-title">Research apparatus status</h2>
+            <p className="dashboard__runtime-hero-description">Live retrieval is available alongside frozen corpus controls, immutable research runs, provenance tracing, and human-authored assessment.</p>
+            <div className="dashboard__model-cards" aria-label="Research apparatus models">
+              <div className="dashboard__model-card dashboard__model-card--qwen">
+                <div className="dashboard__model-card-heading">
+                  <span className="dashboard__model-mark" aria-hidden="true"><img src="/qwen_logo.svg" alt="" /></span>
+                  <span>Qwen</span>
                 </div>
-                <div className="dashboard__granite-hero-spec">
-                  <span className="dashboard__granite-hero-spec-label">Device</span>
-                  <span className="dashboard__granite-hero-spec-value">{graniteInfo.device || 'CPU'}</span>
+                <h3>Source interpretation</h3>
+                <p>Qwen3 8B · evidence-grounded synthesis</p>
+                <span>Interprets retrieved documentary passages into bounded, cited research responses.</span>
+              </div>
+              <div className="dashboard__model-card dashboard__model-card--baai">
+                <div className="dashboard__model-card-heading">
+                  <span className="dashboard__model-mark" aria-hidden="true"><img src="/baai.png" alt="" /></span>
+                  <span>BAAI</span>
                 </div>
-                <div className="dashboard__granite-hero-spec">
-                  <span className="dashboard__granite-hero-spec-label">Active runtime max tokens</span>
-                  <span className="dashboard__granite-hero-spec-value">{graniteInfo.max_tokens ?? 'N/A'}</span>
+                <h3>Semantic retrieval</h3>
+                <p>bge-m3 · 1,024-dimensional embeddings</p>
+                <span>Retrieves semantically related corpus passages and underpins the Semantic Atlas projection.</span>
+              </div>
+            </div>
+            {runtimeInfo && (
+              <div className="dashboard__runtime-hero-specs">
+                <div className="dashboard__runtime-hero-spec">
+                  <span className="dashboard__runtime-hero-spec-label">Context window</span>
+                  <span className="dashboard__runtime-hero-spec-value">{formatTokens(runtimeInfo.context_window_tokens)}</span>
                 </div>
-                <div className="dashboard__granite-hero-spec">
-                  <span className="dashboard__granite-hero-spec-label">Active runtime temperature</span>
-                  <span className="dashboard__granite-hero-spec-value">{graniteInfo.temperature ?? 'N/A'}</span>
+                <div className="dashboard__runtime-hero-spec">
+                  <span className="dashboard__runtime-hero-spec-label">Final synthesis max output</span>
+                  <span className="dashboard__runtime-hero-spec-value">{formatTokens(runtimeInfo.final_synthesis_max_output_tokens)}</span>
+                </div>
+                <div className="dashboard__runtime-hero-spec">
+                  <span className="dashboard__runtime-hero-spec-label">Temperature</span>
+                  <span className="dashboard__runtime-hero-spec-value">{runtimeInfo.temperature ?? 'N/A'}</span>
+                </div>
+                <div className="dashboard__runtime-hero-spec">
+                  <span className="dashboard__runtime-hero-spec-label">Stage output limits</span>
+                  <span className="dashboard__runtime-hero-spec-value">Source analysis: {formatTokens(runtimeInfo.source_analysis_max_output_tokens)} · Cross-source: {formatTokens(runtimeInfo.cross_source_max_output_tokens)} · Final synthesis: {formatTokens(runtimeInfo.final_synthesis_max_output_tokens)}</span>
                 </div>
               </div>
             )}

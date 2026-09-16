@@ -6,7 +6,7 @@ BACKEND_ROOT = Path(__file__).resolve().parents[1]
 if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
-from app.services.turin_pilot_ingestion import chunks_for_page, deterministic_chunk_id, permitted_pages
+from app.services.turin_pilot_ingestion import chunks_for_page, deterministic_chunk_id, extraction_pages, permitted_pages
 
 
 class TurinPilotIngestionTests(unittest.TestCase):
@@ -19,6 +19,12 @@ class TurinPilotIngestionTests(unittest.TestCase):
     def test_ineligible_document_cannot_be_processed(self):
         with self.assertRaisesRegex(ValueError, "not eligible"):
             permitted_pages(12, "excluded_use_for_ml_false", None)
+
+    def test_ml_excluded_document_is_still_fully_materialised(self):
+        self.assertEqual(
+            extraction_pages(12, "excluded_use_for_ml_false", None),
+            list(range(1, 13)),
+        )
 
     def test_page_chunks_keep_heading_and_page_provenance(self):
         chunks = chunks_for_page("# Methods\n\nEvidence paragraph one.\n\nEvidence paragraph two.", 7)

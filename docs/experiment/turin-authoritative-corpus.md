@@ -50,7 +50,7 @@ Do not delete these rows or derive replacements through heuristic ID substitutio
 
 ## Current Ingestion Contract
 
-The next ingestion surface must admit only manifest rows with `ml_policy_status` of `eligible_unrestricted` or `eligible_page_restricted`.
+The ingestion surface must materialise all `109` manifest PDFs. The `97` rows with `ml_policy_status` of `eligible_unrestricted` or `eligible_page_restricted` are available to retrieval; the `12` rows with `excluded_use_for_ml_false` remain materialised for archival inspection but are excluded by retrieval policy.
 
 For every materialised source asset, persist:
 
@@ -64,7 +64,7 @@ The document-to-chunk relationship must enforce referential integrity for all ne
 
 ## Why Controlled Docling Ingestion Is Required
 
-**YES.** No eligible manifest source is currently materialised or has a checksum, page count, extracted text, or valid joined chunk population. Controlled ingestion creates the first correctly joined Turin retrieval corpus from authoritative current assets; it does not reprocess or replace the historical `606` legacy rows.
+**YES.** No manifest source is currently materialised or has a checksum, page count, extracted text, or valid joined chunk population. Controlled ingestion creates the first correctly joined Turin extracted-text corpus from authoritative current assets; it does not reprocess or replace the historical `606` legacy rows.
 
 The existing Phase 2A inventory path already supplies deterministic document identity, asset policy, source materialisation, checksum calculation, and page-count capture. The old Docling scripts are not suitable for this run because they generate random document IDs, omit page-aware chunking and policy filtering, and do not enforce a document foreign key.
 
@@ -76,8 +76,8 @@ The follow-up runtime uses the profile-only `docling-worker`: one document at a 
 
 ## Acceptance Gate Before Retrieval
 
-- Every manifest source is accounted for as eligible, excluded, or failed with an explicit error.
-- Only the 97 eligible sources are materialised and ingested; the 12 exclusions produce no chunks.
+- Every manifest source is materialised or failed with an explicit error.
+- All 109 sources are present in the extracted-text corpus; retrieval admits only the 97 eligible sources.
 - Restricted sources emit chunks only from explicitly allowed pages.
 - Every materialised source has a SHA-256 checksum and stable manifest identity.
 - Every current chunk joins to a current document; current orphan chunks equal zero.
@@ -87,4 +87,4 @@ The follow-up runtime uses the profile-only `docling-worker`: one document at a 
 
 ## Next Task
 
-Ingest a 3-5 document representative pilot from the authoritative manifest into the clean joined Turin chunk surface, validate provenance and FTS end-to-end, then scale the same pipeline to the remaining eligible corpus.
+Run the checkpointed controlled ingestion against all 109 authoritative sources in the environment holding the retrieval-validation database, then validate provenance, full-text persistence, FTS, and retrieval eligibility end-to-end.

@@ -1,0 +1,86 @@
+@use '@carbon/react/scss/spacing' as *;
+@use '@carbon/react/scss/theme' as *;
+
+.claims-workbench {
+  .claims-workbench__claim-col {
+    width: 58%;
+  }
+
+  .claims-workbench__support-col,
+  .claims-workbench__evidence-col {
+    width: 12%;
+  }
+
+  .claims-workbench__reviewer-col {
+    width: 18%;
+  }
+
+  .claims-workbench__table-wrap {
+    overflow-x: auto;
+  }
+
+  .claims-workbench__table-wrap .cds--data-table {
+    min-width: 36rem;
+  }
+
+  .claims-workbench__claim-cell,
+  .claims-workbench__detail-copy,
+  .claims-workbench__evidence-copy,
+  .claims-workbench__evidence-meta,
+  .claims-workbench__updated {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  .claims-workbench__claim-summary,
+  .claims-workbench__detail-head {
+    display: grid;
+    gap: $spacing-03;
+  }
+
+  .claims-workbench__compact-cell {
+    white-space: nowrap;
+  }
+
+  .claims-workbench__detail-copy {
+    margin-bottom: $spacing-04;
+  }
+
+  .claims-workbench__tag-row {
+    display: flex;
+    gap: $spacing-03;
+    flex-wrap: wrap;
+    margin-bottom: $spacing-05;
+  }
+
+  .claims-workbench__evidence-list {
+    display: grid;
+    gap: $spacing-04;
+    margin-top: $spacing-05;
+  }
+
+  .claims-workbench__evidence-item {
+    border-bottom: 1px solid $border-subtle-01;
+    padding-bottom: $spacing-04;
+
+    p {
+      margin: $spacing-02 0 0;
+    }
+  }
+
+  .claims-workbench__evidence-meta {
+    color: $text-secondary;
+  }
+
+  .claims-workbench__detail-actions {
+    display: flex;
+    gap: $spacing-05;
+    align-items: center;
+    margin-top: $spacing-05;
+    flex-wrap: wrap;
+  }
+
+  .claims-workbench__updated {
+    margin-bottom: 0;
+  }
+}

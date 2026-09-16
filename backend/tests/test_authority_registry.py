@@ -45,6 +45,9 @@ class AuthorityRegistryTests(unittest.TestCase):
 
     def test_natural_language_selection_covers_every_registered_non_staff_project_authority(self):
         cases = {
+            "What role did Known agent_employment hold?": "agent_employment",
+            "When did Known agent_employment work at DDR?": "agent_employment",
+            "What was Known agent_employment's involvement at DDR?": "agent_employment",
             "Which students are recorded?": "ref_students",
             "What fonds are represented?": "ref_fonds",
             "Show reports relating to hospital equipment": "ref_publication_type",

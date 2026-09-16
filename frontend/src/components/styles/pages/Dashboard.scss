@@ -67,25 +67,25 @@
     padding: 0 $spacing-05 $spacing-09;
   }
 
-  &__granite-tile {
+  &__runtime-tile {
     margin-bottom: $spacing-07;
     padding: $spacing-06;
     background-color: $layer-01;
     border: 1px solid $border-subtle-01;
   }
 
-  &__granite-header {
+  &__runtime-header {
     display: flex;
     align-items: flex-start;
     gap: $spacing-05;
     margin-bottom: $spacing-05;
   }
 
-  &__granite-logo {
+  &__runtime-logo {
     flex-shrink: 0;
   }
 
-  &__granite-info {
+  &__runtime-info {
     flex: 1;
 
     h3 {
@@ -95,20 +95,20 @@
     }
   }
 
-  &__granite-meta {
+  &__runtime-meta {
     display: flex;
     flex-wrap: wrap;
     gap: $spacing-03;
   }
 
-  &__granite-description {
+  &__runtime-description {
     color: $text-secondary;
     line-height: 1.6;
     margin: 0 0 $spacing-05;
     font-size: 0.95rem;
   }
 
-  &__granite-config {
+  &__runtime-config {
     display: flex;
     flex-wrap: wrap;
     gap: $spacing-05;
@@ -130,15 +130,15 @@
     }
   }
 
-  // Granite Hero Section
-  &__granite-hero-wrapper {
+  // Active runtime status section
+  &__runtime-hero-wrapper {
     padding: $spacing-09 $spacing-07;
     margin-bottom: $spacing-09;
     background-color: $layer-01;
     border: 1px solid $border-subtle-01;
   }
 
-  &__granite-hero-logo {
+  &__runtime-hero-logo {
     display: flex;
     align-items: center;
     justify-content: center;
@@ -160,25 +160,25 @@
     }
   }
 
-  &__granite-hero-content {
+  &__runtime-hero-content {
     position: relative;
     z-index: 1;
   }
 
-  &__granite-hero-badge {
+  &__runtime-hero-badge {
     display: flex;
     gap: $spacing-03;
     margin-bottom: $spacing-05;
     flex-wrap: wrap;
   }
 
-  &__granite-hero-title {
+  &__runtime-hero-title {
     @include type-style('heading-05');
     margin: 0 0 $spacing-05;
     color: $text-primary;
   }
 
-  &__granite-hero-description {
+  &__runtime-hero-description {
     @include type-style('body-01');
     color: $text-secondary;
     margin: 0 0 $spacing-07;
@@ -189,7 +189,82 @@
     }
   }
 
-  &__granite-hero-specs {
+  &__model-cards {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: $spacing-05;
+    margin-bottom: $spacing-05;
+
+    @include breakpoint-down(lg) {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  &__model-card {
+    min-height: 11.5rem;
+    padding: $spacing-05;
+    border: 1px solid $border-subtle-01;
+    border-top: 3px solid $border-strong-01;
+    background-color: $layer-02;
+
+    &--qwen {
+      border-top-color: #0f62fe;
+    }
+
+    &--baai {
+      border-top-color: #24a148;
+    }
+
+    h3 {
+      @include type-style('heading-03');
+      margin: $spacing-05 0 $spacing-03;
+      color: $text-primary;
+    }
+
+    p {
+      @include type-style('body-compact-01');
+      margin: 0 0 $spacing-05;
+      color: $text-primary;
+      overflow-wrap: anywhere;
+    }
+
+    > span {
+      @include type-style('helper-text-01');
+      color: $text-secondary;
+      display: block;
+    }
+  }
+
+  &__model-card-heading {
+    display: flex;
+    align-items: center;
+    gap: $spacing-03;
+    @include type-style('label-01');
+    color: $text-secondary;
+    font-weight: 600;
+    letter-spacing: 0;
+  }
+
+  &__model-mark {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    background-color: $layer-accent-01;
+    border: 1px solid $border-subtle-01;
+    color: $text-primary;
+    font-weight: 700;
+
+    img {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+  }
+
+  &__runtime-hero-specs {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
     gap: $spacing-05;
@@ -202,7 +277,7 @@
     }
   }
 
-  &__granite-hero-spec {
+  &__runtime-hero-spec {
     display: flex;
     flex-direction: column;
     gap: $spacing-02;

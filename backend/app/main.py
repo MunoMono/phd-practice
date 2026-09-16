@@ -9,7 +9,7 @@ import os
 from app.api.routes import agent, sessions, experiments, metrics, documents, sync, graphql_sync, provenance, analysis, viz, search, missingness, claims, query_runs, cross_read, authorities, retrieval
 from app.api.graphql.schema import schema
 from app.core.config import settings
-from app.services.granite_service import initialize_granite
+from app.services.inference_service import initialize_inference_service
 
 # Configure logging
 logging.basicConfig(
@@ -29,24 +29,24 @@ async def lifespan(app: FastAPI):
     """Startup and shutdown events"""
     logger.info("Starting Testamentary Traces Research API")
     logger.info(f"Environment: {settings.ENVIRONMENT}")
-    granite_init_task = None
+    inference_init_task = None
 
-    auto_load = os.getenv("GRANITE_AUTO_LOAD", "true").strip().lower() in {"1", "true", "yes", "on"}
+    auto_load = os.getenv("TURIN_AUTO_LOAD", "true").strip().lower() in {"1", "true", "yes", "on"}
     if auto_load:
-        granite_init_task = asyncio.create_task(initialize_granite())
-        logger.info("Granite LLM auto-load started in background")
+        inference_init_task = asyncio.create_task(initialize_inference_service())
+        logger.info("Active Turin runtime auto-load started in background")
     else:
-        logger.info("Granite LLM service auto-load disabled by GRANITE_AUTO_LOAD")
+        logger.info("Active Turin runtime auto-load disabled by TURIN_AUTO_LOAD")
 
     yield
-    if granite_init_task and not granite_init_task.done():
-        granite_init_task.cancel()
+    if inference_init_task and not inference_init_task.done():
+        inference_init_task.cancel()
     logger.info("Shutting down Testamentary Traces Research API")
 
 
 app = FastAPI(
     title="Testamentary Traces Research API",
-    description="FastAPI backend for cybernetic research with Granite LLM",
+    description="FastAPI backend for the Turin local research instrument",
     version="0.1.0",
     lifespan=lifespan
 )
@@ -69,7 +69,8 @@ app.include_router(documents.router, prefix="/api/documents", tags=["documents"]
 app.include_router(sync.router, prefix="/api/sync", tags=["sync"])
 app.include_router(graphql_sync.router, prefix="/api/v1", tags=["graphql-sync"])
 app.include_router(provenance.router, prefix="/api/provenance", tags=["provenance"])
-app.include_router(analysis.router, prefix="/api/granite", tags=["granite-analysis"])
+app.include_router(analysis.router, prefix="/api/runtime", tags=["runtime-analysis"])
+app.include_router(analysis.exploratory_router, prefix="/api/analysis", tags=["exploratory-analysis"])
 app.include_router(viz.router, prefix="/api/viz", tags=["visualizations"])
 app.include_router(search.router, prefix="/api/search", tags=["search"])
 app.include_router(missingness.router, prefix="/api/missingness", tags=["missingness"])
@@ -101,7 +102,7 @@ async def health_check():
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(
-        "main:app",
+        "app.main:app",
         host="0.0.0.0",
         port=8000,
         reload=True,

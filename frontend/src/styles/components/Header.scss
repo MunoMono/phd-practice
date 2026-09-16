@@ -1,0 +1,57 @@
+@use '@carbon/react/scss/breakpoint' as *;
+
+@media (max-width: 671px) {
+  .cds--header__nav {
+    display: none;
+  }
+
+  .cds--header__menu-toggle {
+    display: flex;
+  }
+}
+
+@media (min-width: 672px) {
+  .cds--header__nav {
+    display: flex;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .cds--header__menu-toggle {
+    display: none !important;
+  }
+
+  .cds--side-nav,
+  .cds--side-nav__overlay {
+    display: none !important;
+    visibility: hidden !important;
+  }
+}
+
+@include breakpoint(md) {
+  .cds--header__nav {
+    gap: 0;
+  }
+}
+
+.cds--header__menu-item,
+.cds--header__menu-title[aria-expanded] {
+  border-left: none !important;
+  border-right: none !important;
+}
+
+.cds--header__menu {
+  max-width: 20rem;
+}
+
+.cds--header__submenu {
+  min-width: 16rem;
+}
+
+.cds--side-nav__overlay {
+  z-index: 6000;
+}
+
+.cds--side-nav {
+  z-index: 8000;
+}

@@ -4,16 +4,20 @@
 @use '@carbon/react/scss/type' as *;
 
 .visual-analytics-workbench {
+  --atlas-canvas-background: #ffffff;
+  --atlas-muted-point: #8d8d8d;
   display: grid;
-  grid-template-columns: 17rem minmax(0, 1fr) 21rem;
-  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-columns: 13.5rem minmax(0, 1fr) 16rem;
+  grid-template-rows: auto minmax(0, 1fr);
   height: calc(100vh - 8.125rem);
   min-height: 34rem;
   overflow: hidden;
   background: $background;
 
-  &--controls-collapsed { grid-template-columns: minmax(0, 1fr) 21rem; }
-  &--inspector-collapsed { grid-template-columns: 17rem minmax(0, 1fr); }
+  &--controls-collapsed { grid-template-columns: minmax(0, 1fr) 16rem; }
+  &--controls-collapsed .visual-analytics-workbench__controls { display: none; }
+  &--inspector-collapsed { grid-template-columns: 13.5rem minmax(0, 1fr); }
+  &--inspector-collapsed .visual-analytics-workbench__inspector { display: none; }
   &--controls-collapsed.visual-analytics-workbench--inspector-collapsed { grid-template-columns: minmax(0, 1fr); }
 
   &__toolbar {
@@ -41,14 +45,16 @@
   &__controls .cds--accordion__content { display: grid; gap: $spacing-04; }
   &__controls p, &__inspector p { @include type-style('body-compact-01'); color: $text-secondary; }
 
-  &__map-region { min-width: 0; min-height: 0; position: relative; padding: $spacing-05; display: flex; flex-direction: column; background: $layer; }
+  &__map-region { min-width: 0; min-height: 0; position: relative; padding: $spacing-04; display: flex; flex-direction: column; background: $layer; }
   &__map-header { display: flex; justify-content: space-between; gap: $spacing-05; align-items: start; }
   &__map-actions { display: flex; gap: $spacing-03; align-items: center; }
   &__map-header h1 { @include type-style('heading-04'); margin-bottom: $spacing-02; }
   &__map-header p { @include type-style('body-compact-01'); color: $text-secondary; max-width: 50rem; }
-  &__canvas { display: block; flex: 1; width: 100%; min-height: 0; cursor: crosshair; border: 1px solid $border-subtle-01; }
+  &__canvas { display: block; flex: 1; width: 100%; min-height: 0; cursor: grab; border: 1px solid $border-subtle-01; touch-action: none; }
+  &__canvas:active { cursor: grabbing; }
   &__empty-map { display: grid; place-items: center; flex: 1; min-height: 28rem; color: $text-secondary; border: 1px dashed $border-strong-01; }
-  &__hover { position: absolute; left: $spacing-06; bottom: $spacing-06; max-width: 30rem; padding: $spacing-03; background: $layer-02; @include type-style('label-01'); }
+  &__hover { position: fixed; z-index: 10000; display: grid; gap: $spacing-02; max-width: 20rem; padding: $spacing-03; border-left: 3px solid $border-interactive; background: $layer-02; box-shadow: 0 2px 6px rgb(0 0 0 / 35%); @include type-style('label-01'); pointer-events: none; }
+  &__hover span { color: $text-secondary; }
 
   &__inspector .cds--tile { margin-top: $spacing-04; padding: $spacing-05; background: $layer-02; }
   &__inspector h2 { @include type-style('heading-03'); }
@@ -63,11 +69,16 @@
   &__neighbour-list button:hover { background: $layer-hover-01; }
   &__neighbour-list small { color: $text-secondary; }
 
-  &__tray { grid-column: 1 / -1; display: grid; grid-template-columns: max-content max-content minmax(12rem, 1fr) minmax(18rem, 32rem) max-content; gap: $spacing-04; align-items: center; padding: $spacing-04 $spacing-05; border-top: 1px solid $border-subtle-01; background: $layer-01; @include type-style('body-compact-01'); }
+  &__tray { display: none; }
   &__tray .cds--text-area__wrapper { min-width: 0; }
 
-  @include breakpoint-down(lg) { grid-template-columns: 15rem minmax(0, 1fr); &__inspector { display: none; } &__toolbar { grid-template-columns: max-content 13rem minmax(14rem, 1fr) max-content max-content; } &__scope { display: none; } &__tray { grid-template-columns: max-content minmax(12rem, 1fr) minmax(16rem, 1fr) max-content; } }
-  @include breakpoint-down(md) { height: auto; min-height: calc(100vh - 8.125rem); overflow: visible; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(28rem, 1fr) auto; &__controls { display: none; } &__toolbar { grid-template-columns: 1fr 1fr; } &__toolbar .cds--search { grid-column: 1 / -1; } &__tray { grid-template-columns: 1fr; } }
+  @include breakpoint-down(lg) { grid-template-columns: 12rem minmax(0, 1fr); &__inspector { display: none; } &__toolbar { grid-template-columns: max-content 13rem minmax(14rem, 1fr) max-content max-content; } &__scope { display: none; } &__tray { grid-template-columns: max-content minmax(12rem, 1fr) minmax(16rem, 1fr) max-content; } }
+  @include breakpoint-down(md) { height: auto; min-height: calc(100vh - 8.125rem); overflow: visible; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(28rem, 1fr) auto; &__controls { display: none; } &__toolbar { grid-template-columns: 1fr 1fr; } &__toolbar .cds--search { grid-column: 1 / -1; } &__tray { display: grid; grid-column: 1; grid-template-columns: 1fr; gap: $spacing-04; padding: $spacing-04; } }
+}
+
+.ddr-theme--dark .visual-analytics-workbench {
+  --atlas-canvas-background: #161616;
+  --atlas-muted-point: #525252;
 }
 
 .visual-analytics-page {

@@ -1,6 +1,61 @@
+@use '@carbon/react/scss/spacing' as *;
+@use '@carbon/react/scss/theme' as *;
+@use '@carbon/react/scss/type' as *;
+
 .evidence-graph {
   width: 100%;
   min-width: 0;
+
+  &__toolbar {
+    display: flex;
+    justify-content: flex-end;
+    gap: $spacing-03;
+    margin-bottom: $spacing-03;
+  }
+
+  &__nodes g[role='button'] {
+    cursor: pointer;
+
+    &:focus circle,
+    &:hover circle {
+      stroke: $focus;
+      stroke-width: 3px;
+    }
+  }
+
+  &__inspector {
+    display: grid;
+    gap: $spacing-04;
+    max-width: 60rem;
+    margin-top: $spacing-05;
+    padding: $spacing-05;
+    border-left: 3px solid $border-interactive;
+    background: $layer-accent-01;
+
+    h4 {
+      @include type-style('heading-02');
+      margin: 0;
+    }
+
+    dl {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: $spacing-04 $spacing-06;
+      margin: 0;
+    }
+
+    dt {
+      @include type-style('label-01');
+      color: $text-secondary;
+    }
+
+    dd {
+      @include type-style('body-compact-01');
+      margin: $spacing-02 0 0;
+      color: $text-primary;
+      overflow-wrap: anywhere;
+    }
+  }
 
   svg {
     display: block;

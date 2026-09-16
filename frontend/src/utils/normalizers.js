@@ -328,7 +328,7 @@ export const normalizeUmapProjection = (raw = {}) => ({
     title: firstDefined(point.title, 'Untitled trace'),
     x: toNumber(firstDefined(point.x, point.umap_x), 0),
     y: toNumber(firstDefined(point.y, point.umap_y), 0),
-    z: toNumber(firstDefined(point.z, point.umap_z), null),
+      z: toNumber(firstDefined(point.z, point.umap_z), null),
     year: firstDefined(point.year, point.publication_year, null),
     sourceType: firstDefined(point.sourceType, point.source_type, 'unknown'),
     themes: toArray(firstDefined(point.themes, point.ml_themes, [])),

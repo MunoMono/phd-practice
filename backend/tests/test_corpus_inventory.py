@@ -389,6 +389,23 @@ class CorpusInventoryServiceTests(unittest.TestCase):
         self.assertEqual({row['asset_pid'] for row in rows}, {'pid-excluded', 'pid-restricted'})
         self.assertEqual({row['ml_policy_status'] for row in rows}, {'excluded_use_for_ml_false', 'eligible_page_restricted'})
 
+    def test_flattened_asset_inherits_controlled_people_and_aliases(self):
+        record = {
+            'id': '155', 'pid': '014262507600', 'title': 'Harbour records',
+            'people': [{'label': 'Asha Bell'}], 'controlled_aliases': [{'label': 'A. Bell'}],
+            'attached_media': [{
+                'id': '149', 'pid': '287080879712', 'title': 'Harbour Survey',
+                'aliases': [{'label': 'Bell, Asha'}],
+                'pdf_files': [{'filename': 'survey.pdf', 'role': 'pdf_master', 'url': 'https://archive.test/survey.pdf'}],
+                'digital_assets': [{'role': 'pdf_master', 'filename': 'survey.pdf', 'assetId': 'asset-survey', 'pid': 'pid-survey', 'use_for_ml': True, 'ml_pages': ''}],
+            }],
+        }
+
+        row = self.service.flatten_records_pdf_sources([record])[0]
+
+        self.assertEqual(row['people'], ['Asha Bell'])
+        self.assertEqual(row['controlled_aliases'], ['Bell, Asha', 'A. Bell'])
+
     def test_missing_metadata_is_preserved(self):
         self.service.authority_service = type('StubAuthorityService', (), {
             'fetch_published_records': lambda self, status='published': [

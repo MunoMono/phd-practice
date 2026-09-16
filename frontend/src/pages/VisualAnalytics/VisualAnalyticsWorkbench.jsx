@@ -1,16 +1,17 @@
-import { Accordion, AccordionItem, Button, InlineNotification, Search, Select, SelectItem, Slider, Tag, TextArea, TextInput, Tile } from '@carbon/react'
-import { Add, DataVis_4, Pause, Play, Renew, Save, View, WarningAlt } from '@carbon/icons-react'
+import { Accordion, AccordionItem, Button, InlineNotification, OverflowMenu, OverflowMenuItem, Search, Select, SelectItem, Slider, Tag, TextArea, TextInput, Tile } from '@carbon/react'
+import { Add, DataVis_4, Download, Pause, Play, Renew, Save, View, WarningAlt } from '@carbon/icons-react'
 import * as d3 from 'd3'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { createAtlasCoverageMissingness, getSemanticNeighbourhood, getUmapProjection } from '../../api/viz'
+import { downloadFile } from '../../utils/workbenchExport'
 
 const VIEWS = [
-  ['atlas', 'Semantic Atlas'],
-  ['neighbourhoods', 'Semantic Neighbourhoods'],
-  ['comparative', 'Comparative Views'],
-  ['temporal', 'Temporal & Documentary Change'],
-  ['critical', 'Critical Inquiry'],
+  ['atlas', 'Semantic atlas'],
+  ['neighbourhoods', 'Semantic neighbourhoods'],
+  ['comparative', 'Comparative views'],
+  ['temporal', 'Temporal and documentary change'],
+  ['critical', 'Critical inquiry'],
 ]
 
 const DEFAULT_FILTERS = { pointType: 'chunks', colorBy: 'cluster', labelBy: 'none', yearMin: '', yearMax: '', theme: '', sourceType: '' }
@@ -41,9 +42,10 @@ const pointColour = (point, colorBy, colourScale) => {
   return colourScale(value || 'Unlabelled')
 }
 
-const EmbeddingCanvas = ({ points, emptyMessage, dimensions, azimuth, elevation, selectedIds, searchIds, anchorId, comparisonA, comparisonB, colorBy, labelBy, onSelect, onHover }) => {
+const EmbeddingCanvas = ({ points, emptyMessage, dimensions, azimuth, elevation, selectedIds, searchIds, anchorId, comparisonA, comparisonB, colorBy, labelBy, onSelect, onHover, onCameraChange, onClearSelection }) => {
   const canvasRef = useRef(null)
   const transformRef = useRef(d3.zoomIdentity)
+  const dragRef = useRef(null)
   const [size, setSize] = useState({ width: 800, height: 620 })
 
   useEffect(() => {
@@ -87,8 +89,33 @@ const EmbeddingCanvas = ({ points, emptyMessage, dimensions, azimuth, elevation,
       const transform = transformRef.current
       context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0)
       context.clearRect(0, 0, size.width, size.height)
-      context.fillStyle = '#161616'
+      const styles = getComputedStyle(canvas)
+      context.fillStyle = styles.getPropertyValue('--atlas-canvas-background').trim() || '#ffffff'
       context.fillRect(0, 0, size.width, size.height)
+      if (dimensions === '3d') {
+        const projectAxis = (x, y, z) => {
+          const rotatedX = x * Math.cos(azimuthRadians) - z * Math.sin(azimuthRadians)
+          const depth = x * Math.sin(azimuthRadians) + z * Math.cos(azimuthRadians)
+          const perspective = 1 + (depth / coordinateSpan) * 0.22
+          return [xScale(rotatedX * perspective), yScale((y * Math.cos(elevationRadians) - depth * Math.sin(elevationRadians)) * perspective)]
+        }
+        const origin = projectAxis(0, 0, 0)
+        const axisLength = coordinateSpan * 0.72
+        ;[[axisLength, 0, 0, '#da1e28', 'x'], [0, axisLength, 0, '#24a148', 'y'], [0, 0, axisLength, '#0f62fe', 'z']].forEach(([x, y, z, colour, label]) => {
+          const endpoint = projectAxis(x, y, z)
+          context.beginPath()
+          context.moveTo(...origin)
+          context.lineTo(...endpoint)
+          context.lineWidth = 1.5
+          context.strokeStyle = colour
+          context.globalAlpha = 0.85
+          context.stroke()
+          context.globalAlpha = 1
+          context.fillStyle = colour
+          context.font = '12px IBM Plex Sans, sans-serif'
+          context.fillText(label, endpoint[0] + 5, endpoint[1] - 5)
+        })
+      }
       context.save()
       context.translate(transform.x, transform.y)
       context.scale(transform.k, transform.k)
@@ -101,8 +128,9 @@ const EmbeddingCanvas = ({ points, emptyMessage, dimensions, azimuth, elevation,
         context.beginPath()
         context.arc(xScale(point.renderX), yScale(point.renderY), (selected || anchored ? 5.5 : 3) + (dimensions === '3d' ? Math.max(-1, Math.min(1, point.depth)) : 0), 0, Math.PI * 2)
         const depthAlpha = dimensions === '3d' ? 0.48 + ((point.depth / coordinateSpan + 1) / 2) * 0.42 : 0.9
-        context.globalAlpha = selected || anchored || searched || inA || inB || selectedIds.length === 0 ? depthAlpha : 0.18
-        context.fillStyle = anchored ? '#ff832b' : inA && inB ? '#a56eff' : inA ? '#42be65' : inB ? '#78a9ff' : pointColour(point, colorBy, colourScale)
+        const focused = selected || anchored || searched || inA || inB
+        context.globalAlpha = selectedIds.length === 0 ? depthAlpha : focused ? depthAlpha : 0.22
+        context.fillStyle = selectedIds.length > 0 && !focused ? styles.getPropertyValue('--atlas-muted-point').trim() || '#8d8d8d' : anchored ? '#ff832b' : inA && inB ? '#a56eff' : inA ? '#42be65' : inB ? '#78a9ff' : pointColour(point, colorBy, colourScale)
         context.fill()
         if (selected || searched || anchored) {
           context.lineWidth = 2 / transform.k
@@ -122,8 +150,8 @@ const EmbeddingCanvas = ({ points, emptyMessage, dimensions, azimuth, elevation,
       context.restore()
     }
     draw()
-    const zoom = d3.zoom().scaleExtent([0.75, 10]).on('zoom', (event) => { transformRef.current = event.transform; draw() })
-    d3.select(canvas).call(zoom)
+    const zoom = d3.zoom().filter((event) => event.type === 'wheel').scaleExtent([0.75, 10]).on('zoom', (event) => { transformRef.current = event.transform; draw() })
+    d3.select(canvas).call(zoom).on('dblclick.zoom', null)
     const locate = (event, select) => {
       const [clientX, clientY] = d3.pointer(event, canvas)
       const transform = transformRef.current
@@ -135,19 +163,57 @@ const EmbeddingCanvas = ({ points, emptyMessage, dimensions, azimuth, elevation,
       if (candidate.distance < threshold * transform.k) select(candidate.point, event)
       else if (event.type === 'click') select(null, event)
     }
-    const onClick = (event) => locate(event, onSelect)
-    const onMove = (event) => locate(event, (point) => onHover(point))
+    const onClick = (event) => {
+      if (dragRef.current?.moved || canvas.dataset.dragged === 'true') {
+        canvas.dataset.dragged = 'false'
+        return
+      }
+      locate(event, onSelect)
+    }
+    const onMove = (event) => locate(event, (point) => onHover(point ? { point, x: event.clientX, y: event.clientY } : null))
+    const onDoubleClick = (event) => {
+      event.preventDefault()
+      onClearSelection()
+    }
+    const startOrbit = (event) => {
+      if (dimensions !== '3d' || event.button !== 0) return
+      dragRef.current = { x: event.clientX, y: event.clientY, azimuth, elevation, moved: false }
+    }
+    const orbit = (event) => {
+      const drag = dragRef.current
+      if (!drag) return
+      const deltaX = event.clientX - drag.x
+      const deltaY = event.clientY - drag.y
+      drag.moved ||= Math.abs(deltaX) + Math.abs(deltaY) > 3
+      if (drag.moved) {
+        event.preventDefault()
+        onCameraChange(Math.max(-80, Math.min(80, drag.elevation - deltaY * 0.45)), ((drag.azimuth + deltaX * 0.45 + 180) % 360) - 180)
+      }
+    }
+    const endOrbit = () => {
+      if (!dragRef.current) return
+      canvas.dataset.dragged = String(dragRef.current.moved)
+      dragRef.current = null
+    }
     canvas.addEventListener('click', onClick)
     canvas.addEventListener('mousemove', onMove)
+    canvas.addEventListener('mousedown', startOrbit, true)
+    canvas.addEventListener('mousemove', orbit, true)
+    canvas.addEventListener('mouseup', endOrbit, true)
+    canvas.addEventListener('dblclick', onDoubleClick)
     return () => {
       canvas.removeEventListener('click', onClick)
       canvas.removeEventListener('mousemove', onMove)
+      canvas.removeEventListener('mousedown', startOrbit, true)
+      canvas.removeEventListener('mousemove', orbit, true)
+      canvas.removeEventListener('mouseup', endOrbit, true)
+      canvas.removeEventListener('dblclick', onDoubleClick)
       d3.select(canvas).on('.zoom', null)
     }
-  }, [points, size, dimensions, azimuth, elevation, selectedIds, searchIds, anchorId, comparisonA, comparisonB, colorBy, labelBy, onSelect, onHover])
+  }, [points, size, dimensions, azimuth, elevation, selectedIds, searchIds, anchorId, comparisonA, comparisonB, colorBy, labelBy, onSelect, onHover, onCameraChange, onClearSelection])
 
   if (!points.length) return <div className="visual-analytics-workbench__empty-map">{emptyMessage || 'No points match the current corpus scope.'}</div>
-  return <canvas ref={canvasRef} className="visual-analytics-workbench__canvas" aria-label="Interactive UMAP embedding map" />
+  return <canvas ref={canvasRef} className="visual-analytics-workbench__canvas" aria-label="Interactive UMAP embedding map" onDoubleClickCapture={(event) => { event.preventDefault(); onClearSelection() }} />
 }
 
 const VisualAnalyticsWorkbench = () => {
@@ -168,10 +234,10 @@ const VisualAnalyticsWorkbench = () => {
   const [comparisonA, setComparisonA] = useState(() => savedWorkspace.comparisonA || [])
   const [comparisonB, setComparisonB] = useState(() => savedWorkspace.comparisonB || [])
   const [note, setNote] = useState(() => savedWorkspace.note || '')
-  const [dimensions, setDimensions] = useState(() => savedWorkspace.dimensions || '3d')
+  const [dimensions, setDimensions] = useState('3d')
   const [azimuth, setAzimuth] = useState(() => savedWorkspace.azimuth || 25)
   const [elevation, setElevation] = useState(() => savedWorkspace.elevation || 18)
-  const [autoRotate, setAutoRotate] = useState(() => savedWorkspace.orbitVersion === 1 ? savedWorkspace.autoRotate : true)
+  const [autoRotate, setAutoRotate] = useState(false)
   const [panels, setPanels] = useState({ controls: true, inspector: true })
 
   useEffect(() => {
@@ -185,7 +251,7 @@ const VisualAnalyticsWorkbench = () => {
   }, [filters.pointType])
 
   useEffect(() => {
-    sessionStorage.setItem(WORKSPACE_STORAGE_KEY, JSON.stringify({ view, filters, search, selectedIds, anchorId, neighbourCount, comparisonA, comparisonB, note, dimensions, azimuth, elevation, autoRotate, orbitVersion: 1 }))
+    sessionStorage.setItem(WORKSPACE_STORAGE_KEY, JSON.stringify({ view, filters, search, selectedIds, anchorId, neighbourCount, comparisonA, comparisonB, note, dimensions, azimuth, elevation, autoRotate, orbitVersion: 3 }))
   }, [view, filters, search, selectedIds, anchorId, neighbourCount, comparisonA, comparisonB, note, dimensions, azimuth, elevation, autoRotate])
 
   const visiblePoints = useMemo(() => projection.points.filter((point) => (
@@ -225,8 +291,10 @@ const VisualAnalyticsWorkbench = () => {
   const updateFilter = (field, value) => setFilters((current) => ({ ...current, [field]: value }))
   const selectPoint = (point, event) => {
     if (!point) { if (!(event?.shiftKey || event?.metaKey)) setSelectedIds([]); return }
+    setPanels((current) => ({ ...current, inspector: true }))
     setSelectedIds((current) => event?.shiftKey || event?.metaKey ? (current.includes(point.id) ? current.filter((id) => id !== point.id) : [...current, point.id]) : [point.id])
   }
+  const clearSelection = () => { setSelectedIds([]); setAnchorId(null); setHovered(null); setAutoRotate(false) }
   const loadNeighbours = async () => {
     const anchor = pointById.get(anchorId) || inspectorPoint
     if (!anchor?.chunkId) return
@@ -237,7 +305,7 @@ const VisualAnalyticsWorkbench = () => {
       setAnchorId(anchor.id)
     } catch (requestError) { setError(requestError.message || 'Embedding neighbours could not be loaded.') }
   }
-  const resetWorkspace = () => { sessionStorage.removeItem(WORKSPACE_STORAGE_KEY); setFilters(DEFAULT_FILTERS); setSearch(''); setSelectedIds([]); setAnchorId(null); setEmbeddingNeighbours([]); setComparisonA([]); setComparisonB([]); setNote(''); setDimensions('3d'); setAzimuth(25); setElevation(18); setAutoRotate(true); setView('atlas') }
+  const resetWorkspace = () => { sessionStorage.removeItem(WORKSPACE_STORAGE_KEY); setFilters(DEFAULT_FILTERS); setSearch(''); setSelectedIds([]); setAnchorId(null); setEmbeddingNeighbours([]); setComparisonA([]); setComparisonB([]); setNote(''); setDimensions('3d'); setAzimuth(25); setElevation(18); setAutoRotate(false); setView('atlas') }
   const handoff = (path) => {
     const params = new URLSearchParams()
     if (selectedPoints[0]?.documentId) params.set(path === '/absences' || path === '/cross-readings' ? 'sourceDocumentId' : 'documentId', selectedPoints[0].documentId)
@@ -255,6 +323,22 @@ const VisualAnalyticsWorkbench = () => {
     link.click()
     URL.revokeObjectURL(link.href)
   }
+  const exportImage = () => {
+    const canvas = document.querySelector('.visual-analytics-workbench__canvas')
+    if (!canvas) return
+    const link = document.createElement('a')
+    link.href = canvas.toDataURL('image/png')
+    link.download = `semantic-${view}-view.png`
+    link.click()
+  }
+  const exportSvg = () => {
+    const canvas = document.querySelector('.visual-analytics-workbench__canvas')
+    if (!canvas) return
+    const image = canvas.toDataURL('image/png')
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${canvas.width}" height="${canvas.height}" viewBox="0 0 ${canvas.width} ${canvas.height}"><image href="${image}" width="${canvas.width}" height="${canvas.height}" /></svg>`
+    downloadFile(`semantic-${view}-view.svg`, svg, 'image/svg+xml;charset=utf-8')
+  }
+  const exportText = () => downloadFile(`semantic-${view}-observation.txt`, `${VIEWS.find(([key]) => key === view)?.[1]}\n\n${note || 'No research observation recorded.'}\n\nSelection: ${selectedPoints.map(pointLabel).join(', ') || 'No points selected'}\nVisible points: ${visiblePoints.length}\nProjection: ${projection.metadata.projectionId || 'Current UMAP surface'}\nExported: ${new Date().toISOString()}\n`)
 
   return <main className={`visual-analytics-workbench ${!panels.controls ? 'visual-analytics-workbench--controls-collapsed' : ''} ${!panels.inspector ? 'visual-analytics-workbench--inspector-collapsed' : ''}`}>
     <header className="visual-analytics-workbench__toolbar">
@@ -263,7 +347,12 @@ const VisualAnalyticsWorkbench = () => {
       <Search id="atlas-search" labelText="Search corpus" placeholder="Search corpus..." value={search} onChange={(event) => setSearch(event.target.value)} />
       <span className="visual-analytics-workbench__scope">{scope.embeddedChunks || projection.points.length} chunks | {scope.documentsWithEmbeddings || 'Unknown'} documents</span>
       <Button kind="ghost" size="sm" renderIcon={Renew} onClick={resetWorkspace}>Reset</Button>
-      <Button kind="secondary" size="sm" renderIcon={Save} onClick={exportWorkspace}>Export</Button>
+      <OverflowMenu aria-label="Save view" iconDescription="Save view" renderIcon={Download} size="sm" flipped>
+        <OverflowMenuItem itemText="Save workspace data" onClick={exportWorkspace} />
+        <OverflowMenuItem itemText="Save view as PNG" onClick={exportImage} />
+        <OverflowMenuItem itemText="Save view as SVG" onClick={exportSvg} />
+        <OverflowMenuItem itemText="Save observation as text" onClick={exportText} />
+      </OverflowMenu>
     </header>
     {error && <InlineNotification className="visual-analytics-workbench__notification" lowContrast kind="error" title="Visual analytics unavailable" subtitle={error} />}
     <aside className="visual-analytics-workbench__controls">
@@ -287,7 +376,7 @@ const VisualAnalyticsWorkbench = () => {
             <SelectItem value="2d" text="2D" />
             <SelectItem value="3d" text={has3dProjection ? '3D' : '3D (no stored coordinate)'} disabled={!has3dProjection} />
           </Select>
-          {activeDimensions === '3d' && <><Button className="visual-analytics-workbench__orbit-toggle" kind="ghost" size="sm" hasIconOnly renderIcon={autoRotate ? Pause : Play} iconDescription={autoRotate ? 'Pause 3D orbit' : 'Start 3D orbit'} tooltipPosition="right" onClick={() => setAutoRotate((current) => !current)} /><Slider id="projection-azimuth" labelText="Horizontal orbit" min={-180} max={180} value={azimuth} onChange={({ value }) => setAzimuth(value)} /><Slider id="projection-elevation" labelText="Vertical orbit" min={-80} max={80} value={elevation} onChange={({ value }) => setElevation(value)} /></>}
+          {activeDimensions === '3d' && <><Slider id="projection-azimuth" labelText="Horizontal orbit" min={-180} max={180} value={azimuth} onChange={({ value }) => setAzimuth(value)} /><Slider id="projection-elevation" labelText="Vertical orbit" min={-80} max={80} value={elevation} onChange={({ value }) => setElevation(value)} /><p>Drag the map to rotate. Scroll or pinch to zoom.</p></>}
         </AccordionItem>
         {view === 'neighbourhoods' && <AccordionItem title="Semantic neighbourhood" open>
           <Select id="neighbour-count" labelText="Embedding neighbours" value={neighbourCount} onChange={(event) => setNeighbourCount(event.target.value)}>{['5', '10', '25', '50'].map((value) => <SelectItem key={value} value={value} text={value} />)}</Select>
@@ -303,9 +392,9 @@ const VisualAnalyticsWorkbench = () => {
       </Accordion>
     </aside>
     <section className="visual-analytics-workbench__map-region">
-      <div className="visual-analytics-workbench__map-header"><div><h1>{VIEWS.find(([key]) => key === view)?.[1]}</h1><p>UMAP proximity is exploratory. Visual patterns are candidates for source investigation, not evidence of historical connection.</p></div><div className="visual-analytics-workbench__map-actions">{activeDimensions === '3d' && <Button size="sm" kind="ghost" renderIcon={autoRotate ? Pause : Play} onClick={() => setAutoRotate((current) => !current)}>{autoRotate ? 'Pause orbit' : 'Start orbit'}</Button>}<Tag type="blue">Visible: {visiblePoints.length}</Tag></div></div>
-      {loading ? <div className="visual-analytics-workbench__empty-map">Loading embedding surface...</div> : <EmbeddingCanvas points={visiblePoints} emptyMessage={projection.message} dimensions={activeDimensions} azimuth={azimuth} elevation={elevation} selectedIds={selectedIds} searchIds={searchIds} anchorId={anchorId} comparisonA={comparisonA} comparisonB={comparisonB} colorBy={filters.colorBy} labelBy={filters.labelBy} onSelect={selectPoint} onHover={setHovered} />}
-      {hovered && <div className="visual-analytics-workbench__hover">{pointLabel(hovered)}{hovered.year ? ` (${hovered.year})` : ''}</div>}
+      <div className="visual-analytics-workbench__map-header"><div><h1>{VIEWS.find(([key]) => key === view)?.[1]}</h1><p>UMAP proximity is exploratory. Visual patterns are candidates for source investigation, not evidence of historical connection.</p></div><div className="visual-analytics-workbench__map-actions">{!panels.controls && <Button kind="ghost" size="sm" renderIcon={View} onClick={() => setPanels((current) => ({ ...current, controls: true }))}>Show controls</Button>}{!panels.inspector && <Button kind="ghost" size="sm" renderIcon={View} onClick={() => setPanels((current) => ({ ...current, inspector: true }))}>Show inspector</Button>}<Tag type="blue">Visible: {visiblePoints.length}</Tag></div></div>
+      {loading ? <div className="visual-analytics-workbench__empty-map">Loading embedding surface...</div> : <EmbeddingCanvas points={visiblePoints} emptyMessage={projection.message} dimensions={activeDimensions} azimuth={azimuth} elevation={elevation} selectedIds={selectedIds} searchIds={searchIds} anchorId={anchorId} comparisonA={comparisonA} comparisonB={comparisonB} colorBy={filters.colorBy} labelBy={filters.labelBy} onSelect={selectPoint} onHover={setHovered} onCameraChange={(nextElevation, nextAzimuth) => { setAutoRotate(false); setElevation(nextElevation); setAzimuth(nextAzimuth) }} onClearSelection={clearSelection} />}
+      {hovered && <div className="visual-analytics-workbench__hover" style={{ left: hovered.x + 14, top: hovered.y + 14 }}><strong>{pointLabel(hovered.point)}</strong><span>{hovered.point.year || 'Undated'}</span></div>}
     </section>
     <aside className="visual-analytics-workbench__inspector">
       <Button kind="ghost" size="sm" renderIcon={View} onClick={() => setPanels((current) => ({ ...current, inspector: false }))}>Collapse inspector</Button>
@@ -318,8 +407,6 @@ const VisualAnalyticsWorkbench = () => {
       </Tile>}
     </aside>
     <section className="visual-analytics-workbench__tray">
-      {!panels.controls && <Button size="sm" kind="ghost" onClick={() => setPanels((current) => ({ ...current, controls: true }))}>Show controls</Button>}
-      {!panels.inspector && <Button size="sm" kind="ghost" onClick={() => setPanels((current) => ({ ...current, inspector: true }))}>Show inspector</Button>}
       <div><strong>{view === 'comparative' ? 'Comparison' : view === 'neighbourhoods' ? 'Neighbourhood' : 'Selection'}:</strong> {selectedPoints.length ? selectedPoints.slice(0, 4).map(pointLabel).join(', ') : 'No points selected'}</div>
       <TextArea id="research-note" labelText="Research observation" hideLabel placeholder="Capture an observation from the current workspace..." value={note} onChange={(event) => setNote(event.target.value)} rows={2} />
       <Button size="sm" kind="tertiary" onClick={exportWorkspace}>Export observation</Button>

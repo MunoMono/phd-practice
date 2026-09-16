@@ -236,3 +236,8 @@ def format_granite_source_block(index: int, chunk: Mapping[str, Any]) -> str:
         lines.extend(catalogue_lines)
     lines.extend(['', 'SOURCE TEXT:', text])
     return '\n'.join(lines)
+
+
+def format_inference_source_block(index: int, chunk: Mapping[str, Any]) -> str:
+    """Format source context for the active model-neutral inference runtime."""
+    return format_granite_source_block(index, chunk)

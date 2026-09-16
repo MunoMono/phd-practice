@@ -20,6 +20,7 @@ from app.services.corpus_status_service import (
     archive_resolution_status,
 )
 from app.services.metadata_roles import extract_metadata_roles
+from app.services.retrieval_protocol import RetrievalPlan, TemporalRetrievalStratum, compile_retrieval_plan
 
 
 RANKING_FUNCTION = "ts_rank(search_tsv, websearch_to_tsquery('english', query))"
@@ -43,6 +44,7 @@ class RetrievalValidationRequest(BaseModel):
     corpus_version: str | None = None
     year_from: int | None = None
     year_to: int | None = None
+    retrieval_plan: RetrievalPlan | None = None
 
 
 def normalise_query(query: str) -> str:
@@ -60,6 +62,7 @@ def build_expanded_query(normalised_query: str, expansions: list[QueryExpansion]
 def build_query_transparency(request: RetrievalValidationRequest) -> dict[str, Any]:
     normalised = normalise_query(request.query)
     expansions = [expansion.model_dump() for expansion in request.expansions]
+    compiled_plan = compile_retrieval_plan(request.retrieval_plan) if request.retrieval_plan else None
     return {
         "original_query": request.query,
         "normalised_query": normalised,
@@ -74,6 +77,9 @@ def build_query_transparency(request: RetrievalValidationRequest) -> dict[str, A
         },
         "top_k": request.top_k,
         "ranking_function": RANKING_FUNCTION,
+        "retrieval_plan": request.retrieval_plan.model_dump(mode="json") if request.retrieval_plan else None,
+        "lexical_formulation": compiled_plan.lexical_formulation if compiled_plan else None,
+        "tsquery_expression": compiled_plan.tsquery_expression if compiled_plan else None,
     }
 
 
@@ -208,6 +214,11 @@ class RetrievalValidationService:
             )
         roles = extract_metadata_roles(authority_data)
         provenance = roles["retrieval_provenance"] if resolution_status == ARCHIVE_RESOLUTION_RESOLVED_CURRENT else {}
+        catalogue_location = {
+            field: roles["retrieval_provenance"].get(field)
+            for field in ("repository", "accession_shelfmark", "location_note")
+            if roles["retrieval_provenance"].get(field)
+        }
         chunk_metadata = dict(row.get("chunk_metadata") or {})
         page_start = row.get("source_page")
         page_end = chunk_metadata.get("page_end") or page_start
@@ -227,18 +238,32 @@ class RetrievalValidationService:
             "included_in_context": True,
             "provenance": provenance,
             "catalogue_metadata": roles["catalogue_metadata"],
+            "catalogue_location": catalogue_location,
+            "rights_access": roles["rights_access"],
         }
 
     def retrieve(self, db: Any, request: RetrievalValidationRequest) -> dict[str, Any]:
+        if request.retrieval_plan and request.expansions:
+            raise ValueError("Retrieval plans and legacy query expansions cannot be combined.")
         self._validate_expansions(db, request.expansions)
         transparency = build_query_transparency(request)
         filters = transparency["filters"]
+        compiled_plan = compile_retrieval_plan(request.retrieval_plan) if request.retrieval_plan else None
         conditions = [
-            "dc.search_tsv @@ websearch_to_tsquery('english', :query)",
             "d.use_for_ml = 1",
             "d.ml_policy_status IN ('eligible_unrestricted', 'eligible_page_restricted')",
         ]
-        params: dict[str, Any] = {"query": transparency["expanded_query"], "limit": request.top_k}
+        if compiled_plan:
+            conditions.insert(0, "dc.search_tsv @@ compiled_query.tsquery")
+            params: dict[str, Any] = {**compiled_plan.parameters, "limit": request.top_k}
+            compiled_tsquery = db.execute(
+                text(f"SELECT {compiled_plan.tsquery_expression}::text AS compiled_tsquery"),
+                compiled_plan.parameters,
+            ).scalar_one()
+            transparency["compiled_postgresql_tsquery"] = compiled_tsquery
+        else:
+            conditions.insert(0, "dc.search_tsv @@ websearch_to_tsquery('english', :query)")
+            params = {"query": transparency["expanded_query"], "limit": request.top_k}
         if filters["pids"]:
             conditions.append("d.pid = ANY(:pids)")
             params["pids"] = filters["pids"]
@@ -251,11 +276,51 @@ class RetrievalValidationService:
         if filters["year_to"] is not None:
             conditions.append("dc.publication_year <= :year_to")
             params["year_to"] = filters["year_to"]
+        if compiled_plan and request.retrieval_plan.authority_linked_document_ids:
+            conditions.append("dc.document_id = ANY(:authority_linked_document_ids)")
+            params["authority_linked_document_ids"] = request.retrieval_plan.authority_linked_document_ids
 
         started = time.perf_counter()
-        rows = db.execute(
-            text(
-                f"""
+        query_cte = f"WITH compiled_query AS (SELECT {compiled_plan.tsquery_expression} AS tsquery)" if compiled_plan else ""
+        ranking_query = "compiled_query.tsquery" if compiled_plan else "websearch_to_tsquery('english', :query)"
+        query_join = "CROSS JOIN compiled_query" if compiled_plan else ""
+        def retrieve_rows(limit: int, stratum: TemporalRetrievalStratum | None = None) -> list[Any]:
+            active_plan = (
+                compile_retrieval_plan(request.retrieval_plan, stratum.lexical_facets)
+                if stratum is not None and stratum.lexical_facets
+                else compiled_plan
+            )
+            active_query_cte = f"WITH compiled_query AS (SELECT {active_plan.tsquery_expression} AS tsquery)" if active_plan else ""
+            active_ranking_query = "compiled_query.tsquery" if active_plan else "websearch_to_tsquery('english', :query)"
+            active_query_join = "CROSS JOIN compiled_query" if active_plan else ""
+            active_params = {**params, **(active_plan.parameters if active_plan else {}), "limit": limit}
+            stratum_conditions: list[str] = []
+            stratum_params: dict[str, Any] = {}
+            if stratum is not None:
+                stratum_conditions.extend([
+                    "d.archive_metadata_source = 'ddr_graphql.record_v1'",
+                    "d.metadata_sync_status IN ('current', 'updated')",
+                    "d.archive_record_id IS NOT NULL",
+                    "d.archive_record_pid IS NOT NULL",
+                    "(d.asset_id IS NOT NULL OR d.asset_pid IS NOT NULL)",
+                    "d.source_uri IS NOT NULL",
+                ])
+                if stratum.year_from is not None:
+                    stratum_conditions.append("dc.publication_year >= :stratum_year_from")
+                    stratum_params["stratum_year_from"] = stratum.year_from
+                if stratum.year_to is not None:
+                    stratum_conditions.append("dc.publication_year <= :stratum_year_to")
+                    stratum_params["stratum_year_to"] = stratum.year_to
+                if stratum.source_type == "oral_history":
+                    stratum_conditions.extend([
+                        "COALESCE(d.authority_data->>'record_title', '') ILIKE '%oral histor%'",
+                        "COALESCE(d.authority_data->'catalogue_metadata'->>'title', d.title, '') !~* '(annual|yearbook|report)'",
+                        "COALESCE(d.authority_data->'catalogue_metadata'->>'extent_unit', '') !~* '(annual|yearbook|report)'",
+                    ])
+            return db.execute(
+                text(
+                    f"""
+                {active_query_cte}
                 SELECT dc.chunk_id, dc.document_id, dc.chunk_text, dc.chunk_index, dc.chunk_type,
                        NULLIF(to_jsonb(dc)->>'source_page', '')::integer AS source_page,
                        to_jsonb(dc)->>'source_section' AS source_section,
@@ -263,17 +328,47 @@ class RetrievalValidationService:
                        d.authority_data, d.archive_record_id, d.archive_record_pid, d.asset_id,
                        d.asset_pid, d.asset_id_or_asset_pid, d.source_uri,
                        d.archive_metadata_source, d.metadata_sync_status, d.corpus_version,
-                       ts_rank(dc.search_tsv, websearch_to_tsquery('english', :query)) AS score
+                         ts_rank(dc.search_tsv, {ranking_query}) AS score
                 FROM document_chunks dc
                 JOIN documents d ON d.document_id = dc.document_id
-                WHERE {' AND '.join(conditions)}
+                    {active_query_join}
+                WHERE {' AND '.join([*conditions, *stratum_conditions])}
                 ORDER BY score DESC, dc.chunk_id ASC
                 LIMIT :limit
                 """
             ),
-            params,
-        ).mappings().all()
-        results = [self._result_from_row(row, index) for index, row in enumerate(rows, start=1)]
+                {**active_params, **stratum_params},
+            ).mappings().all()
+
+        if request.retrieval_plan and request.retrieval_plan.temporal_strata:
+            results: list[dict[str, Any]] = []
+            allocation: list[dict[str, Any]] = []
+            contemporary = next(stratum for stratum in request.retrieval_plan.temporal_strata if stratum.stratum_id == "contemporary")
+            retrospective = next(stratum for stratum in request.retrieval_plan.temporal_strata if stratum.stratum_id == "retrospective")
+            retrospective_rows = retrieve_rows(retrospective.top_k, retrospective)
+            contemporary_limit = contemporary.top_k + max(0, retrospective.top_k - len(retrospective_rows))
+            for stratum, rows in ((contemporary, retrieve_rows(contemporary_limit, contemporary)), (retrospective, retrospective_rows)):
+                for within_stratum_rank, row in enumerate(rows, start=1):
+                    result = self._result_from_row(row, len(results) + 1)
+                    result.update({
+                        "stratum": stratum.stratum_id,
+                        "within_stratum_rank": within_stratum_rank,
+                        "temporal_classification": stratum.classification,
+                        "temporal_classification_basis": f"Plan metadata stratum: {stratum.classification}.",
+                    })
+                    results.append(result)
+                allocation.append({"stratum": stratum.stratum_id, "requested_top_k": stratum.top_k, "retrieved": len(rows)})
+            transparency["temporal_strata"] = allocation
+            transparency["temporal_stratum_lexical_formulations"] = {
+                stratum.stratum_id: (
+                    compile_retrieval_plan(request.retrieval_plan, stratum.lexical_facets).lexical_formulation
+                    if stratum.lexical_facets else compiled_plan.lexical_formulation
+                )
+                for stratum in request.retrieval_plan.temporal_strata
+            }
+        else:
+            rows = retrieve_rows(request.top_k)
+            results = [self._result_from_row(row, index) for index, row in enumerate(rows, start=1)]
         diagnostics = build_retrieval_diagnostics(results)
         transparency["result_count"] = len(results)
         transparency["retrieval_duration_ms"] = round((time.perf_counter() - started) * 1000, 3)

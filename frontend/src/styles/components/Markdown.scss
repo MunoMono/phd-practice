@@ -1,0 +1,111 @@
+// Carbon-styled markdown rendering
+// Custom implementation using Carbon Design System tokens
+@use '@carbon/react/scss/spacing' as *;
+@use '@carbon/react/scss/theme' as *;
+@use '@carbon/react/scss/colors' as *;
+@use '@carbon/react/scss/type' as *;
+
+.markdown-content {
+  // Typography
+  h1, h2, h3, h4, h5, h6 {
+    color: $text-primary;
+    margin-top: $spacing-07;
+    margin-bottom: $spacing-05;
+    font-weight: 600;
+  }
+  
+  h1 { font-size: 2.5rem; line-height: 1.2; }
+  h2 { font-size: 2rem; line-height: 1.3; }
+  h3 { font-size: 1.5rem; line-height: 1.4; }
+  h4 { font-size: 1.25rem; line-height: 1.4; }
+  h5 { font-size: 1rem; line-height: 1.5; }
+  h6 { font-size: 0.875rem; line-height: 1.5; }
+  
+  p {
+    color: $text-secondary;
+    margin-bottom: $spacing-05;
+  }
+  
+  code {
+    background: $layer-01;
+    color: $text-primary;
+    padding: $spacing-01 $spacing-02;
+    border-radius: 2px;
+  }
+  
+  pre {
+    background: $layer-01;
+    padding: $spacing-05;
+    border-radius: 4px;
+    overflow-x: auto;
+    
+    code {
+      background: transparent;
+      padding: 0;
+    }
+  }
+  
+  blockquote {
+    border-left: 4px solid $border-interactive;
+    padding-left: $spacing-05;
+    margin-left: 0;
+    color: $text-secondary;
+    font-style: italic;
+  }
+  
+  a {
+    color: $link-primary;
+    
+    &:hover {
+      color: $link-primary-hover;
+    }
+    
+    &:visited {
+      color: $link-visited;
+    }
+  }
+  
+  ul, ol {
+    padding-left: $spacing-06;
+    margin-bottom: $spacing-05;
+    
+    li {
+      margin-bottom: $spacing-03;
+      color: $text-secondary;
+    }
+  }
+  
+  table {
+    width: 100%;
+    min-width: 40rem;
+    border-collapse: collapse;
+    margin-bottom: $spacing-05;
+    
+    th, td {
+      padding: $spacing-03 $spacing-04;
+      border: 1px solid $border-subtle-01;
+      text-align: left;
+    }
+    
+    th {
+      background: $layer-accent-01;
+      color: $text-primary;
+      font-weight: 600;
+    }
+    
+    td {
+      color: $text-secondary;
+    }
+  }
+
+  &__table-scroll {
+    max-width: 100%;
+    overflow-x: auto;
+  }
+  
+  hr {
+    border: none;
+    border-top: 1px solid $border-subtle-01;
+    margin: $spacing-07 0;
+  }
+}

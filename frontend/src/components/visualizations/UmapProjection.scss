@@ -1,0 +1,36 @@
+@use '@carbon/react/scss/colors' as *;
+@use '@carbon/react/scss/type' as *;
+
+.umap-projection {
+  position: relative;
+
+  &__svg {
+    width: 100%;
+    min-height: 32rem;
+    background:
+      radial-gradient(circle at top left, rgba($blue-50, 0.12), transparent 32%),
+      radial-gradient(circle at bottom right, rgba($purple-50, 0.12), transparent 28%),
+      var(--cds-layer-01);
+    border-radius: 0.5rem;
+  }
+
+  &__tooltip {
+    position: fixed;
+    z-index: 20;
+    max-width: 18rem;
+    @include type-style('body-compact-01');
+  }
+
+  &__state {
+    min-height: 20rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--cds-text-secondary);
+    text-align: center;
+    padding: 2rem;
+    border: 1px dashed color-mix(in srgb, var(--cds-border-subtle) 88%, transparent);
+    border-radius: 0.5rem;
+    background: color-mix(in srgb, var(--cds-layer-02) 48%, transparent);
+  }
+}

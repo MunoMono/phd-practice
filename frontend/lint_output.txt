@@ -1,0 +1,35 @@
+
+> testamentary-traces-frontend@0.1.0 lint
+> eslint .
+
+
+/Users/graham/Documents/repos/innovation-design/frontend/src/components/StatsCards/StatsCards.jsx
+  67:6  warning  React Hook useEffect has missing dependencies: 'demoPidAuthorities', 'demoRecentDocs', 'demoStats', and 'useStaticDemo'. Either include them or remove the dependency array  react-hooks/exhaustive-deps
+
+/Users/graham/Documents/repos/innovation-design/frontend/src/components/visualizations/DocumentNetwork.jsx
+  36:6   warning  React Hook useEffect has a missing dependency: 'renderNetwork'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+  97:11  error    'clusterGroup' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u                      no-unused-vars
+
+/Users/graham/Documents/repos/innovation-design/frontend/src/components/visualizations/EntityNetwork.jsx
+   4:34  error    'chartStyles' is defined but never used. Allowed unused vars must match /^[A-Z_]/u                                no-unused-vars
+  36:6   warning  React Hook useEffect has a missing dependency: 'renderNetwork'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+/Users/graham/Documents/repos/innovation-design/frontend/src/components/visualizations/TemporalTrends.jsx
+   4:24  error    'd3Scales' is defined but never used. Allowed unused vars must match /^[A-Z_]/u                                 no-unused-vars
+   4:34  error    'chartStyles' is defined but never used. Allowed unused vars must match /^[A-Z_]/u                              no-unused-vars
+  35:6   warning  React Hook useEffect has a missing dependency: 'renderChart'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+/Users/graham/Documents/repos/innovation-design/frontend/src/components/visualizations/ThemeDistribution.jsx
+   4:34  error    'chartStyles' is defined but never used. Allowed unused vars must match /^[A-Z_]/u                              no-unused-vars
+   4:59  error    'utils' is defined but never used. Allowed unused vars must match /^[A-Z_]/u                                    no-unused-vars
+  36:6   warning  React Hook useEffect has a missing dependency: 'renderChart'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+/Users/graham/Documents/repos/innovation-design/frontend/src/utils/carbonD3Theme.js
+  102:16  error  'require' is not defined  no-undef
+  109:16  error  'require' is not defined  no-undef
+  116:16  error  'require' is not defined  no-undef
+  123:16  error  'require' is not defined  no-undef
+  130:16  error  'require' is not defined  no-undef
+
+✖ 16 problems (11 errors, 5 warnings)
+

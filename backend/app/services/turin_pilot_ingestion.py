@@ -29,6 +29,13 @@ def permitted_pages(total_pages: int, ml_policy_status: str, ml_page_scope: str 
     return allowed_pages
 
 
+def extraction_pages(total_pages: int, ml_policy_status: str, ml_page_scope: str | None) -> list[int]:
+    """Return PDF pages to materialise, independent of model-retrieval eligibility."""
+    if ml_policy_status == "excluded_use_for_ml_false":
+        return list(range(1, total_pages + 1))
+    return permitted_pages(total_pages, ml_policy_status, ml_page_scope)
+
+
 def deterministic_chunk_id(
     document_id: str,
     corpus_version: str,

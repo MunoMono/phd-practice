@@ -148,6 +148,12 @@ class AuthorityService:
     }
     """
 
+    PUBLISHED_RECORD_IDENTITIES_QUERY = """
+    query GetPublishedRecordIdentities($status: String!) {
+        records_v1(status: $status) { id pid title }
+    }
+    """
+
     RECORD_BY_PID_QUERY = """
     query GetRecordByPid($pid: ID!) {
         record_v1(id: $pid) {
@@ -382,6 +388,26 @@ class AuthorityService:
         }
     }
     """
+
+    MEDIA_BY_ID_QUERY = """
+    query GetMediaById($id: ID!) {
+        media_by_id(id: $id) {
+            id pid title public_uri creator_agent_label creators level fonds_code language_codes
+            date_begin date_end series_id ddr_period artefact_date_from artefact_date_to category
+            reference_code extent_number extent_unit scope_and_content methodology project_theme
+            project_title project_job_number location_repository location_accession location_box
+            box_title location_note access_level abstract caption subjects parent_collection used_for_ml
+            ml_annotation keywords { id label }
+            parent_record { id pid title public_uri location_repository location_accession location_box box_title location_note }
+            pdf_files { filename role url label }
+            digital_assets {
+                role filename assetId pid use_for_ml ml_pages ml_annotation mime bytes status sequence label
+                display_date normalized_date date_qualifier date_unknown location_repository location_accession
+                location_box location_note language_codes extent_number extent_unit keywords { id label }
+            }
+        }
+    }
+    """
     
     def _make_graphql_request(self, query: str, variables: Optional[Dict] = None) -> Optional[Dict]:
         """Make GraphQL request to DDR Archive API"""
@@ -447,6 +473,31 @@ class AuthorityService:
         data = self._unwrap_data(result)
         records = data.get('records_v1') or []
         logger.info("Fetched %s published archive records from GraphQL", len(records))
+        return records
+
+    def fetch_complete_media_surface(self) -> List[Dict[str, Any]]:
+        """Enumerate the public media surface; records_v1 is a restricted record listing."""
+        result = self._make_graphql_request(self.ALL_MEDIA_ITEMS_QUERY)
+        stubs = self._unwrap_data(result).get('all_media_items') or []
+        media = []
+        for stub in stubs:
+            result = self._make_graphql_request(self.MEDIA_BY_ID_QUERY, {'id': stub['pid']})
+            item = self._unwrap_data(result).get('media_by_id')
+            if item:
+                media.append(item)
+        logger.info("Fetched %s media items from the complete Archive media surface", len(media))
+        return media
+
+    def fetch_complete_record_surface(self, status: str = 'published') -> List[Dict[str, Any]]:
+        """Avoid partial nested-list results by resolving each enumerated record directly."""
+        result = self._make_graphql_request(self.PUBLISHED_RECORD_IDENTITIES_QUERY, {'status': status})
+        identities = self._unwrap_data(result).get('records_v1') or []
+        records = []
+        for identity in identities:
+            record = self.fetch_record_by_pid(str(identity['pid']))
+            if record:
+                records.append(record)
+        logger.info("Fetched %s/%s complete published records through direct record_v1 traversal", len(records), len(identities))
         return records
 
     def fetch_record_by_pid(self, pid: str) -> Optional[Dict[str, Any]]:

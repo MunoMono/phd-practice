@@ -118,17 +118,17 @@
   }
 }
 
-.granite-chat-tile {
+.runtime-chat-tile {
   padding: $spacing-06;
   margin-bottom: $spacing-07;
   border: 1px solid $border-subtle-01;
 }
 
-.granite-chat__header {
+.runtime-chat__header {
   margin-bottom: $spacing-05;
 }
 
-.granite-chat__history {
+.runtime-chat__history {
   max-height: 28rem;
   overflow-y: auto;
   display: flex;
@@ -140,39 +140,39 @@
   border-bottom: 1px solid $border-subtle-01;
 }
 
-.granite-chat__message {
+.runtime-chat__message {
   max-width: 88%;
   padding: $spacing-04;
   border-radius: 1rem;
   background: $layer-accent-01;
 }
 
-.granite-chat__message--user {
+.runtime-chat__message--user {
   align-self: flex-end;
   background: $layer-selected-inverse;
   color: $text-inverse;
 
-  .granite-chat__message-body,
-  .granite-chat__meta {
+  .runtime-chat__message-body,
+  .runtime-chat__meta {
     color: $text-inverse;
   }
 }
 
-.granite-chat__message--assistant {
+.runtime-chat__message--assistant {
   align-self: flex-start;
 }
 
-.granite-chat__message-head {
+.runtime-chat__message-head {
   margin-bottom: $spacing-03;
 }
 
-.granite-chat__message-body {
+.runtime-chat__message-body {
   @include type-style('body-01');
   white-space: pre-wrap;
   color: $text-primary;
 }
 
-.granite-chat__meta {
+.runtime-chat__meta {
   display: flex;
   gap: $spacing-05;
   flex-wrap: wrap;
@@ -181,17 +181,17 @@
   color: $text-secondary;
 }
 
-.granite-chat__loading {
+.runtime-chat__loading {
   padding: $spacing-03 0;
 }
 
-.granite-chat__sources {
+.runtime-chat__sources {
   margin-top: $spacing-04;
   padding-top: $spacing-03;
   border-top: 1px solid $border-subtle-01;
 }
 
-.granite-chat__sources-label {
+.runtime-chat__sources-label {
   @include type-style('label-01');
   color: $text-secondary;
   display: block;
@@ -200,7 +200,7 @@
   letter-spacing: 0.04em;
 }
 
-.granite-chat__source-list {
+.runtime-chat__source-list {
   list-style: none;
   padding: 0;
   margin: 0;
@@ -209,27 +209,27 @@
   gap: $spacing-03;
 }
 
-.granite-chat__source-item {
+.runtime-chat__source-item {
   @include type-style('helper-text-01');
   line-height: 1.5;
 }
 
-.granite-chat__source-quote {
+.runtime-chat__source-quote {
   font-style: italic;
   color: $text-primary;
 }
 
-.granite-chat__source-ref {
+.runtime-chat__source-ref {
   color: $text-secondary;
 }
 
-.granite-chat__source-pid {
+.runtime-chat__source-pid {
   font-family: 'IBM Plex Mono', monospace;
   font-size: 0.7rem;
   color: $text-placeholder;
 }
 
-.granite-chat__composer {
+.runtime-chat__composer {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: $spacing-04;
@@ -278,19 +278,19 @@
     padding: $spacing-05;
   }
 
-  .granite-chat-tile {
+  .runtime-chat-tile {
     padding: $spacing-05;
   }
 
-  .granite-chat__header {
+  .runtime-chat__header {
     flex-direction: column;
   }
 
-  .granite-chat__message {
+  .runtime-chat__message {
     max-width: 100%;
   }
 
-  .granite-chat__composer {
+  .runtime-chat__composer {
     grid-template-columns: 1fr;
   }
 }

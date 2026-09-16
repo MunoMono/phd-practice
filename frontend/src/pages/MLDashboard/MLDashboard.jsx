@@ -36,7 +36,7 @@ import DocumentNetwork from '../../components/visualizations/DocumentNetwork';
 import ThemeDistribution from '../../components/visualizations/ThemeDistribution';
 import TemporalTrends from '../../components/visualizations/TemporalTrends';
 import EntityNetwork from '../../components/visualizations/EntityNetwork';
-import GraniteChatPanel from './GraniteChatPanel';
+import RuntimeChatPanel from './RuntimeChatPanel';
 import {
   fetchDashboardStats as fetchDashboardStatsData,
   refreshDashboardStats as refreshDashboardStatsData
@@ -223,7 +223,7 @@ const MLDashboard = () => {
         </Column>
 
         <Column>
-          <GraniteChatPanel />
+          <RuntimeChatPanel />
         </Column>
 
         {/* Recent Activity */}

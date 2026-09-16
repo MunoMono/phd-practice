@@ -21,7 +21,7 @@ services:
       timeout: 5s
       retries: 5
 
-  # Ollama local inference runtime for Granite analysis
+  # Ollama local inference runtime for active Turin analysis
   ollama:
     image: ollama/ollama:latest
     container_name: phd-practice-ollama-dev
@@ -42,20 +42,22 @@ services:
       POSTGRES_HOST: db
       POSTGRES_PORT: 5432
       POSTGRES_DB: ${POSTGRES_DB:-testamentary-traces}
-      GRANITE_MODEL_PATH: ${GRANITE_MODEL_PATH:-ibm-granite/granite-3.1-2b-instruct}
-      GRANITE_DEVICE: ${GRANITE_DEVICE:-cpu}
-      GRANITE_MAX_TOKENS: ${GRANITE_MAX_TOKENS:-384}
-      GRANITE_TEMPERATURE: ${GRANITE_TEMPERATURE:-0.2}
-      GRANITE_MAX_INPUT_CHARS: ${GRANITE_MAX_INPUT_CHARS:-6000}
-      GRANITE_TIMEOUT_SECONDS: ${GRANITE_TIMEOUT_SECONDS:-180}
+      TURIN_MODEL: ${TURIN_MODEL:-qwen3:8b-q4_K_M}
+      TURIN_RUNTIME_VERSION: ${TURIN_RUNTIME_VERSION:-turin-runtime-v2}
+      TURIN_QWEN_NUM_CTX: ${TURIN_QWEN_NUM_CTX:-16384}
+      TURIN_QWEN_SOURCE_ANALYSIS_MAX_TOKENS: ${TURIN_QWEN_SOURCE_ANALYSIS_MAX_TOKENS:-1000}
+      TURIN_QWEN_CROSS_SOURCE_MAX_TOKENS: ${TURIN_QWEN_CROSS_SOURCE_MAX_TOKENS:-1000}
+      TURIN_QWEN_FINAL_SYNTHESIS_MAX_TOKENS: ${TURIN_QWEN_FINAL_SYNTHESIS_MAX_TOKENS:-768}
+      TURIN_QWEN_TEMPERATURE: ${TURIN_QWEN_TEMPERATURE:-0.2}
+      TURIN_MAX_INPUT_TOKENS: ${TURIN_MAX_INPUT_TOKENS:-12000}
+      TURIN_TIMEOUT_SECONDS: ${TURIN_TIMEOUT_SECONDS:-180}
       OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://ollama:11434}
-      OLLAMA_MODEL: ${OLLAMA_MODEL:-granite3.1-dense:2b-instruct-q4_K_M}
       S3_BUCKET: ${S3_BUCKET}
       S3_ENDPOINT: ${S3_ENDPOINT}
       S3_ACCESS_KEY: ${S3_ACCESS_KEY}
       S3_SECRET_KEY: ${S3_SECRET_KEY}
     ports:
-      - "8000:8000"
+      - "${BACKEND_PORT:-8000}:8000"
     volumes:
       # Mount source code for hot reload
       - ./backend/app:/app/app:ro
@@ -82,6 +84,8 @@ services:
       # Mount source for hot module replacement
       - ./frontend/src:/app/src:ro
       - ./frontend/public:/app/public:ro
+      - ./frontend/tests:/app/tests:ro
+      - ./docs/turin_experiment:/docs/turin_experiment:ro
       - ./frontend/index.html:/app/index.html:ro
       - ./frontend/vite.config.js:/app/vite.config.js:ro
       # Don't mount node_modules (use container's version)
@@ -89,7 +93,7 @@ services:
     networks:
       - epistemic-network-dev
     environment:
-      - VITE_API_URL=http://localhost:8000
+      - VITE_API_URL=http://localhost:${BACKEND_PORT:-8000}
 
 networks:
   epistemic-network-dev:

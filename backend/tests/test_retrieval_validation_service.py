@@ -122,6 +122,7 @@ class RetrievalValidationServiceTests(unittest.TestCase):
         self.assertEqual(result['archive_resolution_status'], 'unresolved_legacy')
         self.assertIsNone(result['archive_record_pid'])
         self.assertEqual(result['provenance'], {})
+        self.assertEqual(result['rights_access'], {})
 
     def test_zero_result_diagnostics_describe_retrieval_scope_only(self):
         diagnostics = build_retrieval_diagnostics([])

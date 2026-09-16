@@ -1,0 +1,872 @@
+{
+  "fixture_version": "turin-v31-neutral-benchmark-v1",
+  "corpus_version": "corpus_f40d78dbce52",
+  "graph_snapshot_version": "turin-archive-authority-graph-v1",
+  "cases": [
+    {
+      "benchmark_id": "neutral-01",
+      "case_id": "neutral-01",
+      "neutral_question": "Find documentary material naming Alfonso Gomez in archival asset 778285816069.",
+      "question_type": "person_associated_with_source",
+      "expected_authority_ids": [
+        "ALFONSOGOM"
+      ],
+      "expected_canonical_document_ids": [
+        "doc_940221533316_1b8618e5e891"
+      ],
+      "expected_canonical_assets": [
+        "47ef9cd6984ba9166991a88af84a3cfa14b69e3aa3ad1f352e1f8a85019f4a3a"
+      ],
+      "expected_asset_pids": [
+        "778285816069"
+      ],
+      "expected_passage_ids": [
+        "turin_doc_940221533316_1b8618e5e891_1_2_7eddf802f7eb3131"
+      ],
+      "expected_passage_chunk_ids": [
+        "turin_doc_940221533316_1b8618e5e891_1_2_7eddf802f7eb3131"
+      ],
+      "expected_relation_type": "PERSON_ASSOCIATED_WITH_SOURCE",
+      "why_ground_truth_is_objective": "Persisted exact graph edge and exact authority-label occurrence in the identified governed chunk.",
+      "ground_truth_derivation": {
+        "snapshot_version": "turin-archive-authority-graph-v1",
+        "authority_type": "agent_employment",
+        "authority_id": "ALFONSOGOM",
+        "document_id": "doc_940221533316_1b8618e5e891",
+        "asset_id": "47ef9cd6984ba9166991a88af84a3cfa14b69e3aa3ad1f352e1f8a85019f4a3a",
+        "asset_pid": "778285816069",
+        "chunk_id": "turin_doc_940221533316_1b8618e5e891_1_2_7eddf802f7eb3131",
+        "chunk_index": 2
+      }
+    },
+    {
+      "benchmark_id": "neutral-02",
+      "case_id": "neutral-02",
+      "neutral_question": "Find documentary material naming Bruce Archer in archival asset 594517157818.",
+      "question_type": "person_associated_with_source",
+      "expected_authority_ids": [
+        "BRUCEARCHE"
+      ],
+      "expected_canonical_document_ids": [
+        "doc_287080879712_0ca51b627c85"
+      ],
+      "expected_canonical_assets": [
+        "402a363ff782964e4ea4c42d50414fec9ecb7319ecb6443cd3a46daa9f1e9ce4"
+      ],
+      "expected_asset_pids": [
+        "594517157818"
+      ],
+      "expected_passage_ids": [
+        "turin_doc_287080879712_0ca51b627c85_1_2_9444e1200d79b010"
+      ],
+      "expected_passage_chunk_ids": [
+        "turin_doc_287080879712_0ca51b627c85_1_2_9444e1200d79b010"
+      ],
+      "expected_relation_type": "PERSON_ASSOCIATED_WITH_SOURCE",
+      "why_ground_truth_is_objective": "Persisted exact graph edge and exact authority-label occurrence in the identified governed chunk.",
+      "ground_truth_derivation": {
+        "snapshot_version": "turin-archive-authority-graph-v1",
+        "authority_type": "agent_employment",
+        "authority_id": "BRUCEARCHE",
+        "document_id": "doc_287080879712_0ca51b627c85",
+        "asset_id": "402a363ff782964e4ea4c42d50414fec9ecb7319ecb6443cd3a46daa9f1e9ce4",
+        "asset_pid": "594517157818",
+        "chunk_id": "turin_doc_287080879712_0ca51b627c85_1_2_9444e1200d79b010",
+        "chunk_index": 2
+      }
+    },
+    {
+      "benchmark_id": "neutral-03",
+      "case_id": "neutral-03",
+      "neutral_question": "Find documentary material naming Bruce Archer in archival asset 602243358937.",
+      "question_type": "person_associated_with_source",
+      "expected_authority_ids": [
+        "BRUCEARCHE"
+      ],
+      "expected_canonical_document_ids": [
+        "doc_287080879712_23ba7078a89a"
+      ],
+      "expected_canonical_assets": [
+        "73876e511e303a5260d1ef013423c6b4bf95e481889b5252e8e60f5bd72eb2a3"
+      ],
+      "expected_asset_pids": [
+        "602243358937"
+      ],
+      "expected_passage_ids": [
+        "turin_doc_287080879712_23ba7078a89a_2_7_2e9518aee318db8f"
+      ],
+      "expected_passage_chunk_ids": [
+        "turin_doc_287080879712_23ba7078a89a_2_7_2e9518aee318db8f"
+      ],
+      "expected_relation_type": "PERSON_ASSOCIATED_WITH_SOURCE",
+      "why_ground_truth_is_objective": "Persisted exact graph edge and exact authority-label occurrence in the identified governed chunk.",
+      "ground_truth_derivation": {
+        "snapshot_version": "turin-archive-authority-graph-v1",
+        "authority_type": "agent_employment",
+        "authority_id": "BRUCEARCHE",
+        "document_id": "doc_287080879712_23ba7078a89a",
+        "asset_id": "73876e511e303a5260d1ef013423c6b4bf95e481889b5252e8e60f5bd72eb2a3",
+        "asset_pid": "602243358937",
+        "chunk_id": "turin_doc_287080879712_23ba7078a89a_2_7_2e9518aee318db8f",
+        "chunk_index": 7
+      }
+    },
+    {
+      "benchmark_id": "neutral-04",
+      "case_id": "neutral-04",
+      "neutral_question": "Find documentary material naming Bruce Archer in archival asset 689209818780.",
+      "question_type": "person_associated_with_source",
+      "expected_authority_ids": [
+        "BRUCEARCHE"
+      ],
+      "expected_canonical_document_ids": [
+        "doc_287080879712_63387e05dbce"
+      ],
+      "expected_canonical_assets": [
+        "caa5a13d26c939ce21e7f125b48ab5410d73efbd41c0945f3b35f9104884a88d"
+      ],
+      "expected_asset_pids": [
+        "689209818780"
+      ],
+      "expected_passage_ids": [
+        "turin_doc_287080879712_63387e05dbce_1_4_0b9ff93bbe55171c"
+      ],
+      "expected_passage_chunk_ids": [
+        "turin_doc_287080879712_63387e05dbce_1_4_0b9ff93bbe55171c"
+      ],
+      "expected_relation_type": "PERSON_ASSOCIATED_WITH_SOURCE",
+      "why_ground_truth_is_objective": "Persisted exact graph edge and exact authority-label occurrence in the identified governed chunk.",
+      "ground_truth_derivation": {
+        "snapshot_version": "turin-archive-authority-graph-v1",
+        "authority_type": "agent_employment",
+        "authority_id": "BRUCEARCHE",
+        "document_id": "doc_287080879712_63387e05dbce",
+        "asset_id": "caa5a13d26c939ce21e7f125b48ab5410d73efbd41c0945f3b35f9104884a88d",
+        "asset_pid": "689209818780",
+        "chunk_id": "turin_doc_287080879712_63387e05dbce_1_4_0b9ff93bbe55171c",
+        "chunk_index": 4
+      }
+    },
+    {
+      "benchmark_id": "neutral-05",
+      "case_id": "neutral-05",
+      "neutral_question": "Find documentary material naming Bruce Archer in archival asset 467400143512.",
+      "question_type": "person_associated_with_source",
+      "expected_authority_ids": [
+        "BRUCEARCHE"
+      ],
+      "expected_canonical_document_ids": [
+        "doc_287080879712_974ecb9d61df"
+      ],
+      "expected_canonical_assets": [
+        "979b66f9816fd7f92647cf9b88f3d414b8ab60085a32004c824a778b09316e9b"
+      ],
+      "expected_asset_pids": [
+        "467400143512"
+      ],
+      "expected_passage_ids": [
+        "turin_doc_287080879712_974ecb9d61df_3_24_32f908d1e4a701bf"
+      ],
+      "expected_passage_chunk_ids": [
+        "turin_doc_287080879712_974ecb9d61df_3_24_32f908d1e4a701bf"
+      ],
+      "expected_relation_type": "PERSON_ASSOCIATED_WITH_SOURCE",
+      "why_ground_truth_is_objective": "Persisted exact graph edge and exact authority-label occurrence in the identified governed chunk.",
+      "ground_truth_derivation": {
+        "snapshot_version": "turin-archive-authority-graph-v1",
+        "authority_type": "agent_employment",
+        "authority_id": "BRUCEARCHE",
+        "document_id": "doc_287080879712_974ecb9d61df",
+        "asset_id": "979b66f9816fd7f92647cf9b88f3d414b8ab60085a32004c824a778b09316e9b",
+        "asset_pid": "467400143512",
+        "chunk_id": "turin_doc_287080879712_974ecb9d61df_3_24_32f908d1e4a701bf",
+        "chunk_index": 24
+      }
+    },
+    {
+      "benchmark_id": "neutral-06",
+      "case_id": "neutral-06",
+      "neutral_question": "Find documentary material naming Bruce Archer in archival asset 109634416345.",
+      "question_type": "person_associated_with_source",
+      "expected_authority_ids": [
+        "BRUCEARCHE"
+      ],
+      "expected_canonical_document_ids": [
+        "doc_287080879712_c776e78a6d5b"
+      ],
+      "expected_canonical_assets": [
+        "e79dae4491213ed21a4bdca1d6b1778d7974fe2771a89a0bfc5b2da3f9fcb91d"
+      ],
+      "expected_asset_pids": [
+        "109634416345"
+      ],
+      "expected_passage_ids": [
+        "turin_doc_287080879712_c776e78a6d5b_4_23_605f42ba5d669d57"
+      ],
+      "expected_passage_chunk_ids": [
+        "turin_doc_287080879712_c776e78a6d5b_4_23_605f42ba5d669d57"
+      ],
+      "expected_relation_type": "PERSON_ASSOCIATED_WITH_SOURCE",
+      "why_ground_truth_is_objective": "Persisted exact graph edge and exact authority-label occurrence in the identified governed chunk.",
+      "ground_truth_derivation": {
+        "snapshot_version": "turin-archive-authority-graph-v1",
+        "authority_type": "agent_employment",
+        "authority_id": "BRUCEARCHE",
+        "document_id": "doc_287080879712_c776e78a6d5b",
+        "asset_id": "e79dae4491213ed21a4bdca1d6b1778d7974fe2771a89a0bfc5b2da3f9fcb91d",
+        "asset_pid": "109634416345",
+        "chunk_id": "turin_doc_287080879712_c776e78a6d5b_4_23_605f42ba5d669d57",
+        "chunk_index": 23
+      }
+    },
+    {
+      "benchmark_id": "neutral-07",
+      "case_id": "neutral-07",
+      "neutral_question": "Find documentary material naming Bruce Archer in archival asset 729887918554.",
+      "question_type": "person_associated_with_source",
+      "expected_authority_ids": [
+        "BRUCEARCHE"
+      ],
+      "expected_canonical_document_ids": [
+        "doc_287080879712_e20ef929f698"
+      ],
+      "expected_canonical_assets": [
+        "95bd6ebc6c2089005bfd52e1a367b1a5f612bbb3b5e4dc718cb5d0e131d3bab6"
+      ],
+      "expected_asset_pids": [
+        "729887918554"
+      ],
+      "expected_passage_ids": [
+        "turin_doc_287080879712_e20ef929f698_1_0_2537c43a98d4eaae"
+      ],
+      "expected_passage_chunk_ids": [
+        "turin_doc_287080879712_e20ef929f698_1_0_2537c43a98d4eaae"
+      ],
+      "expected_relation_type": "PERSON_ASSOCIATED_WITH_SOURCE",
+      "why_ground_truth_is_objective": "Persisted exact graph edge and exact authority-label occurrence in the identified governed chunk.",
+      "ground_truth_derivation": {
+        "snapshot_version": "turin-archive-authority-graph-v1",
+        "authority_type": "agent_employment",
+        "authority_id": "BRUCEARCHE",
+        "document_id": "doc_287080879712_e20ef929f698",
+        "asset_id": "95bd6ebc6c2089005bfd52e1a367b1a5f612bbb3b5e4dc718cb5d0e131d3bab6",
+        "asset_pid": "729887918554",
+        "chunk_id": "turin_doc_287080879712_e20ef929f698_1_0_2537c43a98d4eaae",
+        "chunk_index": 0
+      }
+    },
+    {
+      "benchmark_id": "neutral-08",
+      "case_id": "neutral-08",
+      "neutral_question": "Find documentary material naming Bruce Archer in archival asset 023332561304.",
+      "question_type": "person_associated_with_source",
+      "expected_authority_ids": [
+        "BRUCEARCHE"
+      ],
+      "expected_canonical_document_ids": [
+        "doc_287080879712_f1d3b8ea4fcc"
+      ],
+      "expected_canonical_assets": [
+        "ab8f56929e000b69a41ff37138050a96ed959ca59eae1bd0d39d74f373a327a4"
+      ],
+      "expected_asset_pids": [
+        "023332561304"
+      ],
+      "expected_passage_ids": [
+        "turin_doc_287080879712_f1d3b8ea4fcc_1_7_93c1d36f2abf6775"
+      ],
+      "expected_passage_chunk_ids": [
+        "turin_doc_287080879712_f1d3b8ea4fcc_1_7_93c1d36f2abf6775"
+      ],
+      "expected_relation_type": "PERSON_ASSOCIATED_WITH_SOURCE",
+      "why_ground_truth_is_objective": "Persisted exact graph edge and exact authority-label occurrence in the identified governed chunk.",
+      "ground_truth_derivation": {
+        "snapshot_version": "turin-archive-authority-graph-v1",
+        "authority_type": "agent_employment",
+        "authority_id": "BRUCEARCHE",
+        "document_id": "doc_287080879712_f1d3b8ea4fcc",
+        "asset_id": "ab8f56929e000b69a41ff37138050a96ed959ca59eae1bd0d39d74f373a327a4",
+        "asset_pid": "023332561304",
+        "chunk_id": "turin_doc_287080879712_f1d3b8ea4fcc_1_7_93c1d36f2abf6775",
+        "chunk_index": 7
+      }
+    },
+    {
+      "benchmark_id": "neutral-09",
+      "case_id": "neutral-09",
+      "neutral_question": "Find documentary material naming Bruce Archer in archival asset 595499003453.",
+      "question_type": "person_associated_with_source",
+      "expected_authority_ids": [
+        "BRUCEARCHE"
+      ],
+      "expected_canonical_document_ids": [
+        "doc_321843234637_764a8e8c3451"
+      ],
+      "expected_canonical_assets": [
+        "3c155ac59db6688d8b4764b51f93ac74d301df926dd809152056ab4702ef69b3"
+      ],
+      "expected_asset_pids": [
+        "595499003453"
+      ],
+      "expected_passage_ids": [
+        "turin_doc_321843234637_764a8e8c3451_1_1_de9c39a2348da579"
+      ],
+      "expected_passage_chunk_ids": [
+        "turin_doc_321843234637_764a8e8c3451_1_1_de9c39a2348da579"
+      ],
+      "expected_relation_type": "PERSON_ASSOCIATED_WITH_SOURCE",
+      "why_ground_truth_is_objective": "Persisted exact graph edge and exact authority-label occurrence in the identified governed chunk.",
+      "ground_truth_derivation": {
+        "snapshot_version": "turin-archive-authority-graph-v1",
+        "authority_type": "agent_employment",
+        "authority_id": "BRUCEARCHE",
+        "document_id": "doc_321843234637_764a8e8c3451",
+        "asset_id": "3c155ac59db6688d8b4764b51f93ac74d301df926dd809152056ab4702ef69b3",
+        "asset_pid": "595499003453",
+        "chunk_id": "turin_doc_321843234637_764a8e8c3451_1_1_de9c39a2348da579",
+        "chunk_index": 1
+      }
+    },
+    {
+      "benchmark_id": "neutral-10",
+      "case_id": "neutral-10",
+      "neutral_question": "Find documentary material naming Bruce Archer in archival asset 266939971608.",
+      "question_type": "person_associated_with_source",
+      "expected_authority_ids": [
+        "BRUCEARCHE"
+      ],
+      "expected_canonical_document_ids": [
+        "doc_338541406157_15ef98daa711"
+      ],
+      "expected_canonical_assets": [
+        "19f20667a1b0095074a5fd212a861f66cf8a7f0c489f232541cbd9039a58dab7"
+      ],
+      "expected_asset_pids": [
+        "266939971608"
+      ],
+      "expected_passage_ids": [
+        "turin_doc_338541406157_15ef98daa711_14_116_0e6691fb62c83e7d"
+      ],
+      "expected_passage_chunk_ids": [
+        "turin_doc_338541406157_15ef98daa711_14_116_0e6691fb62c83e7d"
+      ],
+      "expected_relation_type": "PERSON_ASSOCIATED_WITH_SOURCE",
+      "why_ground_truth_is_objective": "Persisted exact graph edge and exact authority-label occurrence in the identified governed chunk.",
+      "ground_truth_derivation": {
+        "snapshot_version": "turin-archive-authority-graph-v1",
+        "authority_type": "agent_employment",
+        "authority_id": "BRUCEARCHE",
+        "document_id": "doc_338541406157_15ef98daa711",
+        "asset_id": "19f20667a1b0095074a5fd212a861f66cf8a7f0c489f232541cbd9039a58dab7",
+        "asset_pid": "266939971608",
+        "chunk_id": "turin_doc_338541406157_15ef98daa711_14_116_0e6691fb62c83e7d",
+        "chunk_index": 116
+      }
+    },
+    {
+      "benchmark_id": "neutral-11",
+      "case_id": "neutral-11",
+      "neutral_question": "Find documentary material naming Bruce Archer in archival asset 664446166051.",
+      "question_type": "person_associated_with_source",
+      "expected_authority_ids": [
+        "BRUCEARCHE"
+      ],
+      "expected_canonical_document_ids": [
+        "doc_338541406157_1cb3d7b8e15f"
+      ],
+      "expected_canonical_assets": [
+        "d669db9ecef5f9f6c779e199601e04eec3c112c677321259d6fd5c14c5be15a5"
+      ],
+      "expected_asset_pids": [
+        "664446166051"
+      ],
+      "expected_passage_ids": [
+        "turin_doc_338541406157_1cb3d7b8e15f_1_2_b7c2e899c9acece4"
+      ],
+      "expected_passage_chunk_ids": [
+        "turin_doc_338541406157_1cb3d7b8e15f_1_2_b7c2e899c9acece4"
+      ],
+      "expected_relation_type": "PERSON_ASSOCIATED_WITH_SOURCE",
+      "why_ground_truth_is_objective": "Persisted exact graph edge and exact authority-label occurrence in the identified governed chunk.",
+      "ground_truth_derivation": {
+        "snapshot_version": "turin-archive-authority-graph-v1",
+        "authority_type": "agent_employment",
+        "authority_id": "BRUCEARCHE",
+        "document_id": "doc_338541406157_1cb3d7b8e15f",
+        "asset_id": "d669db9ecef5f9f6c779e199601e04eec3c112c677321259d6fd5c14c5be15a5",
+        "asset_pid": "664446166051",
+        "chunk_id": "turin_doc_338541406157_1cb3d7b8e15f_1_2_b7c2e899c9acece4",
+        "chunk_index": 2
+      }
+    },
+    {
+      "benchmark_id": "neutral-12",
+      "case_id": "neutral-12",
+      "neutral_question": "Find documentary material naming Bruce Archer in archival asset 476447008358.",
+      "question_type": "person_associated_with_source",
+      "expected_authority_ids": [
+        "BRUCEARCHE"
+      ],
+      "expected_canonical_document_ids": [
+        "doc_338541406157_30a4669bc03d"
+      ],
+      "expected_canonical_assets": [
+        "179e32df37e64a76e351fa88018bea6f08c0f133b8496c1246c2c77d2caee299"
+      ],
+      "expected_asset_pids": [
+        "476447008358"
+      ],
+      "expected_passage_ids": [
+        "turin_doc_338541406157_30a4669bc03d_1_2_74881a69af40c449"
+      ],
+      "expected_passage_chunk_ids": [
+        "turin_doc_338541406157_30a4669bc03d_1_2_74881a69af40c449"
+      ],
+      "expected_relation_type": "PERSON_ASSOCIATED_WITH_SOURCE",
+      "why_ground_truth_is_objective": "Persisted exact graph edge and exact authority-label occurrence in the identified governed chunk.",
+      "ground_truth_derivation": {
+        "snapshot_version": "turin-archive-authority-graph-v1",
+        "authority_type": "agent_employment",
+        "authority_id": "BRUCEARCHE",
+        "document_id": "doc_338541406157_30a4669bc03d",
+        "asset_id": "179e32df37e64a76e351fa88018bea6f08c0f133b8496c1246c2c77d2caee299",
+        "asset_pid": "476447008358",
+        "chunk_id": "turin_doc_338541406157_30a4669bc03d_1_2_74881a69af40c449",
+        "chunk_index": 2
+      }
+    },
+    {
+      "benchmark_id": "neutral-13",
+      "case_id": "neutral-13",
+      "neutral_question": "Find documentary material naming Bruce Archer in archival asset 721621453325.",
+      "question_type": "person_associated_with_source",
+      "expected_authority_ids": [
+        "BRUCEARCHE"
+      ],
+      "expected_canonical_document_ids": [
+        "doc_338541406157_3c95cfa4ad23"
+      ],
+      "expected_canonical_assets": [
+        "0359fe3564fb41ef785b138ddee084a56e1b904513267ed3510db0187a2a2ad8"
+      ],
+      "expected_asset_pids": [
+        "721621453325"
+      ],
+      "expected_passage_ids": [
+        "turin_doc_338541406157_3c95cfa4ad23_1_2_066439453ca46f49"
+      ],
+      "expected_passage_chunk_ids": [
+        "turin_doc_338541406157_3c95cfa4ad23_1_2_066439453ca46f49"
+      ],
+      "expected_relation_type": "PERSON_ASSOCIATED_WITH_SOURCE",
+      "why_ground_truth_is_objective": "Persisted exact graph edge and exact authority-label occurrence in the identified governed chunk.",
+      "ground_truth_derivation": {
+        "snapshot_version": "turin-archive-authority-graph-v1",
+        "authority_type": "agent_employment",
+        "authority_id": "BRUCEARCHE",
+        "document_id": "doc_338541406157_3c95cfa4ad23",
+        "asset_id": "0359fe3564fb41ef785b138ddee084a56e1b904513267ed3510db0187a2a2ad8",
+        "asset_pid": "721621453325",
+        "chunk_id": "turin_doc_338541406157_3c95cfa4ad23_1_2_066439453ca46f49",
+        "chunk_index": 2
+      }
+    },
+    {
+      "benchmark_id": "neutral-14",
+      "case_id": "neutral-14",
+      "neutral_question": "Find documentary material naming Bruce Archer in archival asset 023074909505.",
+      "question_type": "person_associated_with_source",
+      "expected_authority_ids": [
+        "BRUCEARCHE"
+      ],
+      "expected_canonical_document_ids": [
+        "doc_338541406157_92fc6d9bc38e"
+      ],
+      "expected_canonical_assets": [
+        "c6614b78f1365a675bd836d010918bc969d2c1ad072f606060a52f5aa8fc94e2"
+      ],
+      "expected_asset_pids": [
+        "023074909505"
+      ],
+      "expected_passage_ids": [
+        "turin_doc_338541406157_92fc6d9bc38e_3_36_dc3201af280fe02c"
+      ],
+      "expected_passage_chunk_ids": [
+        "turin_doc_338541406157_92fc6d9bc38e_3_36_dc3201af280fe02c"
+      ],
+      "expected_relation_type": "PERSON_ASSOCIATED_WITH_SOURCE",
+      "why_ground_truth_is_objective": "Persisted exact graph edge and exact authority-label occurrence in the identified governed chunk.",
+      "ground_truth_derivation": {
+        "snapshot_version": "turin-archive-authority-graph-v1",
+        "authority_type": "agent_employment",
+        "authority_id": "BRUCEARCHE",
+        "document_id": "doc_338541406157_92fc6d9bc38e",
+        "asset_id": "c6614b78f1365a675bd836d010918bc969d2c1ad072f606060a52f5aa8fc94e2",
+        "asset_pid": "023074909505",
+        "chunk_id": "turin_doc_338541406157_92fc6d9bc38e_3_36_dc3201af280fe02c",
+        "chunk_index": 36
+      }
+    },
+    {
+      "benchmark_id": "neutral-15",
+      "case_id": "neutral-15",
+      "neutral_question": "Find documentary material naming Bruce Archer in archival asset 165684415676.",
+      "question_type": "person_associated_with_source",
+      "expected_authority_ids": [
+        "BRUCEARCHE"
+      ],
+      "expected_canonical_document_ids": [
+        "doc_338541406157_ba2e3cef8801"
+      ],
+      "expected_canonical_assets": [
+        "61d4f5e89f88a5f625f73896a34c72097b396e9b17360391cfb092934b3070c1"
+      ],
+      "expected_asset_pids": [
+        "165684415676"
+      ],
+      "expected_passage_ids": [
+        "turin_doc_338541406157_ba2e3cef8801_12_61_c3c093dd0e06f597"
+      ],
+      "expected_passage_chunk_ids": [
+        "turin_doc_338541406157_ba2e3cef8801_12_61_c3c093dd0e06f597"
+      ],
+      "expected_relation_type": "PERSON_ASSOCIATED_WITH_SOURCE",
+      "why_ground_truth_is_objective": "Persisted exact graph edge and exact authority-label occurrence in the identified governed chunk.",
+      "ground_truth_derivation": {
+        "snapshot_version": "turin-archive-authority-graph-v1",
+        "authority_type": "agent_employment",
+        "authority_id": "BRUCEARCHE",
+        "document_id": "doc_338541406157_ba2e3cef8801",
+        "asset_id": "61d4f5e89f88a5f625f73896a34c72097b396e9b17360391cfb092934b3070c1",
+        "asset_pid": "165684415676",
+        "chunk_id": "turin_doc_338541406157_ba2e3cef8801_12_61_c3c093dd0e06f597",
+        "chunk_index": 61
+      }
+    },
+    {
+      "benchmark_id": "neutral-16",
+      "case_id": "neutral-16",
+      "neutral_question": "Find documentary material naming Bruce Archer in archival asset 451967247044.",
+      "question_type": "person_associated_with_source",
+      "expected_authority_ids": [
+        "BRUCEARCHE"
+      ],
+      "expected_canonical_document_ids": [
+        "doc_338541406157_c12bf4363463"
+      ],
+      "expected_canonical_assets": [
+        "1476a4badf161b3d7b0c9ccc3b55479aff97cf4c6f282688f3c1b69543f269ab"
+      ],
+      "expected_asset_pids": [
+        "451967247044"
+      ],
+      "expected_passage_ids": [
+        "turin_doc_338541406157_c12bf4363463_3_40_5be6e91513802724"
+      ],
+      "expected_passage_chunk_ids": [
+        "turin_doc_338541406157_c12bf4363463_3_40_5be6e91513802724"
+      ],
+      "expected_relation_type": "PERSON_ASSOCIATED_WITH_SOURCE",
+      "why_ground_truth_is_objective": "Persisted exact graph edge and exact authority-label occurrence in the identified governed chunk.",
+      "ground_truth_derivation": {
+        "snapshot_version": "turin-archive-authority-graph-v1",
+        "authority_type": "agent_employment",
+        "authority_id": "BRUCEARCHE",
+        "document_id": "doc_338541406157_c12bf4363463",
+        "asset_id": "1476a4badf161b3d7b0c9ccc3b55479aff97cf4c6f282688f3c1b69543f269ab",
+        "asset_pid": "451967247044",
+        "chunk_id": "turin_doc_338541406157_c12bf4363463_3_40_5be6e91513802724",
+        "chunk_index": 40
+      }
+    },
+    {
+      "benchmark_id": "neutral-17",
+      "case_id": "neutral-17",
+      "neutral_question": "Find documentary material naming Bruce Archer in archival asset 084230409963.",
+      "question_type": "person_associated_with_source",
+      "expected_authority_ids": [
+        "BRUCEARCHE"
+      ],
+      "expected_canonical_document_ids": [
+        "doc_404613335296_abe79cd10b57"
+      ],
+      "expected_canonical_assets": [
+        "326075798e9d480c7082904ec70a2797db1765ee693a16c0d055c8486d870d9b"
+      ],
+      "expected_asset_pids": [
+        "084230409963"
+      ],
+      "expected_passage_ids": [
+        "turin_doc_404613335296_abe79cd10b57_1_4_fb6eb417b21587cc"
+      ],
+      "expected_passage_chunk_ids": [
+        "turin_doc_404613335296_abe79cd10b57_1_4_fb6eb417b21587cc"
+      ],
+      "expected_relation_type": "PERSON_ASSOCIATED_WITH_SOURCE",
+      "why_ground_truth_is_objective": "Persisted exact graph edge and exact authority-label occurrence in the identified governed chunk.",
+      "ground_truth_derivation": {
+        "snapshot_version": "turin-archive-authority-graph-v1",
+        "authority_type": "agent_employment",
+        "authority_id": "BRUCEARCHE",
+        "document_id": "doc_404613335296_abe79cd10b57",
+        "asset_id": "326075798e9d480c7082904ec70a2797db1765ee693a16c0d055c8486d870d9b",
+        "asset_pid": "084230409963",
+        "chunk_id": "turin_doc_404613335296_abe79cd10b57_1_4_fb6eb417b21587cc",
+        "chunk_index": 4
+      }
+    },
+    {
+      "benchmark_id": "neutral-18",
+      "case_id": "neutral-18",
+      "neutral_question": "Find documentary material naming Bruce Archer in archival asset 073893702140.",
+      "question_type": "person_associated_with_source",
+      "expected_authority_ids": [
+        "BRUCEARCHE"
+      ],
+      "expected_canonical_document_ids": [
+        "doc_413217298959_85ccf18fd324"
+      ],
+      "expected_canonical_assets": [
+        "2d915fd74604f93b8d229427b02c6fdb862e1db8ff08b7671389c15fa8e66980"
+      ],
+      "expected_asset_pids": [
+        "073893702140"
+      ],
+      "expected_passage_ids": [
+        "turin_doc_413217298959_85ccf18fd324_1_5_6a131aeb363243dc"
+      ],
+      "expected_passage_chunk_ids": [
+        "turin_doc_413217298959_85ccf18fd324_1_5_6a131aeb363243dc"
+      ],
+      "expected_relation_type": "PERSON_ASSOCIATED_WITH_SOURCE",
+      "why_ground_truth_is_objective": "Persisted exact graph edge and exact authority-label occurrence in the identified governed chunk.",
+      "ground_truth_derivation": {
+        "snapshot_version": "turin-archive-authority-graph-v1",
+        "authority_type": "agent_employment",
+        "authority_id": "BRUCEARCHE",
+        "document_id": "doc_413217298959_85ccf18fd324",
+        "asset_id": "2d915fd74604f93b8d229427b02c6fdb862e1db8ff08b7671389c15fa8e66980",
+        "asset_pid": "073893702140",
+        "chunk_id": "turin_doc_413217298959_85ccf18fd324_1_5_6a131aeb363243dc",
+        "chunk_index": 5
+      }
+    },
+    {
+      "benchmark_id": "neutral-19",
+      "case_id": "neutral-19",
+      "neutral_question": "Find documentary material naming Bruce Archer in archival asset 208660726919.",
+      "question_type": "person_associated_with_source",
+      "expected_authority_ids": [
+        "BRUCEARCHE"
+      ],
+      "expected_canonical_document_ids": [
+        "doc_521129471965_1ff812723a53"
+      ],
+      "expected_canonical_assets": [
+        "190ba63d580cf153217270f1eef55adfa44bb34dee65710fac6d4a14122a0b3a"
+      ],
+      "expected_asset_pids": [
+        "208660726919"
+      ],
+      "expected_passage_ids": [
+        "turin_doc_521129471965_1ff812723a53_23_6_7ffb2f86c1430a26"
+      ],
+      "expected_passage_chunk_ids": [
+        "turin_doc_521129471965_1ff812723a53_23_6_7ffb2f86c1430a26"
+      ],
+      "expected_relation_type": "PERSON_ASSOCIATED_WITH_SOURCE",
+      "why_ground_truth_is_objective": "Persisted exact graph edge and exact authority-label occurrence in the identified governed chunk.",
+      "ground_truth_derivation": {
+        "snapshot_version": "turin-archive-authority-graph-v1",
+        "authority_type": "agent_employment",
+        "authority_id": "BRUCEARCHE",
+        "document_id": "doc_521129471965_1ff812723a53",
+        "asset_id": "190ba63d580cf153217270f1eef55adfa44bb34dee65710fac6d4a14122a0b3a",
+        "asset_pid": "208660726919",
+        "chunk_id": "turin_doc_521129471965_1ff812723a53_23_6_7ffb2f86c1430a26",
+        "chunk_index": 6
+      }
+    },
+    {
+      "benchmark_id": "neutral-20",
+      "case_id": "neutral-20",
+      "neutral_question": "Find documentary material naming Bruce Archer in archival asset 616870404126.",
+      "question_type": "person_associated_with_source",
+      "expected_authority_ids": [
+        "BRUCEARCHE"
+      ],
+      "expected_canonical_document_ids": [
+        "doc_521129471965_26e48f4ee403"
+      ],
+      "expected_canonical_assets": [
+        "09472f6e070663bdf9f03883775cfbd0045be963d7baaf1827f056ad3439bb37"
+      ],
+      "expected_asset_pids": [
+        "616870404126"
+      ],
+      "expected_passage_ids": [
+        "turin_doc_521129471965_26e48f4ee403_4_1_2e3df79b8a436929"
+      ],
+      "expected_passage_chunk_ids": [
+        "turin_doc_521129471965_26e48f4ee403_4_1_2e3df79b8a436929"
+      ],
+      "expected_relation_type": "PERSON_ASSOCIATED_WITH_SOURCE",
+      "why_ground_truth_is_objective": "Persisted exact graph edge and exact authority-label occurrence in the identified governed chunk.",
+      "ground_truth_derivation": {
+        "snapshot_version": "turin-archive-authority-graph-v1",
+        "authority_type": "agent_employment",
+        "authority_id": "BRUCEARCHE",
+        "document_id": "doc_521129471965_26e48f4ee403",
+        "asset_id": "09472f6e070663bdf9f03883775cfbd0045be963d7baaf1827f056ad3439bb37",
+        "asset_pid": "616870404126",
+        "chunk_id": "turin_doc_521129471965_26e48f4ee403_4_1_2e3df79b8a436929",
+        "chunk_index": 1
+      }
+    },
+    {
+      "benchmark_id": "neutral-21",
+      "case_id": "neutral-21",
+      "neutral_question": "Find documentary material naming Bruce Archer in archival asset 170814315604.",
+      "question_type": "person_associated_with_source",
+      "expected_authority_ids": [
+        "BRUCEARCHE"
+      ],
+      "expected_canonical_document_ids": [
+        "doc_521129471965_44eb2a374c00"
+      ],
+      "expected_canonical_assets": [
+        "1da2e231b8aaba9dea6cbec1406736fbb15adf59f68b0d7213a5017e51a4bba9"
+      ],
+      "expected_asset_pids": [
+        "170814315604"
+      ],
+      "expected_passage_ids": [
+        "turin_doc_521129471965_44eb2a374c00_4_2_0c44cc9d31af470b"
+      ],
+      "expected_passage_chunk_ids": [
+        "turin_doc_521129471965_44eb2a374c00_4_2_0c44cc9d31af470b"
+      ],
+      "expected_relation_type": "PERSON_ASSOCIATED_WITH_SOURCE",
+      "why_ground_truth_is_objective": "Persisted exact graph edge and exact authority-label occurrence in the identified governed chunk.",
+      "ground_truth_derivation": {
+        "snapshot_version": "turin-archive-authority-graph-v1",
+        "authority_type": "agent_employment",
+        "authority_id": "BRUCEARCHE",
+        "document_id": "doc_521129471965_44eb2a374c00",
+        "asset_id": "1da2e231b8aaba9dea6cbec1406736fbb15adf59f68b0d7213a5017e51a4bba9",
+        "asset_pid": "170814315604",
+        "chunk_id": "turin_doc_521129471965_44eb2a374c00_4_2_0c44cc9d31af470b",
+        "chunk_index": 2
+      }
+    },
+    {
+      "benchmark_id": "neutral-22",
+      "case_id": "neutral-22",
+      "neutral_question": "Find documentary material naming Bruce Archer in archival asset 468703944635.",
+      "question_type": "person_associated_with_source",
+      "expected_authority_ids": [
+        "BRUCEARCHE"
+      ],
+      "expected_canonical_document_ids": [
+        "doc_521129471965_947374206fd4"
+      ],
+      "expected_canonical_assets": [
+        "1743cb151134d784271501e09d84d62efa554ab5e5e803eea2f62b8d13a9c833"
+      ],
+      "expected_asset_pids": [
+        "468703944635"
+      ],
+      "expected_passage_ids": [
+        "turin_doc_521129471965_947374206fd4_22_0_5505052c30db8768"
+      ],
+      "expected_passage_chunk_ids": [
+        "turin_doc_521129471965_947374206fd4_22_0_5505052c30db8768"
+      ],
+      "expected_relation_type": "PERSON_ASSOCIATED_WITH_SOURCE",
+      "why_ground_truth_is_objective": "Persisted exact graph edge and exact authority-label occurrence in the identified governed chunk.",
+      "ground_truth_derivation": {
+        "snapshot_version": "turin-archive-authority-graph-v1",
+        "authority_type": "agent_employment",
+        "authority_id": "BRUCEARCHE",
+        "document_id": "doc_521129471965_947374206fd4",
+        "asset_id": "1743cb151134d784271501e09d84d62efa554ab5e5e803eea2f62b8d13a9c833",
+        "asset_pid": "468703944635",
+        "chunk_id": "turin_doc_521129471965_947374206fd4_22_0_5505052c30db8768",
+        "chunk_index": 0
+      }
+    },
+    {
+      "benchmark_id": "neutral-23",
+      "case_id": "neutral-23",
+      "neutral_question": "Find documentary material naming Bruce Archer in archival asset 164716629050.",
+      "question_type": "person_associated_with_source",
+      "expected_authority_ids": [
+        "BRUCEARCHE"
+      ],
+      "expected_canonical_document_ids": [
+        "doc_521129471965_d505803b82fd"
+      ],
+      "expected_canonical_assets": [
+        "57f0c33fbce50c3c5298dddb0d5b5a808f221e73b5549ae1ec569ef082d8fe55"
+      ],
+      "expected_asset_pids": [
+        "164716629050"
+      ],
+      "expected_passage_ids": [
+        "turin_doc_521129471965_d505803b82fd_4_0_3ae550037d0c51b3"
+      ],
+      "expected_passage_chunk_ids": [
+        "turin_doc_521129471965_d505803b82fd_4_0_3ae550037d0c51b3"
+      ],
+      "expected_relation_type": "PERSON_ASSOCIATED_WITH_SOURCE",
+      "why_ground_truth_is_objective": "Persisted exact graph edge and exact authority-label occurrence in the identified governed chunk.",
+      "ground_truth_derivation": {
+        "snapshot_version": "turin-archive-authority-graph-v1",
+        "authority_type": "agent_employment",
+        "authority_id": "BRUCEARCHE",
+        "document_id": "doc_521129471965_d505803b82fd",
+        "asset_id": "57f0c33fbce50c3c5298dddb0d5b5a808f221e73b5549ae1ec569ef082d8fe55",
+        "asset_pid": "164716629050",
+        "chunk_id": "turin_doc_521129471965_d505803b82fd_4_0_3ae550037d0c51b3",
+        "chunk_index": 0
+      }
+    },
+    {
+      "benchmark_id": "neutral-24",
+      "case_id": "neutral-24",
+      "neutral_question": "Find documentary material naming Bruce Archer in archival asset 769172953867.",
+      "question_type": "person_associated_with_source",
+      "expected_authority_ids": [
+        "BRUCEARCHE"
+      ],
+      "expected_canonical_document_ids": [
+        "doc_521129471965_f87a382bad1b"
+      ],
+      "expected_canonical_assets": [
+        "3b3a30e3c154f8312ee00b220dd932a95b9e30c8ee958999f09fc24dfbedd5b1"
+      ],
+      "expected_asset_pids": [
+        "769172953867"
+      ],
+      "expected_passage_ids": [
+        "turin_doc_521129471965_f87a382bad1b_6_1_22f09919afc64829"
+      ],
+      "expected_passage_chunk_ids": [
+        "turin_doc_521129471965_f87a382bad1b_6_1_22f09919afc64829"
+      ],
+      "expected_relation_type": "PERSON_ASSOCIATED_WITH_SOURCE",
+      "why_ground_truth_is_objective": "Persisted exact graph edge and exact authority-label occurrence in the identified governed chunk.",
+      "ground_truth_derivation": {
+        "snapshot_version": "turin-archive-authority-graph-v1",
+        "authority_type": "agent_employment",
+        "authority_id": "BRUCEARCHE",
+        "document_id": "doc_521129471965_f87a382bad1b",
+        "asset_id": "3b3a30e3c154f8312ee00b220dd932a95b9e30c8ee958999f09fc24dfbedd5b1",
+        "asset_pid": "769172953867",
+        "chunk_id": "turin_doc_521129471965_f87a382bad1b_6_1_22f09919afc64829",
+        "chunk_index": 1
+      }
+    }
+  ],
+  "sha256": "c3c37a6190c0ef81bd0ef577363f3212b0f0c4a90ae77bdcd02da80d8f08770f"
+}

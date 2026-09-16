@@ -78,3 +78,59 @@ test('Qwen V2 CI1 Stage A failure remains explicit without a synthetic answer', 
   await expect(page.getByText('Raw Stage A model output (immutable audit record)')).toBeVisible()
   await expect(page.getByRole('region', { name: 'Documentary evidence' })).toContainText('No documentary claim is asserted beyond the retrieved source stack.')
 })
+
+test('default interrogation renders the canonical staged exploratory projection', async ({ page }) => {
+  let requestBody
+  await page.route('**/api/analysis/interrogate', async (route) => {
+    requestBody = route.request().postDataJSON()
+    await route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({
+        query_id: 'exploratory-test',
+        mode: 'exploratory',
+        response_schema: 'turin-evidence-pipeline-v2-exploratory-projection',
+        status: 'completed',
+        persisted: false,
+        answer: 'A staged final synthesis answer.',
+        model: { name: 'qwen3:8b-q4_K_M' },
+        retrieved_evidence: [1, 2, 3, 4, 5].map(source),
+        documentary_evidence: [],
+        contextual_evidence: [],
+        inferences: [{ inference: 'Stage B interpretation.', origin: 'model', stage: 'cross_source' }],
+        contradictions: [{ description: 'A qualified difference.', origin: 'model', stage: 'cross_source' }],
+        missingness: [
+          { category: 'not_established', explanation: 'A model-scoped limit.', origin: 'model' },
+          { category: 'not_established', explanation: "The selected evidence does not directly establish the named subject's activity.", origin: 'system_pipeline' }
+        ],
+        provenance_validation: { valid: true, source_analyses: { valid: true }, final_synthesis: { valid: true } },
+        retrieval_diagnostics: { archive_candidate_count: 9, ml_eligible_candidate_count: 7, materialised_candidate_count: 6, retrieved_documentary_source_count: 5, corpus_representation_gaps: 1 },
+        authority_roles: {
+          planner_entity_resolution: [{ label: 'Designer-computer interaction in the early stages of design', authority_type: 'ddr_projects' }],
+          controlled_lexical_expansion: { used: true },
+          retrieval_nomination: { used: false },
+          qwen_authority_context: { supplied: false },
+          persisted_authority_audit: { persisted: false }
+        },
+        stage_execution: { classification: 'EXPLORATORY / NON-FORMAL INTERROGATION', stages: ['source_analysis', 'cross_source', 'final_synthesis'], call_count: 3 }
+      })
+    })
+  })
+
+  await page.goto('/source-interrogation')
+  await expect(page.locator('#trace-mode')).toHaveValue('runtime')
+  await page.locator('#query-input').fill('What documentary traces connect Job 171?')
+  await page.getByRole('button', { name: 'Run interrogation' }).click()
+
+  await expect(page.locator('.tracer__answer-body')).toHaveText('A staged final synthesis answer.')
+  await expect(page.getByRole('region', { name: 'Qwen interpretation' })).toContainText('Stage B interpretation.')
+  await expect(page.getByRole('region', { name: 'Qwen interpretation' })).toContainText('Stages run: source_analysis, cross_source, final_synthesis (3 Qwen calls).')
+  await expect(page.getByText('Retrieved passages: 5.')).toBeVisible()
+  await expect(page.getByText('Archive candidates: 9.')).toBeVisible()
+  await expect(page.getByText('Pipeline-derived:', { exact: true })).toBeVisible()
+  await expect(page.getByText('Model-generated:', { exact: true })).toBeVisible()
+  await expect(page.getByRole('region', { name: 'Database authority context' })).toContainText('Planner entity resolution: Designer-computer interaction in the early stages of design (ddr_projects).')
+  await expect(page.getByRole('region', { name: 'Database authority context' })).toContainText('Authority context supplied to Qwen: No.')
+  await expect(page.getByText('Exploratory / non-formal interrogation.')).toBeVisible()
+  await expect(page.getByText('No generated inference is asserted.')).toHaveCount(0)
+  expect(requestBody).toMatchObject({ mode: 'exploratory', top_k: 5 })
+})

@@ -1,0 +1,103 @@
+-- Authorize exactly one Q06 replacement after the recorded orphaned inference and write-ahead remediation.
+BEGIN;
+
+ALTER TABLE turin_formal_protocol_authorizations
+    DROP CONSTRAINT IF EXISTS turin_formal_protocol_authorizat_prior_non_evaluable_run_id_key;
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_turin_formal_protocol_authorization_prior_category
+    ON turin_formal_protocol_authorizations(prior_non_evaluable_run_id, authorization_category);
+
+ALTER TABLE turin_formal_protocol_authorizations
+    ADD COLUMN IF NOT EXISTS replacement_incident_id VARCHAR(255) REFERENCES turin_execution_incidents(incident_id) ON DELETE RESTRICT,
+    ADD COLUMN IF NOT EXISTS replacement_intended_run_id VARCHAR(255);
+
+ALTER TABLE turin_formal_protocol_authorizations
+    DROP CONSTRAINT IF EXISTS turin_formal_protocol_authorizations_governed_pair_check,
+    ADD CONSTRAINT turin_formal_protocol_authorizations_governed_pair_check CHECK (
+        (execution_protocol_version = 'turin-retrieval-protocol-v1.1'
+            AND authorization_category = 'protocol_v1_1_reexecution_after_non_evaluable_v1_0_commissioning')
+        OR (execution_protocol_version = 'turin-retrieval-protocol-v1.2'
+            AND authorization_category IN (
+                'protocol_v1_2_reexecution_after_v1_1_output_token_exhaustion',
+                'infrastructure_recovery_after_v1_2_read_timeout',
+                'orphaned_inference_replacement_after_write_ahead_persistence_remediation'
+            ))
+    ),
+    ADD CONSTRAINT turin_formal_protocol_authorizations_replacement_lineage_check CHECK (
+        (authorization_category = 'orphaned_inference_replacement_after_write_ahead_persistence_remediation'
+            AND replacement_incident_id = 'turin-q06-v12-orphaned-inference-incident'
+            AND replacement_intended_run_id = 'experiment-2604c21d4d1b')
+        OR (authorization_category <> 'orphaned_inference_replacement_after_write_ahead_persistence_remediation'
+            AND replacement_incident_id IS NULL
+            AND replacement_intended_run_id IS NULL)
+    );
+
+CREATE OR REPLACE FUNCTION validate_turin_failure_recovery()
+RETURNS TRIGGER AS $$
+DECLARE original_run experiment_runs%ROWTYPE;
+BEGIN
+    IF NEW.recovery_of_run_id IS NULL AND NEW.recovery_category IS NULL THEN
+        PERFORM pg_advisory_xact_lock(hashtext(COALESCE(NEW.question_id, '') || COALESCE(NEW.retrieval_protocol_version, '')));
+        IF NEW.retrieval_run_classification = 'primary' AND NEW.retrieval_scope = 'corpus_wide'
+           AND EXISTS (SELECT 1 FROM experiment_runs prior LEFT JOIN turin_formal_run_invalidations invalidation ON invalidation.invalidated_run_id = prior.run_id WHERE prior.question_id = NEW.question_id AND prior.retrieval_protocol_version = NEW.retrieval_protocol_version AND (prior.status IN ('completed', 'completed_with_missingness') OR prior.raw_model_response IS NOT NULL OR COALESCE(jsonb_typeof(prior.structured_response_json), 'null') <> 'null' OR COALESCE(jsonb_typeof(prior.provenance_validation_json), 'null') <> 'null') AND invalidation.invalidated_run_id IS NULL) THEN
+            RAISE EXCEPTION 'An evaluable primary result already exists for this question and protocol.';
+        END IF;
+        RETURN NEW;
+    END IF;
+    IF NEW.recovery_of_run_id IS NULL THEN RAISE EXCEPTION 'Formal recovery requires complete lineage.'; END IF;
+    SELECT * INTO original_run FROM experiment_runs WHERE run_id = NEW.recovery_of_run_id;
+    IF NOT FOUND OR NEW.question_id <> original_run.question_id OR NEW.retrieval_plan_id <> original_run.retrieval_plan_id OR NEW.retrieval_plan_version <> original_run.retrieval_plan_version OR NEW.retrieval_protocol_version <> original_run.retrieval_protocol_version OR NEW.corpus_version <> original_run.corpus_version OR NEW.retrieval_scope <> original_run.retrieval_scope OR NEW.retrieval_run_classification <> original_run.retrieval_run_classification THEN RAISE EXCEPTION 'Recovery must use the identical question, plan, protocol, corpus, scope, and classification.'; END IF;
+    IF NEW.recovery_category = 'infrastructure_recovery_after_v1_2_read_timeout' THEN
+        IF original_run.run_id <> 'experiment-3643a4fc2fb0' OR original_run.status <> 'failed' OR original_run.error_code <> 'granite_failure' OR original_run.error_message NOT LIKE 'ReadTimeout:%' OR original_run.raw_model_response IS NOT NULL OR original_run.raw_repair_response IS NOT NULL OR original_run.parse_status <> 'not_invoked' OR NOT (original_run.parsed_response_json IS NULL OR original_run.parsed_response_json = 'null'::jsonb) OR NOT (original_run.structured_response_json IS NULL OR original_run.structured_response_json IN ('null'::jsonb, '{}'::jsonb)) OR NOT (original_run.display_response_json IS NULL OR original_run.display_response_json IN ('null'::jsonb, '{}'::jsonb)) OR NOT (original_run.provenance_validation_json IS NULL OR original_run.provenance_validation_json IN ('null'::jsonb, '{}'::jsonb)) THEN RAISE EXCEPTION 'Recovery source is not the governed Q06 no-output ReadTimeout incident.'; END IF;
+        IF NOT EXISTS (SELECT 1 FROM turin_formal_protocol_authorizations a WHERE a.authorization_id = NEW.formal_authorization_id AND a.prior_non_evaluable_run_id = NEW.recovery_of_run_id AND a.question_id = NEW.question_id AND a.plan_id = NEW.retrieval_plan_id AND a.execution_protocol_version = NEW.retrieval_protocol_version AND a.corpus_version = NEW.corpus_version AND a.authorization_category = NEW.recovery_category) THEN RAISE EXCEPTION 'Recovery requires its exact formal authorization.'; END IF;
+        IF EXISTS (SELECT 1 FROM turin_execution_incidents i WHERE i.authorization_id = NEW.formal_authorization_id) THEN RAISE EXCEPTION 'Formal authorization is logically spent by a recorded execution incident.'; END IF;
+    ELSIF NEW.recovery_category = 'orphaned_inference_replacement_after_write_ahead_persistence_remediation' THEN
+        IF original_run.run_id <> 'experiment-3643a4fc2fb0' OR original_run.status <> 'failed' OR original_run.error_code <> 'granite_failure' OR original_run.error_message NOT LIKE 'ReadTimeout:%' OR original_run.raw_model_response IS NOT NULL OR original_run.raw_repair_response IS NOT NULL OR original_run.parse_status <> 'not_invoked' THEN RAISE EXCEPTION 'Replacement source is not the governed Q06 no-output ReadTimeout parent.'; END IF;
+        IF NOT EXISTS (SELECT 1 FROM turin_formal_protocol_authorizations a JOIN turin_execution_incidents i ON i.incident_id = a.replacement_incident_id WHERE a.authorization_id = NEW.formal_authorization_id AND a.prior_non_evaluable_run_id = NEW.recovery_of_run_id AND a.question_id = NEW.question_id AND a.plan_id = NEW.retrieval_plan_id AND a.execution_protocol_version = NEW.retrieval_protocol_version AND a.corpus_version = NEW.corpus_version AND a.authorization_category = NEW.recovery_category AND i.incident_id = 'turin-q06-v12-orphaned-inference-incident' AND i.intended_run_id = 'experiment-2604c21d4d1b' AND i.parent_run_id = NEW.recovery_of_run_id AND i.question_id = NEW.question_id AND i.incident_category = 'post_generation_persistence_failure' AND i.granite_http_status = 200 AND i.raw_response_durably_persisted = false) THEN RAISE EXCEPTION 'Replacement requires its exact orphaned-inference authorization and incident lineage.'; END IF;
+    ELSIF NEW.recovery_category = 'infrastructure_failure_before_inference' THEN
+        IF original_run.status <> 'failed' OR original_run.error_code <> 'granite_failure' OR original_run.raw_model_response IS NOT NULL OR original_run.model_name IS NOT NULL OR original_run.inference_duration_ms IS NOT NULL OR original_run.parse_status <> 'not_invoked' THEN RAISE EXCEPTION 'Recovery source is not a failed-before-inference infrastructure attempt.'; END IF;
+        IF NOT EXISTS (SELECT 1 FROM turin_formal_run_recoveries audit_record WHERE audit_record.recovery_of_run_id = NEW.recovery_of_run_id AND audit_record.plan_id = NEW.retrieval_plan_id AND audit_record.protocol_version = NEW.retrieval_protocol_version AND audit_record.corpus_version = NEW.corpus_version AND audit_record.recovery_category = NEW.recovery_category) THEN RAISE EXCEPTION 'Recovery requires an append-only authorized recovery record.'; END IF;
+    ELSIF NEW.recovery_category = 'instrument_implementation_correction' THEN
+        IF original_run.status <> 'failed' OR original_run.error_code <> 'provenance_validation_failure' OR original_run.raw_model_response IS NULL OR NOT EXISTS (SELECT 1 FROM turin_formal_run_invalidations invalidation WHERE invalidation.invalidated_run_id = original_run.run_id AND invalidation.invalidation_category = 'instrument_implementation_correction' AND invalidation.defect_code = 'citation_contract_ambiguity' AND invalidation.plan_id = NEW.retrieval_plan_id AND invalidation.protocol_version = NEW.retrieval_protocol_version AND invalidation.corpus_version = NEW.corpus_version AND invalidation.model_name = NEW.model_name AND invalidation.max_tokens = (NEW.model_parameters_json->>'max_tokens')::integer AND invalidation.temperature = (NEW.model_parameters_json->>'temperature')::double precision AND invalidation.top_p = (NEW.model_parameters_json->>'top_p')::double precision AND invalidation.do_sample = (NEW.model_parameters_json->>'do_sample')::boolean) THEN RAISE EXCEPTION 'Recovery source is not a documented instrument implementation defect with identical governed model configuration.'; END IF;
+        IF NOT EXISTS (SELECT 1 FROM turin_formal_run_recoveries audit_record WHERE audit_record.recovery_of_run_id = NEW.recovery_of_run_id AND audit_record.plan_id = NEW.retrieval_plan_id AND audit_record.protocol_version = NEW.retrieval_protocol_version AND audit_record.corpus_version = NEW.corpus_version AND audit_record.recovery_category = NEW.recovery_category) THEN RAISE EXCEPTION 'Recovery requires an append-only authorized recovery record.'; END IF;
+    ELSE
+        RAISE EXCEPTION 'Unsupported formal recovery category.';
+    END IF;
+    IF EXISTS (SELECT 1 FROM experiment_runs prior WHERE prior.recovery_of_run_id = NEW.recovery_of_run_id) THEN RAISE EXCEPTION 'Only one formal recovery execution is permitted for a recovery source.'; END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+WITH prerequisites AS (
+    SELECT 1
+    WHERE EXISTS (
+        SELECT 1 FROM turin_retrieval_plans
+        WHERE plan_id = 'CI2-v1' AND question_id = 'CI2' AND plan_version = '1.0'
+          AND protocol_version = 'turin-retrieval-protocol-v1.0' AND researcher_approval_state = 'approved'
+          AND run_classification = 'primary' AND plan_json->>'retrieval_scope' = 'corpus_wide'
+          AND (plan_json->>'top_k')::integer = 5
+    )
+    AND EXISTS (SELECT 1 FROM turin_retrieval_protocol_amendments WHERE protocol_version = 'turin-retrieval-protocol-v1.2' AND amendment_scope = 'structured_output_capacity' AND amendment_json->>'structured_output_max_tokens' = '500')
+    AND (SELECT count(*) FROM turin_execution_incidents WHERE incident_id = 'turin-q06-v12-orphaned-inference-incident' AND authorization_id = 'turin-q06-v12-read-timeout-infrastructure-recovery-authorization' AND intended_run_id = 'experiment-2604c21d4d1b' AND parent_run_id = 'experiment-3643a4fc2fb0' AND question_id = 'CI2' AND incident_category = 'post_generation_persistence_failure' AND granite_http_status = 200 AND raw_response_durably_persisted = false) = 1
+    AND EXISTS (SELECT 1 FROM turin_formal_protocol_authorizations WHERE authorization_id = 'turin-q06-v12-read-timeout-infrastructure-recovery-authorization')
+    AND (SELECT count(*) FROM experiment_runs WHERE question_id = 'CI2' AND retrieval_scope = 'corpus_wide' AND retrieval_run_classification = 'primary' AND status IN ('completed', 'completed_with_missingness') AND parse_status = 'parsed') = 0
+    AND (SELECT count(*) FROM experiment_runs WHERE recovery_of_run_id = 'experiment-3643a4fc2fb0') = 0
+    AND (SELECT count(*) FROM experiment_runs WHERE question_id IN ('CI3', 'CI4', 'SM1', 'SM2', 'SM3', 'SM4')) = 0
+    AND NOT EXISTS (SELECT 1 FROM turin_formal_protocol_authorizations WHERE authorization_category = 'orphaned_inference_replacement_after_write_ahead_persistence_remediation')
+)
+INSERT INTO turin_formal_protocol_authorizations (
+    authorization_id, prior_non_evaluable_run_id, question_id, plan_id, plan_version, plan_protocol_version,
+    execution_protocol_version, corpus_version, retrieval_scope, run_classification, authorization_category,
+    model_name, model_parameters_json, replacement_incident_id, replacement_intended_run_id
+)
+SELECT
+    'turin-q06-v12-orphaned-inference-write-ahead-replacement-authorization',
+    'experiment-3643a4fc2fb0', 'CI2', 'CI2-v1', '1.0', 'turin-retrieval-protocol-v1.0',
+    'turin-retrieval-protocol-v1.2', 'corpus_f40d78dbce52', 'corpus_wide', 'primary',
+    'orphaned_inference_replacement_after_write_ahead_persistence_remediation',
+    'granite3.1-dense:2b-instruct-q4_K_M',
+    '{"max_tokens": 500, "temperature": 0.0, "top_p": 1.0, "do_sample": false, "granite_timeout_seconds": 600}'::jsonb,
+    'turin-q06-v12-orphaned-inference-incident', 'experiment-2604c21d4d1b'
+FROM prerequisites;
+
+COMMIT;

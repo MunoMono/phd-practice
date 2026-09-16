@@ -10,7 +10,7 @@ const ExperimentalLog = () => {
       <Column>
         <PageHeader
           title="Experimental log"
-          description="IBM Granite fine-tuning runs with complete provenance. Track which PIDs trained which model version for reproducibility."
+          description="Historical model fine-tuning runs with complete provenance. Track which PIDs trained which model version for reproducibility."
           actions={(
             <Tag type="purple" size="md">
               <Chemistry size={16} /> Training runs

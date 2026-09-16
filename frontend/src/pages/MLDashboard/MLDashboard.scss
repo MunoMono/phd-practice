@@ -1,0 +1,296 @@
+@use '@carbon/react/scss/spacing' as *;
+@use '@carbon/react/scss/type' as *;
+@use '@carbon/react/scss/theme' as *;
+@use '@carbon/react/scss/breakpoint' as *;
+
+.ml-dashboard {
+  background-color: $layer-01;
+  min-height: 100vh;
+}
+
+.ml-dashboard-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+}
+
+.dashboard-header {
+  margin-bottom: $spacing-01;
+}
+
+.stats-tile {
+  height: 100%;
+  padding: $spacing-05;
+  display: flex;
+  gap: $spacing-05;
+  transition: all 0.2s ease;
+  border: 1px solid $border-subtle-01;
+
+  &:hover {
+    transform: translateY(-2px);
+    border-color: $border-interactive;
+  }
+
+  .stats-icon {
+    color: $icon-primary;
+    flex-shrink: 0;
+  }
+
+  .stats-content {
+    flex: 1;
+  }
+
+  .stats-number {
+    @include type-style('heading-04');
+    color: $text-primary;
+    margin: 0 0 $spacing-02 0;
+  }
+
+  .stats-label {
+    @include type-style('label-01');
+    color: $text-secondary;
+    margin: 0 0 $spacing-03 0;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .stats-meta {
+    @include type-style('helper-text-01');
+    color: $text-secondary;
+    margin-top: $spacing-03;
+  }
+
+  .cds--progress-bar {
+    margin-top: $spacing-03;
+  }
+}
+
+.visualization-section {
+  margin: $spacing-07 0;
+
+  .cds--tabs {
+    background-color: $layer-01;
+  }
+
+  .cds--tab-content {
+    padding: 0;
+  }
+}
+
+.visualization-tile {
+  padding: $spacing-06;
+  min-height: 600px;
+  background-color: $layer-01;
+  border: 1px solid $border-subtle-01;
+
+  &__header {
+    margin-bottom: $spacing-06;
+    padding-bottom: $spacing-05;
+    border-bottom: 1px solid $border-subtle-01;
+  }
+}
+
+.activity-tile {
+  padding: $spacing-06;
+  border: 1px solid $border-subtle-01;
+
+  &__header {
+    margin-bottom: $spacing-05;
+  }
+
+  .activity-table {
+    margin-bottom: $spacing-05;
+  }
+
+  .no-activity {
+    @include type-style('body-01');
+    color: $text-secondary;
+    padding: $spacing-07 0;
+    text-align: center;
+  }
+
+  .activity-footer {
+    @include type-style('helper-text-01');
+    color: $text-secondary;
+    padding-top: $spacing-05;
+    border-top: 1px solid $border-subtle-01;
+  }
+}
+
+.granite-chat-tile {
+  padding: $spacing-06;
+  margin-bottom: $spacing-07;
+  border: 1px solid $border-subtle-01;
+}
+
+.granite-chat__header {
+  margin-bottom: $spacing-05;
+}
+
+.granite-chat__history {
+  max-height: 28rem;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-04;
+  padding: $spacing-02 0 $spacing-05;
+  margin-bottom: $spacing-05;
+  border-top: 1px solid $border-subtle-01;
+  border-bottom: 1px solid $border-subtle-01;
+}
+
+.granite-chat__message {
+  max-width: 88%;
+  padding: $spacing-04;
+  border-radius: 1rem;
+  background: $layer-accent-01;
+}
+
+.granite-chat__message--user {
+  align-self: flex-end;
+  background: $layer-selected-inverse;
+  color: $text-inverse;
+
+  .granite-chat__message-body,
+  .granite-chat__meta {
+    color: $text-inverse;
+  }
+}
+
+.granite-chat__message--assistant {
+  align-self: flex-start;
+}
+
+.granite-chat__message-head {
+  margin-bottom: $spacing-03;
+}
+
+.granite-chat__message-body {
+  @include type-style('body-01');
+  white-space: pre-wrap;
+  color: $text-primary;
+}
+
+.granite-chat__meta {
+  display: flex;
+  gap: $spacing-05;
+  flex-wrap: wrap;
+  margin-top: $spacing-03;
+  @include type-style('helper-text-01');
+  color: $text-secondary;
+}
+
+.granite-chat__loading {
+  padding: $spacing-03 0;
+}
+
+.granite-chat__sources {
+  margin-top: $spacing-04;
+  padding-top: $spacing-03;
+  border-top: 1px solid $border-subtle-01;
+}
+
+.granite-chat__sources-label {
+  @include type-style('label-01');
+  color: $text-secondary;
+  display: block;
+  margin-bottom: $spacing-02;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.granite-chat__source-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-03;
+}
+
+.granite-chat__source-item {
+  @include type-style('helper-text-01');
+  line-height: 1.5;
+}
+
+.granite-chat__source-quote {
+  font-style: italic;
+  color: $text-primary;
+}
+
+.granite-chat__source-ref {
+  color: $text-secondary;
+}
+
+.granite-chat__source-pid {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.7rem;
+  color: $text-placeholder;
+}
+
+.granite-chat__composer {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: $spacing-04;
+  align-items: end;
+}
+
+// Carbon DataTable overrides
+.activity-tile {
+  .cds--data-table {
+    background-color: transparent;
+  }
+
+  .cds--data-table thead {
+    background-color: $layer-accent-01;
+  }
+
+  .cds--data-table tbody tr:hover {
+    background-color: $layer-hover-01;
+  }
+
+  .cds--tag {
+    min-width: 80px;
+    justify-content: center;
+  }
+}
+
+// Responsive adjustments
+@include breakpoint-down(lg) {
+  .stats-tile {
+    flex-direction: column;
+    text-align: center;
+
+    .stats-icon {
+      align-self: center;
+    }
+  }
+}
+
+@include breakpoint-down(md) {
+  .visualization-tile {
+    padding: $spacing-05;
+    min-height: 400px;
+  }
+
+  .activity-tile {
+    padding: $spacing-05;
+  }
+
+  .granite-chat-tile {
+    padding: $spacing-05;
+  }
+
+  .granite-chat__header {
+    flex-direction: column;
+  }
+
+  .granite-chat__message {
+    max-width: 100%;
+  }
+
+  .granite-chat__composer {
+    grid-template-columns: 1fr;
+  }
+}

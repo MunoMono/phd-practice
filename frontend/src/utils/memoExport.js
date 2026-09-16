@@ -119,6 +119,11 @@ export const buildEvidenceTraceMemo = ({ trace, generatedAt = new Date() }) => {
   ]
   appendSection(lines, 'Retrieval', retrievalLines)
   appendSection(lines, 'Retrieval diagnostics', retrievalDiagnosticLines(trace.retrievalDiagnostics))
+  appendSection(lines, 'Evidence accounting', [
+    ...(Number.isInteger(trace.retrievalDiagnostics?.direct_documentary_claim_count) ? [`- Direct documentary claims: ${trace.retrievalDiagnostics.direct_documentary_claim_count}`] : []),
+    ...(Number.isInteger(trace.retrievalDiagnostics?.final_direct_claim_count) ? [`- Final direct claims: ${trace.retrievalDiagnostics.final_direct_claim_count}`] : []),
+    ...(trace.retrievalDiagnostics?.source_classification_counts ? [`- Source classifications: ${Object.entries(trace.retrievalDiagnostics.source_classification_counts).map(([key, value]) => `${key}: ${value}`).join('; ')}`] : [])
+  ])
   appendSection(lines, 'Retrieved source-document evidence', sourceLines ? [sourceLines] : [])
   appendSection(lines, 'Archive / database authority context', (trace.authorityEvidence || []).map((item) => `- ${formatAuthorityContext(item)}`))
 

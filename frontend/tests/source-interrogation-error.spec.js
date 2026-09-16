@@ -205,6 +205,69 @@ test('a successful structured interrogation renders separated evidence and sourc
   expect(pageErrors).toEqual([])
 })
 
+test('an immutable researcher capture renders source and model-claim provenance separately', async ({ page }) => {
+  const rawCapture = 'DIRECT DOCUMENTARY EVIDENCE\nS1 [DIRECT_SUPPORT]: CEDAR-2 is described.\n\nCONTESTED / QUALIFIED EVIDENCE\nNo relevant passage provides contested evidence.\n\nWHAT THE EVIDENCE DOES NOT ESTABLISH\nNo relevant passage establishes the reception of Job 171.\nEXACT REGISTERED QUESTION\nWhat documentary traces connect Job 171?'
+  await page.route('**/api/analysis/interrogate/captures/researcher-ui-capture-8ff3bed89a6f', async (route) => {
+    await route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({
+        capture_id: 'researcher-ui-capture-8ff3bed89a6f',
+        question_id: 'Q03',
+        exact_question: 'What evidence connects Ken Baynes and Phil Roberts within the work of the Design Education Unit?',
+        created_at: '2026-09-03T15:07:38Z',
+        corpus_version: 'corpus_turin_archive_first_cc11e8678168',
+        answer: rawCapture,
+        raw_model_response: rawCapture,
+        model_config: { model: 'qwen3:8b-q4_K_M' },
+        source_provenance: { valid: true, source_count: 5 },
+        retrieval_diagnostics: { retained_source_count: 5, candidate_count: null, reconstruction: 'retained capture source diagnostics' },
+        claim_provenance_result: { valid: false, claim_count: 4 },
+        claim_provenance: [
+          { claim_id: 'claim-1', section: 'DIRECT DOCUMENTARY EVIDENCE', claim_text: 'S1 [DIRECT_SUPPORT]: CEDAR-2 is described.', source_ids: ['S1'], provenance_status: 'PROVENANCE_PASS' },
+          { claim_id: 'claim-2', section: 'CONTESTED / QUALIFIED EVIDENCE', claim_text: 'No relevant passage provides contested evidence.', source_ids: [], provenance_status: 'UNCITED_CLAIM' },
+          { claim_id: 'claim-3', section: 'WHAT THE EVIDENCE DOES NOT ESTABLISH', claim_text: 'No relevant passage establishes the reception of Job 171.', source_ids: [], provenance_status: 'UNCITED_CLAIM' },
+          { claim_id: 'claim-4', section: 'WHAT THE EVIDENCE DOES NOT ESTABLISH', claim_text: 'EXACT REGISTERED QUESTION', source_ids: [], provenance_status: 'FORMAT_VIOLATION' }
+        ],
+        retrieved_sources: ['DIRECT_SUPPORT', 'CONTEXTUAL', 'CONTEXTUAL', 'CONTEXTUAL', 'CONTEXTUAL'].map((classification, index) => ({
+          source_id: `S${index + 1}`, chunk_id: `chunk-${index + 1}`, document_id: `document-${index + 1}`, pid: `PID-${index + 1}`,
+          page_start: index + 1, archive_resolution_status: 'resolved_current', excerpt: `Passage ${index + 1}.`,
+          snapshot: { title: `Document ${index + 1}`, provenance: { record_public_uri: `https://example.test/${index + 1}` } },
+          asset_pid: `ASSET-${index + 1}`,
+          archive_nomination: { display_date: `198${index}`, nomination_reasons: [] },
+          provenance: { record_public_uri: `https://example.test/${index + 1}`, archive_record_pid: `RECORD-${index + 1}`, attached_media_pid: `MEDIA-${index + 1}`, asset_pid: `ASSET-${index + 1}` }, evidence_classification: { source_id: `S${index + 1}`, classification }
+        }))
+      })
+    })
+  })
+
+  await page.goto('/source-interrogation?captureId=researcher-ui-capture-8ff3bed89a6f')
+  await expect(page.getByRole('textbox', { name: 'Research query' })).toHaveValue('What evidence connects Ken Baynes and Phil Roberts within the work of the Design Education Unit?')
+  await expect(page.getByRole('combobox', { name: 'Mode / model selector' })).toHaveValue('archive-first-one-shot')
+  await expect(page.getByRole('heading', { name: 'Source provenance' })).toBeVisible()
+  await expect(page.getByText('PASS Documentary passage archival/document/page chain: 5 sources.')).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Model-claim provenance' })).toBeVisible()
+  await expect(page.getByText('PARTIAL / requires researcher review.')).toBeVisible()
+  await expect(page.getByText('PROVENANCE_PASS')).toBeVisible()
+  await expect(page.getByText('UNCITED_CLAIM').first()).toBeVisible()
+  await expect(page.getByText('FORMAT_VIOLATION', { exact: true })).toBeVisible()
+  await expect(page.getByText('Model output contained unexpected structural/prompt-echo text.')).toBeVisible()
+  await expect(page.locator('.tracer__raw-capture pre')).toHaveText(rawCapture)
+  for (const sourceId of ['S1', 'S2', 'S3', 'S4', 'S5']) await expect(page.getByRole('heading', { name: `Source ${sourceId}` })).toBeVisible()
+  await expect(page.getByText('Direct support', { exact: true })).toBeVisible()
+  await expect(page.getByText('Contextual').first()).toBeVisible()
+  await expect(page.getByText('Archive nomination', { exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Retrieval diagnostics' })).toBeVisible()
+  await expect(page.getByText('Retained capture sources: 5.')).toBeVisible()
+  await expect(page.getByText('Date: 1980').first()).toBeVisible()
+  await expect(page.getByText('Archive identity: RECORD-1 → MEDIA-1 → ASSET-1')).toBeVisible()
+  await expect(page.getByText('Direct support for a component of the query; it does not alone establish every part of the registered question.')).toBeVisible()
+  await expect(page.getByText('No selected passage directly co-names Ken Baynes and Phil Roberts.')).toBeVisible()
+  await expect(page.getByText('These are limits of the selected documentary passages in this immutable capture, not evidence of archival absence.')).toBeVisible()
+  await expect(page.getByText('Baynes / Roberts / DEU documentary sources')).toBeVisible()
+  await expect(page.getByText('Evidence set', { exact: true })).toBeVisible()
+  await expect(page.getByText('One-shot Qwen', { exact: true })).toBeVisible()
+})
+
 test('a project authority interrogation renders job records without documentary claims', async ({ page }) => {
   const pageErrors = []
   page.on('pageerror', (error) => pageErrors.push(error.message))
@@ -356,6 +419,34 @@ test('a zero retrieval result distinguishes retrieval scope from historical abse
   const download = await readMemoDownload(page)
   expect(download.content).toContain('This is a retrieval-scope result, not evidence of historical absence.')
   expect(download.content).not.toContain('historical or archive-wide absence is established')
+})
+
+test('a selected-document retrieval limit remains deterministic and model-free', async ({ page }) => {
+  await page.route('**/api/analysis/interrogate', async (route) => {
+    await route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({
+        query_id: 'exploratory-targeted-limit-test', status: 'completed',
+        answer: 'No relevant passage was retrieved from the selected document under the current query and corpus configuration.',
+        answer_origin: 'targeted_document_evidence_limit',
+        model: { name: 'none', display_name: 'Targeted document retrieval', runtime: 'deterministic' },
+        retrieved_evidence: [], documentary_evidence: [], authority_evidence: [], inferences: [], contradictions: [],
+        missingness: [{ scope: 'selected_document', category: 'zero_retrieval', explanation: 'No relevant passage was retrieved from the selected document under the current query and corpus configuration.' }],
+        provenance_validation: { valid: true, source_count: 0, claim_count: 0, claim_provenance: [] },
+        stage_execution: { classification: 'TARGETED DOCUMENT EVIDENCE LIMIT', stages: ['explicit_document_selection'], call_count: 0 },
+        retrieval_diagnostics: { result_count: 0, notes: [] }
+      })
+    })
+  })
+
+  await page.goto('/source-interrogation')
+  await page.getByRole('textbox', { name: 'Research query' }).fill('What categories are shown in the selected figure?')
+  await page.getByRole('button', { name: 'Run interrogation' }).evaluate((button) => button.click())
+
+  await expect(page.locator('.tracer__answer-body')).toHaveText('No relevant passage was retrieved from the selected document under the current query and corpus configuration.')
+  await expect(page.getByText('Direct archive or database-authority result. No model synthesis was used.')).toBeVisible()
+  await expect(page.getByText('Not used. This result was determined from the selected-document retrieval result without model synthesis.')).toBeVisible()
+  await expect(page.getByText('Stages run: explicit_document_selection (0 Qwen calls).')).toBeVisible()
 })
 
 test('a temporal evidential limit preserves the requested-year scope', async ({ page }) => {

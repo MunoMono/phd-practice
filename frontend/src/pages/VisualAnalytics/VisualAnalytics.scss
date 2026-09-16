@@ -1,0 +1,260 @@
+@use '@carbon/react/scss/spacing' as *;
+@use '@carbon/react/scss/theme' as *;
+@use '@carbon/react/scss/breakpoint' as *;
+@use '@carbon/react/scss/type' as *;
+
+.visual-analytics-workbench {
+  --atlas-canvas-background: #ffffff;
+  display: grid;
+  grid-template-columns: 13.5rem minmax(0, 1fr) 16rem;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  height: calc(100vh - 8.125rem);
+  min-height: 34rem;
+  overflow: hidden;
+  background: $background;
+
+  &--controls-collapsed { grid-template-columns: minmax(0, 1fr) 16rem; }
+  &--inspector-collapsed { grid-template-columns: 13.5rem minmax(0, 1fr); }
+  &--controls-collapsed.visual-analytics-workbench--inspector-collapsed { grid-template-columns: minmax(0, 1fr); }
+
+  &__toolbar {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: max-content 14rem minmax(14rem, 24rem) minmax(10rem, 1fr) max-content max-content;
+    gap: $spacing-04;
+    align-items: end;
+    padding: $spacing-04 $spacing-05;
+    border-bottom: 1px solid $border-subtle-01;
+    background: $layer-01;
+  }
+
+  &__title { display: flex; gap: $spacing-03; align-items: center; @include type-style('heading-03'); }
+  &__scope { @include type-style('label-01'); color: $text-secondary; padding-bottom: $spacing-03; }
+  &__notification { grid-column: 1 / -1; }
+
+  &__controls, &__inspector {
+    overflow-y: auto;
+    padding: $spacing-04;
+    background: $layer-01;
+  }
+  &__controls { border-right: 1px solid $border-subtle-01; }
+  &__inspector { border-left: 1px solid $border-subtle-01; }
+  &__controls .cds--accordion__content { display: grid; gap: $spacing-04; }
+  &__controls p, &__inspector p { @include type-style('body-compact-01'); color: $text-secondary; }
+
+  &__map-region { min-width: 0; min-height: 0; position: relative; padding: $spacing-04; display: flex; flex-direction: column; background: $layer; }
+  &__map-header { display: flex; justify-content: space-between; gap: $spacing-05; align-items: start; }
+  &__map-actions { display: flex; gap: $spacing-03; align-items: center; }
+  &__map-header h1 { @include type-style('heading-04'); margin-bottom: $spacing-02; }
+  &__map-header p { @include type-style('body-compact-01'); color: $text-secondary; max-width: 50rem; }
+  &__canvas { display: block; flex: 1; width: 100%; min-height: 0; cursor: grab; border: 1px solid $border-subtle-01; touch-action: none; }
+  &__canvas:active { cursor: grabbing; }
+  &__empty-map { display: grid; place-items: center; flex: 1; min-height: 28rem; color: $text-secondary; border: 1px dashed $border-strong-01; }
+  &__hover { position: absolute; left: $spacing-06; bottom: $spacing-06; display: grid; gap: $spacing-02; max-width: 28rem; padding: $spacing-04; border-left: 3px solid $border-interactive; background: $layer-02; box-shadow: 0 2px 6px rgb(0 0 0 / 35%); @include type-style('label-01'); pointer-events: none; }
+  &__hover p { margin: 0; color: $text-secondary; @include type-style('body-compact-01'); }
+  &__hover span, &__hover small { color: $text-secondary; }
+
+  &__inspector .cds--tile { margin-top: $spacing-04; padding: $spacing-05; background: $layer-02; }
+  &__inspector h2 { @include type-style('heading-03'); }
+  &__inspector h3 { @include type-style('heading-01'); margin: $spacing-06 0 $spacing-02; }
+  &__excerpt { border-left: 3px solid $border-interactive; padding-left: $spacing-03; }
+  &__inspector dl { display: grid; grid-template-columns: 6rem minmax(0, 1fr); gap: $spacing-03; @include type-style('body-compact-01'); }
+  &__inspector dt { color: $text-secondary; }
+  &__inspector dd { margin: 0; overflow-wrap: anywhere; }
+  &__actions { display: flex; flex-wrap: wrap; gap: $spacing-02; margin-top: $spacing-05; }
+  &__neighbour-list { display: grid; gap: 1px; max-height: 14rem; overflow-y: auto; background: $border-subtle-01; }
+  &__neighbour-list button { display: grid; gap: $spacing-02; width: 100%; padding: $spacing-03; border: 0; background: $layer-01; color: $text-primary; text-align: left; cursor: pointer; }
+  &__neighbour-list button:hover { background: $layer-hover-01; }
+  &__neighbour-list small { color: $text-secondary; }
+
+  &__tray { grid-column: 1 / -1; display: grid; grid-template-columns: max-content max-content minmax(12rem, 1fr) minmax(18rem, 32rem) max-content; gap: $spacing-04; align-items: center; padding: $spacing-04 $spacing-05; border-top: 1px solid $border-subtle-01; background: $layer-01; @include type-style('body-compact-01'); }
+  &__tray .cds--text-area__wrapper { min-width: 0; }
+
+  @include breakpoint-down(lg) { grid-template-columns: 12rem minmax(0, 1fr); &__inspector { display: none; } &__toolbar { grid-template-columns: max-content 13rem minmax(14rem, 1fr) max-content max-content; } &__scope { display: none; } &__tray { grid-template-columns: max-content minmax(12rem, 1fr) minmax(16rem, 1fr) max-content; } }
+  @include breakpoint-down(md) { height: auto; min-height: calc(100vh - 8.125rem); overflow: visible; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(28rem, 1fr) auto; &__controls { display: none; } &__toolbar { grid-template-columns: 1fr 1fr; } &__toolbar .cds--search { grid-column: 1 / -1; } &__tray { grid-template-columns: 1fr; } }
+}
+
+.ddr-theme--dark .visual-analytics-workbench {
+  --atlas-canvas-background: #161616;
+}
+
+.visual-analytics-page {
+  &__status-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: $spacing-03;
+  }
+
+  &__framing-card,
+  &__controls,
+  &__projection-panel,
+  &__scope-panel,
+  &__coverage-panel {
+    background-color: $layer-01;
+    border: 1px solid $border-subtle-01;
+  }
+
+  &__framing-card {
+    min-height: 0;
+    padding: $spacing-05;
+
+    h3 {
+      @include type-style('heading-03');
+      margin-bottom: $spacing-03;
+    }
+
+    p {
+      @include type-style('body-compact-01');
+      margin-bottom: 0;
+    }
+  }
+
+  &__controls,
+  &__projection-panel,
+  &__scope-panel,
+  &__coverage-panel {
+    margin-top: $spacing-05;
+  }
+
+  &__controls-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: $spacing-05;
+
+    @include breakpoint-down(md) {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  &__controls-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: $spacing-04;
+    margin-top: $spacing-05;
+  }
+
+  &__panel-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: $spacing-03;
+    align-items: flex-start;
+  }
+
+  &__scope-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: $spacing-04;
+
+    p {
+      margin: 0;
+    }
+
+    @include breakpoint-down(md) {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  &__warning-list {
+    margin-top: $spacing-05;
+    display: grid;
+    gap: $spacing-03;
+
+    p {
+      margin: 0;
+      padding-left: $spacing-04;
+      border-left: 2px solid $support-warning;
+      color: $text-secondary;
+    }
+  }
+}
+
+.atlas-coverage-chart {
+  margin-top: $spacing-05;
+}
+
+.visual-inquiry-page {
+  &__controls,
+  &__projection,
+  &__chart,
+  &__results {
+    background-color: $layer-01;
+    border: 1px solid $border-subtle-01;
+  }
+
+  &__control-row {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    align-items: end;
+    gap: $spacing-05;
+    margin-top: $spacing-05;
+
+    @include breakpoint-down(md) {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  &__projection,
+  &__chart,
+  &__results {
+    margin-top: $spacing-05;
+  }
+
+  &__result {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 7rem 5rem;
+    width: 100%;
+    gap: $spacing-04;
+    padding: $spacing-04 0;
+    border: 0;
+    border-bottom: 1px solid $border-subtle-01;
+    background: transparent;
+    color: $text-primary;
+    cursor: pointer;
+    text-align: left;
+
+    span:last-child {
+      text-align: right;
+    }
+
+    &:hover {
+      color: $link-primary;
+    }
+
+    @include breakpoint-down(md) {
+      grid-template-columns: 1fr;
+
+      span:last-child {
+        text-align: left;
+      }
+    }
+  }
+}
+
+.challenge-map-page {
+  &__controls,
+  &__apparatus,
+  &__projection {
+    background-color: $layer-01;
+    border: 1px solid $border-subtle-01;
+  }
+
+  &__grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: $spacing-05;
+    margin: $spacing-05 0;
+
+    p {
+      margin: 0;
+    }
+
+    @include breakpoint-down(md) {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  &__apparatus,
+  &__projection {
+    margin-top: $spacing-05;
+  }
+}

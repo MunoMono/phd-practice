@@ -1,0 +1,139 @@
+@use '@carbon/react/scss/spacing' as *;
+@use '@carbon/react/scss/theme' as *;
+@use '@carbon/react/scss/breakpoint' as *;
+
+.evidence-tracer {
+  .tracer__visualization {
+    min-height: 32rem;
+    margin-top: $spacing-05;
+  }
+
+  .tracer__panel {
+    margin-top: $spacing-05;
+    background-color: $layer-01;
+    border: 1px solid $border-subtle-01;
+  }
+
+  .tracer__panel--query {
+    margin-top: 0;
+  }
+
+  .tracer__query-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 18rem;
+    gap: $spacing-05;
+
+    @include breakpoint-down(md) {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .tracer__query-actions {
+    display: flex;
+    align-items: center;
+    gap: $spacing-05;
+    margin-top: $spacing-05;
+
+    @include breakpoint-down(md) {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+  }
+
+  .tracer__answer-body {
+    white-space: pre-wrap;
+    line-height: 1.65;
+    color: $text-primary;
+  }
+
+  .tracer__answer-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: $spacing-03;
+  }
+
+  .tracer__answer-controls {
+    margin-top: $spacing-05;
+    display: flex;
+    flex-wrap: wrap;
+    gap: $spacing-05;
+    align-items: end;
+  }
+
+  .evidence-chain {
+    display: grid;
+    gap: $spacing-05;
+  }
+
+  .evidence-source-card {
+    background-color: $layer-accent-01;
+    border: 1px solid $border-subtle-01;
+    min-width: 0;
+  }
+
+  .evidence-source-card__header {
+    display: flex;
+    justify-content: space-between;
+    gap: $spacing-05;
+    margin-bottom: $spacing-04;
+
+    @include breakpoint-down(md) {
+      flex-direction: column;
+    }
+
+    > div {
+      min-width: 0;
+    }
+
+    h4 {
+      margin: 0 0 $spacing-02;
+      overflow-wrap: anywhere;
+    }
+
+    p {
+      margin: 0;
+      color: $text-secondary;
+      overflow-wrap: anywhere;
+    }
+  }
+
+  .evidence-source-card__tags,
+  .evidence-source-card__actions,
+  .evidence-source-card__meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: $spacing-03;
+  }
+
+  .evidence-source-card__meta {
+    font-size: 0.875rem;
+    color: $text-secondary;
+    margin-bottom: $spacing-04;
+
+    span {
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
+  }
+
+  .evidence-source-card__excerpt,
+  .evidence-source-card__citation,
+  .evidence-source-card__provenance {
+    margin-bottom: $spacing-04;
+    line-height: 1.55;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  .evidence-source-card__controls {
+    margin-bottom: $spacing-04;
+    max-width: 16rem;
+  }
+
+  .evidence-source-card__actions {
+    .cds--btn {
+      max-width: 100%;
+      white-space: normal;
+    }
+  }
+}

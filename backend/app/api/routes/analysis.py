@@ -222,12 +222,18 @@ def _catalogue_response(query: str, retrieval: dict[str, Any], authority_evidenc
         return None
 
     records = []
-    for source in sources:
+    for source_number, source in enumerate(sources, start=1):
         title = str(source.get("snapshot", {}).get("title") or source.get("title") or source.get("document_id") or "Untitled record")
         provenance = source.get("provenance") or {}
         asset_pid = provenance.get("asset_pid") or provenance.get("pid") or source.get("asset_pid") or source.get("pid") or "unavailable"
         page = source.get("page_start") or source.get("source_page") or "unavailable"
-        records.append({"title": title, "asset_pid": str(asset_pid), "page": page, "chunk_id": source.get("chunk_id")})
+        records.append({
+            "title": title,
+            "asset_pid": str(asset_pid),
+            "page": page,
+            "chunk_id": source.get("chunk_id"),
+            "source_number": source_number,
+        })
 
     unique_records = []
     seen = set()
@@ -246,6 +252,13 @@ def _catalogue_response(query: str, retrieval: dict[str, Any], authority_evidenc
         return None
     if authority_defined_question:
         unique_records = []
+    documentary_claims = [
+        {
+            "text": f"{record['title']} (Asset PID {record['asset_pid']}, p. {record['page']})",
+            "source_numbers": [record["source_number"]],
+        }
+        for record in unique_records
+    ]
     if not unique_records:
         lead = "No matching documentary record was retrieved."
     elif exact_job_lookup:
@@ -308,7 +321,10 @@ def _catalogue_response(query: str, retrieval: dict[str, Any], authority_evidenc
             lines.extend(["", *authority_block])
     return {
         "answer": "\n".join(lines),
-        "answer_paragraphs": [{"claims": authority_claims}] if authority_claims else [],
+        "answer_paragraphs": [
+            *([{"claims": documentary_claims}] if documentary_claims else []),
+            *([{"claims": authority_claims}] if authority_claims else []),
+        ],
         "records": unique_records,
         "subject": subject,
     }
@@ -437,8 +453,7 @@ def _project_staged_exploratory_response(
                 }
                 for source_id, _, excerpt, _, source in passages
             ]
-    generic_limit = "The DDR documents do not provide direct documentary evidence"
-    if generic_limit in answer and not evidence_map["DIRECT_DOCUMENTARY"]:
+    if not answer_origin and retrieval["results"] and not evidence_map["DIRECT_DOCUMENTARY"]:
         source_labels = []
         for source in retrieval["results"][:5]:
             title = str(source.get("snapshot", {}).get("title") or source.get("title") or source.get("document_id") or "Untitled record")
@@ -451,6 +466,13 @@ def _project_staged_exploratory_response(
                 f"The selected records - {'; '.join(source_labels)} - do not provide a direct documentary description that answers this question. "
                 "They may provide context, but the supplied passages do not establish a broader DDR account."
             )
+            answer_paragraphs = [{
+                "claims": [{
+                    "text": answer,
+                    "source_numbers": list(source_numbers.values()),
+                }],
+            }]
+            answer_origin = "deterministic_evidence_limit"
     response = {
         "answer": answer,
         "answer_paragraphs": answer_paragraphs,

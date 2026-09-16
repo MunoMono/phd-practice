@@ -331,7 +331,14 @@ const CorpusExplorer = () => {
           onRefreshMetadata={handleMetadataRefresh}
           onTraceEvidence={() => navigate('/source-interrogation')}
           onViewAnalytics={() => navigate('/semantic-atlas')}
-          onInspectMissingness={() => navigate('/absences')}
+          onInspectMissingness={() => {
+            const source = selectedDetail?.document
+            const params = new URLSearchParams()
+            if (source?.id) params.set('sourceDocumentId', source.id)
+            if (source?.pid) params.set('pid', source.pid)
+            if (source?.page_count) params.set('pageRange', `1-${source.page_count}`)
+            navigate(`/absences${params.size ? `?${params.toString()}` : ''}`)
+          }}
         />
       </Column>
     </PageGrid>

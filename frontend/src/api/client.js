@@ -26,8 +26,12 @@ export const apiRequest = async (path, options = {}) => {
     params,
     body,
     headers = {},
-    signal
+    signal,
+    timeoutMs
   } = options
+
+  const timeoutController = timeoutMs ? new AbortController() : null
+  const timeout = timeoutController && setTimeout(() => timeoutController.abort(), timeoutMs)
 
   const baseUrl = getApiBaseUrl()
   const normalizedPath = path.startsWith('/') ? path : `/${path}`
@@ -38,8 +42,10 @@ export const apiRequest = async (path, options = {}) => {
       ...headers
     },
     body: body ? JSON.stringify(body) : undefined,
-    signal
+    signal: signal || timeoutController?.signal
   })
+
+  if (timeout) clearTimeout(timeout)
 
   const contentType = response.headers.get('content-type') || ''
   const payload = contentType.includes('application/json')
@@ -47,8 +53,10 @@ export const apiRequest = async (path, options = {}) => {
     : await response.text()
 
   if (!response.ok) {
-    const message = typeof payload === 'string'
-      ? payload
+    const message = response.status === 504
+      ? 'Interrogation timed out before the analysis pipeline completed. No formal research run was created.'
+      : typeof payload === 'string'
+      ? 'The research service returned an unexpected response.'
       : payload?.detail || payload?.message || response.statusText
     const error = new Error(message)
     error.status = response.status

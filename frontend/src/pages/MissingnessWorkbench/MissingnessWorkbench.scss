@@ -1,0 +1,23 @@
+@use '@carbon/react/scss/spacing' as *;
+@use '@carbon/react/scss/type' as *;
+@use '@carbon/react/scss/theme' as *;
+
+.missingness-workbench {
+  &__review-note {
+    margin-top: $spacing-03;
+  }
+
+  &__stat-title {
+    margin-top: 0;
+  }
+
+  &__stat-value {
+    @include type-style('heading-03');
+    margin: $spacing-02 0;
+    color: $text-primary;
+  }
+
+  &__detail-actions {
+    margin-top: $spacing-05;
+  }
+}
