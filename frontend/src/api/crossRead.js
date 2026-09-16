@@ -26,6 +26,11 @@ export const updateCrossReadMapping = (mappingId, payload) => apiRequest(`/api/c
   body: payload
 })
 
+export const nominateCrossReadMappingForMissingness = (mappingId, payload) => apiRequest(`/api/cross-read/mappings/${mappingId}/nominate-missingness`, {
+  method: 'POST',
+  body: payload
+})
+
 export const exportCrossReadCsv = () => apiRequest('/api/cross-read/export.csv')
 
 export const exportCrossReadMarkdown = () => apiRequest('/api/cross-read/export.md')
