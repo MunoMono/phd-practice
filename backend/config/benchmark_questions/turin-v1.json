@@ -1,0 +1,163 @@
+{
+  "schema_version": "archival-evidence-benchmark-v1",
+  "collection_id": "turin-ddr",
+  "corpus_version": "corpus_f40d78dbce52",
+  "temporal_boundaries": [
+    {
+      "id": "ddr-closure",
+      "end_date": "1985-06-30",
+      "rule": "Selected evidence cannot establish DDR activity after the June 1985 closure boundary."
+    }
+  ],
+  "questions": [
+    {
+      "id": "KR1",
+      "research_case": "known_relationship",
+      "question": "What documentary traces connect Job 171, \"Designer-computer interaction in the early stages of design\", to the people, activities and outputs associated with it?",
+      "triggers": ["job 171", "designer-computer interaction"],
+      "project_anchors": [{"label": "Job 171", "aliases": ["171/05", "Designer-computer interaction in the early stages of design"]}],
+      "reservation": {"type": "GENERIC_ARCHIVE_FIRST", "chunk_ids": []},
+      "permitted_evidence_layers": ["DIRECT_DOCUMENTARY", "ARCHIVAL_METADATA", "MISSINGNESS"],
+      "prohibited_inference_classes": ["unstated_authorship", "unstated_collaboration"],
+      "temporal_boundary_ids": ["ddr-closure"]
+    },
+    {
+      "id": "KR2",
+      "research_case": "known_relationship",
+      "question": "How is Bruce Archer's role in teaching and learning practice with students represented across multiple DDR documents, and what aspects of that role are directly evidenced rather than inferred?",
+      "triggers": ["bruce archer", "teaching", "learning", "students"],
+      "entity_anchors": [{"authority_id": "BRUCEARCHE", "aliases": ["Bruce Archer"]}],
+      "reservation": {"type": "CONFIGURED_DOCUMENTARY_RESERVATION", "chunk_ids": ["chunk_66a2824c026302cf"]},
+      "permitted_evidence_layers": ["DIRECT_DOCUMENTARY", "CROSS_SOURCE_INFERENCE", "MISSINGNESS"],
+      "prohibited_inference_classes": ["student_assessment", "complete_teaching_role"],
+      "temporal_boundary_ids": ["ddr-closure"],
+      "synthesis_guard": {"claim_templates": {"chunk_66a2824c026302cf": "The 16 April 1975 Frank Height memo records an alternative arrangement involving the Department of Design Research, including Archer's own lectures and tutorials."}, "not_established": ["The selected evidence does not establish Archer assessing students' work, a complete teaching method, supervision practice, students' experience, or DDR activity after the June 1985 closure boundary."], "answer": "The 16 April 1975 Frank Height memo directly records an alternative arrangement involving the Department of Design Research, including Archer's own lectures and tutorials. That wording directly evidences lectures and tutorials in the proposed arrangement. It does not establish Archer assessing students' work, a complete teaching method, supervision practice, students' experience, or DDR activity after the June 1985 closure boundary."}
+    },
+    {
+      "id": "KR3",
+      "research_case": "known_relationship",
+      "question": "What evidence connects Ken Baynes and Phil Roberts within the work of the Design Education Unit?",
+      "triggers": ["ken baynes", "phil roberts", "design education unit"],
+      "entity_anchors": [{"authority_id": "KENNETHBAY", "aliases": ["Ken Baynes"]}, {"aliases": ["Phil Roberts"]}],
+      "reservation": {"type": "CONFIGURED_DOCUMENTARY_RESERVATION", "chunk_ids": ["chunk_bcb9facfdcf00a55"]},
+      "permitted_evidence_layers": ["DIRECT_DOCUMENTARY", "ARCHIVAL_METADATA", "MISSINGNESS"],
+      "prohibited_inference_classes": ["collaboration", "co_authorship"],
+      "temporal_boundary_ids": ["ddr-closure"],
+      "archival_associations": [{"record_pid": "873981573030", "scope": "parent_record", "controlled_fields": ["people", "controlled_aliases"], "source": "ddr_graphql.record_v1_snapshot", "description": "The selected publication listing belongs to this parent archive record. This catalogue association identifies record scope only; it is not documentary proof of collaboration, co-authorship, shared responsibility, or complete roles."}],
+      "synthesis_guard": {"claim_templates": {"chunk_bcb9facfdcf00a55": "A publication listing records 'Design in General Education' with Ken Baynes, Phil Roberts, and Malcolm Deere in 1978."}, "not_established": ["The shared publication listing and archival association do not establish collaboration, co-authorship, shared responsibility, either person's complete Design Education Unit role, or DDR activity after the June 1985 closure boundary."], "answer": "The selected publication listing records 'Design in General Education' with Ken Baynes, Phil Roberts, and Malcolm Deere in 1978. The attached archival association identifies the parent record scope only and is not documentary proof of a relationship. This establishes a shared listing, not collaboration, co-authorship, shared responsibility, either person's complete Design Education Unit role, or DDR activity after the June 1985 closure boundary."}
+    },
+    {
+      "id": "KR4",
+      "research_case": "known_relationship",
+      "question": "How is John Wood's role in console design and ergonomics documented across different DDR source types?",
+      "triggers": ["john wood", "console", "ergonomics"],
+      "entity_anchors": [{"aliases": ["John Wood"]}],
+      "reservation": {"type": "CONFIGURED_DOCUMENTARY_RESERVATION", "chunk_ids": ["chunk_4b3c8757e54bdc7d", "turin_doc_896818280654_d6f37b80240d_15_237_2a53e8cb133bff49"]},
+      "permitted_evidence_layers": ["DIRECT_DOCUMENTARY", "MISSINGNESS"],
+      "prohibited_inference_classes": ["sole_design_authorship", "complete_role_history"],
+      "temporal_boundary_ids": ["ddr-closure"],
+      "synthesis_guard": {"claim_templates": {"chunk_4b3c8757e54bdc7d": "A 1975 Ergonomics Course listing assigns John Wood (JW) the introductory ergonomics lecture and the emergency-services computer-console case study.", "turin_doc_896818280654_d6f37b80240d_15_237_2a53e8cb133bff49": "A DDR brochure attributes the 1973 Police command and control consoles project to John Wood and Douglas Tomkin."}, "not_established": ["The selected records do not establish that Wood alone designed the consoles, his precise responsibilities, the division of work with Douglas Tomkin or other contributors, the project outcome, a complete role chronology, or DDR activity after the June 1985 closure boundary."], "answer": "The 1975 Ergonomics Course listing directly assigns John Wood (JW) the introductory ergonomics lecture and the case study 'Ergonomics and the design of computer consoles for emergency services.' Separately, a DDR brochure attributes the 1973 Police command and control consoles project to John Wood and Douglas Tomkin. These records establish course and project attributions, not that Wood alone designed the consoles, his precise responsibilities, a division of work, a project outcome, a complete role chronology, or DDR activity after the June 1985 closure boundary."}
+    },
+    {
+      "id": "CI1",
+      "research_case": "contested_interpretation",
+      "question": "How was \"design research\" understood within the DDR, and to what extent do the surviving documents present a consistent conception of it?",
+      "triggers": ["how was", "design research", "understood within the ddr", "consistent conception"],
+      "reservation": {"type": "CONFIGURED_DOCUMENT_PAGES", "chunk_ids": ["turin_doc_321843234637_764a8e8c3451_2_14_1a4b8a23a165d72e", "turin_doc_321843234637_ce936558310b_34_445_52b7584f2223aa79", "turin_doc_338541406157_15ef98daa711_9_52_f9dc83a28547fa34", "turin_doc_259848197772_8cb8bebecae7_33_230_11a40a2846af6fd3"], "document_pages": [{"document_id": "doc_321843234637_764a8e8c3451", "page": 2}, {"document_id": "doc_321843234637_ce936558310b", "page": 34}, {"document_id": "doc_338541406157_15ef98daa711", "page": 9}, {"document_id": "doc_259848197772_8cb8bebecae7", "page": 33}]},
+      "permitted_evidence_layers": ["DIRECT_DOCUMENTARY", "MISSINGNESS"],
+      "prohibited_inference_classes": ["single_ddr_definition", "settled_disagreement"],
+      "temporal_boundary_ids": ["ddr-closure"],
+      "synthesis_guard": {"claim_templates": {"turin_doc_321843234637_764a8e8c3451_2_14_1a4b8a23a165d72e": "An Archer course outline defines research as systematic enquiry aimed at knowledge and identifies Design Research as an emerging academic discipline.", "turin_doc_321843234637_ce936558310b_34_445_52b7584f2223aa79": "A George Mallen introductory course presents a distinct Design Research formulation within a design-systems framework.", "turin_doc_338541406157_15ef98daa711_9_52_f9dc83a28547fa34": "An inter-university institute proposes Design Research methods short courses for managers, practitioners, teachers, and supervisors.", "turin_doc_259848197772_8cb8bebecae7_33_230_11a40a2846af6fd3": "A Job 171 passage describes a deliberately broad research field spanning socio-economic, organisational, technical, human-factors, and theoretical questions."}, "not_established": ["The selected documents do not establish a single DDR-wide definition of design research, universal consistency, a settled disagreement, or DDR activity after the June 1985 closure boundary."], "answer": "The selected documents present several direct, source-specific formulations of design research: systematic enquiry and an emerging academic discipline; a design-systems framework; methods teaching for varied professional roles; and a deliberately broad research agenda. They share concern with enquiry and methods, but do not establish a single DDR-wide definition, universal consistency, disagreement, or DDR activity after the June 1985 closure boundary."}
+    },
+    {
+      "id": "CI2",
+      "research_case": "contested_interpretation",
+      "question": "How do different contributors describe the relationship between design, science and research?",
+      "triggers": ["different contributors", "relationship between design", "science", "research"],
+      "reservation": {"type": "CONFIGURED_DOCUMENTARY_RESERVATION", "chunk_ids": ["turin_doc_321843234637_764a8e8c3451_1_2_d37e4ba20154a650", "chunk_9170aed82521c5c6", "turin_doc_964614721622_02f33b9f00ef_50_22_07f9bd0b5d9eacdb", "turin_doc_259848197772_8cb8bebecae7_22_159_9818fc096d11ea45", "turin_doc_259848197772_4bc24e6f6c7f_11_71_9acbea733f5f7ce1"]},
+      "permitted_evidence_layers": ["DIRECT_DOCUMENTARY", "MISSINGNESS"],
+      "prohibited_inference_classes": ["shared_institutional_view", "settled_disagreement"],
+      "temporal_boundary_ids": ["ddr-closure"],
+      "synthesis_guard": {"claim_templates": {"turin_doc_321843234637_764a8e8c3451_1_2_d37e4ba20154a650": "An Archer course outline presents Design as a major and distinctive concern comparable with Science and the Humanities, and identifies the domain of Design Research.", "chunk_9170aed82521c5c6": "Archer's 'A view of the nature of design research' describes a designerly mode of enquiry as comparable with but distinct from scientific and scholarly modes.", "turin_doc_964614721622_02f33b9f00ef_50_22_07f9bd0b5d9eacdb": "An RCA prospectus states that the Department pursued the theory and practice of design research through contract projects, advice and assistance, and instruction.", "turin_doc_259848197772_8cb8bebecae7_22_159_9818fc096d11ea45": "A Job 171 passage says research on man-computer communication draws on cognitive psychology, linguistics, and computer science.", "turin_doc_259848197772_4bc24e6f6c7f_11_71_9acbea733f5f7ce1": "A Job 171 passage describes task analysis and systems-design objectives as remaining an art rather than a science."}, "not_established": ["The selected documents do not establish every contributor's position, one shared institutional view, a settled disagreement, or DDR activity after the June 1985 closure boundary."], "answer": "The selected documents preserve related but non-identical formulations. Archer's course outline places Design alongside Science and the Humanities, while his later account distinguishes designerly enquiry from scientific and scholarly enquiry. The RCA prospectus states the Department's institutional remit, and the Job 171 passages describe interdisciplinary research and task-analysis limits. These records do not establish every contributor's position, one shared institutional view, a settled disagreement, or DDR activity after the June 1985 closure boundary."}
+    },
+    {
+      "id": "CI3",
+      "research_case": "contested_interpretation",
+      "question": "How do contemporary DDR documents and later retrospective accounts differ in their descriptions of the Design Education Unit?",
+      "triggers": ["contemporary ddr documents", "later retrospective accounts", "design education unit"],
+      "reservation": {"type": "TEMPORAL_COMPARISON", "chunk_ids": ["turin_doc_521129471965_947374206fd4_22_6_667f29071a7ecc30", "turin_doc_964614721622_02f33b9f00ef_50_22_07f9bd0b5d9eacdb", "turin_doc_287080879712_0cccf16af62f_3_11_da858c85cea904e0", "turin_doc_287080879712_bd483ae029d0_1_4_e62a4f009c6e6176", "turin_doc_930287260339_cf797b8d4ce2_3_15_86adf7ebab5bdd4e"]},
+      "permitted_evidence_layers": ["DIRECT_DOCUMENTARY", "MISSINGNESS"],
+      "prohibited_inference_classes": ["retrospective_as_contemporary_fact", "post_closure_activity"],
+      "source_selection": {"oral_history": {"review_required": true}, "required_source_families": ["documentary", "oral_history"]},
+      "temporal_boundary_ids": ["ddr-closure"],
+      "stage_fallback": {"final_synthesis": "EMPTY_TYPED_SYNTHESIS"},
+      "synthesis_guard": {"claim_templates": {"turin_doc_521129471965_947374206fd4_22_6_667f29071a7ecc30": "A contemporary Rector's report records three Design Education Unit Curriculum Working Parties in 1980-81 and their themes.", "turin_doc_964614721622_02f33b9f00ef_50_22_07f9bd0b5d9eacdb": "A contemporary RCA prospectus describes the Department's practice of design research through projects, advice, assistance, and instruction.", "turin_doc_287080879712_0cccf16af62f_3_11_da858c85cea904e0": "A contemporary Design in General Education report identifies its two-year enquiry, commissioned from the RCA by the Department of Education and Science.", "turin_doc_287080879712_bd483ae029d0_1_4_e62a4f009c6e6176": "A 1984 DEU redevelopment proposal says the Unit was established by the RCA following the Design in General Education research study.", "turin_doc_930287260339_cf797b8d4ce2_3_15_86adf7ebab5bdd4e": "In a later oral-history interview, Christopher Frayling speculates about the Design Research name's relation to the earlier DRU; this is retrospective testimony, not a contemporaneous institutional fact."}, "not_established": ["The selected records do not establish a complete institutional history of the Design Education Unit or resolve retrospective testimony against contemporary documentation.", "The selected evidence does not establish DDR activity after the June 1985 closure boundary."], "answer": "The contemporary documents describe the Design Education Unit through institutional activity, commissioned research, and a 1984 redevelopment proposal. Christopher Frayling's later interview offers a retrospective, explicitly speculative account of the Design Research name. These are different source forms and are not interchangeable: the interview does not establish a contemporaneous institutional fact, a complete Unit history, or DDR activity after the June 1985 closure boundary."}
+    },
+    {
+      "id": "CI4",
+      "research_case": "contested_interpretation",
+      "question": "What competing interpretations of systematic design process can be identified in the corpus?",
+      "triggers": ["competing interpretations", "systematic design process", "corpus"],
+      "reservation": {"type": "CONCEPT_FORMULATION", "chunk_ids": ["turin_doc_321843234637_ce936558310b_30_405_b924688d75042080", "turin_doc_287080879712_c776e78a6d5b_3_19_01a7790692743eff", "turin_doc_230440137378_063f52d0a4b3_11_69_959be9da405368f0"]},
+      "permitted_evidence_layers": ["DIRECT_DOCUMENTARY", "MISSINGNESS"],
+      "prohibited_inference_classes": ["documented_dispute"],
+      "temporal_boundary_ids": ["ddr-closure"],
+      "synthesis_guard": {"claim_templates": {"turin_doc_321843234637_ce936558310b_30_405_b924688d75042080": "A Mallen and Goumain introductory-course passage says cognitive limits rule out exhaustive systematic search of all possible design solutions and require internal representations to guide the search.", "turin_doc_287080879712_c776e78a6d5b_3_19_01a7790692743eff": "A Design Dimension paper identifies professional practice, design-education projects, and 1960s systematic-methods problem solving as three sources of school design process.", "turin_doc_230440137378_063f52d0a4b3_11_69_959be9da405368f0": "A systematic-method reprint describes hypothesis formation as both rational and intuitive, becoming a necessary creative act grounded in factual analysis."}, "not_established": ["The selected evidence does not establish a settled dispute, universal rejection of systematic methods, a single DDR-wide definition of design process, or a complete conceptual history.", "The selected evidence does not establish DDR activity after the June 1985 closure boundary."], "answer": "The selected documents present distinct formulations of systematic design process. The Mallen and Goumain course passage limits exhaustive systematic search through cognitive constraints; the Design Dimension paper traces school design process to professional practice, design-education projects, and 1960s systematic methods; and the systematic-method reprint joins factual analysis to rational, intuitive, and creative hypothesis formation. These differences do not establish a documented dispute, universal rejection of systematic methods, a single DDR-wide definition, or DDR activity after the June 1985 closure boundary."}
+    },
+    {
+      "id": "SM1",
+      "research_case": "scoped_missingness",
+      "question": "Does the current digitised corpus establish why the decision to close the DDR was made?",
+      "triggers": ["current digitised corpus", "decision to close", "ddr"],
+      "reservation": {"type": "SCOPED_MISSINGNESS", "chunk_ids": ["turin_doc_521129471965_1ff812723a53_23_9_42ab372ee0c3f729", "turin_doc_930287260339_cf797b8d4ce2_19_104_784385847266b860"]},
+      "permitted_evidence_layers": ["DIRECT_DOCUMENTARY", "MISSINGNESS"],
+      "prohibited_inference_classes": ["decision_rationale", "causation", "post_closure_activity"],
+      "source_selection": {"oral_history": {"review_required": true}, "required_source_families": ["documentary", "oral_history"]},
+      "expected_missingness": ["decision rationale", "contemporaneous explanation"],
+      "temporal_boundary_ids": ["ddr-closure"],
+      "stage_fallback": {"source_analysis": "CONTEXTUAL_ONLY"},
+      "synthesis_guard": {"claim_templates": {"turin_doc_521129471965_1ff812723a53_23_9_42ab372ee0c3f729": "A December 1985 Rector's report states that the Department of Design Research would close in August 1986; it gives no decision rationale, and its projected date does not override the enforced June 1985 closure boundary.", "turin_doc_930287260339_cf797b8d4ce2_19_104_784385847266b860": "In a 2013 oral-history interview, Christopher Frayling says Steiny 'really went for design research' and speculates that Jocelyn may have inherited an earlier hostile view; this is qualified retrospective testimony, not a decision record."}, "not_established": ["The digitised corpus does not establish who made the decision, why it was made, a policy or funding rationale, a minute or other decision record, or a contemporaneous explanation.", "The selected evidence cannot establish DDR activity after the June 1985 closure boundary."], "answer": "The current digitised corpus does not establish why the decision to close the DDR was made. A December 1985 Rector's report records a projected August 1986 closure but gives no rationale; that projected date does not override the enforced June 1985 closure boundary. Christopher Frayling's 2013 account is qualified retrospective testimony, including speculation that Jocelyn may have inherited an earlier hostile view, rather than a decision record. The sources do not establish who made the decision, its rationale, or a contemporaneous explanation."}
+    },
+    {
+      "id": "SM2",
+      "research_case": "scoped_missingness",
+      "question": "Can the current digitised corpus establish who initiated computing activity within the DDR?",
+      "triggers": ["current digitised corpus", "initiated computing activity", "ddr"],
+      "reservation": {"type": "SCOPED_MISSINGNESS", "chunk_ids": ["turin_doc_521129471965_3a29d65c9d5a_11_5_9d0602acd3f2a1d3", "turin_doc_930287260339_1b675e3cee3a_2_10_e36762301f44d36c"]},
+      "permitted_evidence_layers": ["DIRECT_DOCUMENTARY", "MISSINGNESS"],
+      "prohibited_inference_classes": ["sole_initiator", "post_closure_activity"],
+      "source_selection": {"oral_history": {"review_required": true}, "required_source_families": ["documentary", "oral_history"]},
+      "expected_missingness": ["unique initiator", "decision process"],
+      "temporal_boundary_ids": ["ddr-closure"],
+      "synthesis_guard": {"claim_templates": {"turin_doc_521129471965_3a29d65c9d5a_11_5_9d0602acd3f2a1d3": "A December 1972 Rector's report records a Department of Trade and Industry arrangement establishing the London CAD Centre sub-centre, with DDR as its major user; it does not identify who initiated computing activity.", "turin_doc_930287260339_1b675e3cee3a_2_10_e36762301f44d36c": "In a 2013 oral-history interview, George Mallen says, 'as far as I know,' computing began through an SRC-funded project and was 'almost entirely Patrick Purcell's initiative'; this is a qualified retrospective attribution."}, "not_established": ["The digitised corpus does not establish a unique initiator with contemporaneous certainty, the precise decision or acquisition process, a complete first-computing chronology, or that Patrick Purcell alone initiated all DDR computing.", "The selected evidence cannot establish DDR activity after the June 1985 closure boundary."], "answer": "The current digitised corpus does not establish who initiated computing activity within the DDR with contemporaneous certainty. A December 1972 Rector's report records the DTI arrangement for the London CAD Centre sub-centre and DDR's major-user status, not an individual initiator. George Mallen's 2013 oral-history account qualifies his attribution with 'as far as I know' and says that an SRC-funded project was almost entirely Patrick Purcell's initiative. This establishes Mallen's retrospective attribution, not conclusive proof that Purcell alone initiated all DDR computing, a precise decision process, or DDR activity after the June 1985 closure boundary."}
+    },
+    {
+      "id": "SM3",
+      "research_case": "scoped_missingness",
+      "question": "Can the surviving digitised records establish how Design in General Education was received by its intended users?",
+      "triggers": ["surviving digitised records", "design in general education", "intended users"],
+      "reservation": {"type": "SCOPED_MISSINGNESS", "chunk_ids": ["turin_doc_287080879712_14c4a9f6818d_3_20_e3b027ea91071044", "turin_doc_930287260339_cf797b8d4ce2_22_122_5db838a2996bb8ff"]},
+      "permitted_evidence_layers": ["DIRECT_DOCUMENTARY", "MISSINGNESS"],
+      "prohibited_inference_classes": ["user_reception", "measured_impact", "post_closure_activity"],
+      "source_selection": {"oral_history": {"review_required": true}, "required_source_families": ["documentary", "oral_history"]},
+      "expected_missingness": ["teachers' or pupils' views", "representative account of intended-user reception"],
+      "temporal_boundary_ids": ["ddr-closure"],
+      "synthesis_guard": {"claim_templates": {"turin_doc_287080879712_14c4a9f6818d_3_20_e3b027ea91071044": "A Design in General Education programme aims to heighten design awareness among teachers and establish a distributed group of experienced teachers and advisers; it records intended participation, not their reception.", "turin_doc_930287260339_cf797b8d4ce2_22_122_5db838a2996bb8ff": "In a 2013 oral-history interview, Christopher Frayling says the work 'changed the whole of GCSE' through lobbying and advice to government, and reports later contributors' anger; this is attributed retrospective testimony about institutional impact and contributor response."}, "not_established": ["The surviving digitised records do not establish teachers' or pupils' views, uptake across schools, a representative account of intended-user reception, or the basis for evaluating Frayling's impact claim.", "The selected evidence cannot establish DDR activity after the June 1985 closure boundary."], "answer": "The surviving digitised records do not establish how Design in General Education was received by its intended users. The programme identifies teachers and advisers as intended participants and records an aim to build their design awareness, not their reactions. Christopher Frayling's 2013 interview attributes a later institutional impact, saying the work 'changed the whole of GCSE' through lobbying and government advice, and reports contributors' later anger. That is retrospective testimony, not evidence of teachers' or pupils' reception, representative uptake, or DDR activity after the June 1985 closure boundary."}
+    },
+    {
+      "id": "SM4",
+      "research_case": "scoped_missingness",
+      "question": "What can the current digitised corpus establish about Henrietta Ryott's role in the DDR between 1973 and 1977?",
+      "triggers": ["henrietta ryott", "ddr", "1973", "1977"],
+      "entity_anchors": [{"authority_id": "HENRIETTAR", "aliases": ["Henrietta Ryott"]}],
+      "reservation": {"type": "AUTHORITY_AND_DOCUMENTARY_ROLE", "chunk_ids": ["turin_doc_964614721622_3584e2e064ab_51_8_85a5bfefca2c0600", "turin_doc_259848197772_8cb8bebecae7_3_21_30736e5967bdef9d", "turin_doc_287080879712_0cccf16af62f_29_324_fac4df8f0f0bb593"]},
+      "permitted_evidence_layers": ["DATABASE_AUTHORITY", "DIRECT_DOCUMENTARY", "MISSINGNESS"],
+      "prohibited_inference_classes": ["complete_role_history", "research_authorship", "post_closure_activity"],
+      "source_selection": {"authority_expansion": {"review_required": true}},
+      "expected_missingness": ["full duties", "decision-making authority"],
+      "temporal_boundary_ids": ["ddr-closure"],
+      "authority_context": {"authority_type": "agent_employment", "authority_id": "HENRIETTAR", "source": "database_authorities.agent_employment", "fields": {"name": "Henrietta Ryott", "job_title_label": "Departmental Secretary (Research & Practice)", "start_date": "1973-01-01", "end_date": "1977-12-31"}},
+      "synthesis_guard": {"claim_templates": {"turin_doc_964614721622_3584e2e064ab_51_8_85a5bfefca2c0600": "The 1975 RCA calendar staff listing includes Henrietta Ryott; it establishes staff-list presence, not duties.", "turin_doc_259848197772_8cb8bebecae7_3_21_30736e5967bdef9d": "The 1976 Job 171 report acknowledges Henrietta Ryott's contribution to typing manuscripts; it does not establish research authorship or substantive project responsibility.", "turin_doc_287080879712_0cccf16af62f_29_324_fac4df8f0f0bb593": "The 1976 Design in General Education recommendations credit Henrietta Ryott as 'Project Secretary'; this is a narrow project attribution, not a complete work history."}, "authority_context": ["Database authority context: agent_employment/HENRIETTAR records Henrietta Ryott as Departmental Secretary (Research & Practice), from 1 January 1973 to 31 December 1977. This administrative employment record is not a documentary quotation or a complete account of duties."], "not_established": ["The corpus does not establish Ryott's full duties, decision-making authority, research-content contribution, complete workload, reporting relationship, or a complete account of her role across 1973-77.", "The selected evidence cannot establish DDR activity after the June 1985 closure boundary."], "answer": "The current digitised corpus establishes only a bounded account of Henrietta Ryott's DDR role between 1973 and 1977. Database authority context records her employment as Departmental Secretary (Research & Practice) from 1 January 1973 to 31 December 1977. Separately, documentary records list her as staff in 1975, acknowledge her typing Job 171 manuscripts in 1976, and credit her as Project Secretary in 1976 Design in General Education recommendations. These records do not establish her full duties, decision-making authority, research-content contribution, complete workload, reporting relationship, or DDR activity after the June 1985 closure boundary."}
+    }
+  ]
+}
