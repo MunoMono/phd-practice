@@ -3,6 +3,72 @@
 @use '@carbon/react/scss/breakpoint' as *;
 @use '@carbon/react/scss/type' as *;
 
+.visual-analytics-workbench {
+  display: grid;
+  grid-template-columns: 17rem minmax(0, 1fr) 21rem;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  height: calc(100vh - 8.125rem);
+  min-height: 34rem;
+  overflow: hidden;
+  background: $background;
+
+  &--controls-collapsed { grid-template-columns: minmax(0, 1fr) 21rem; }
+  &--inspector-collapsed { grid-template-columns: 17rem minmax(0, 1fr); }
+  &--controls-collapsed.visual-analytics-workbench--inspector-collapsed { grid-template-columns: minmax(0, 1fr); }
+
+  &__toolbar {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: max-content 14rem minmax(14rem, 24rem) minmax(10rem, 1fr) max-content max-content;
+    gap: $spacing-04;
+    align-items: end;
+    padding: $spacing-04 $spacing-05;
+    border-bottom: 1px solid $border-subtle-01;
+    background: $layer-01;
+  }
+
+  &__title { display: flex; gap: $spacing-03; align-items: center; @include type-style('heading-03'); }
+  &__scope { @include type-style('label-01'); color: $text-secondary; padding-bottom: $spacing-03; }
+  &__notification { grid-column: 1 / -1; }
+
+  &__controls, &__inspector {
+    overflow-y: auto;
+    padding: $spacing-04;
+    background: $layer-01;
+  }
+  &__controls { border-right: 1px solid $border-subtle-01; }
+  &__inspector { border-left: 1px solid $border-subtle-01; }
+  &__controls .cds--accordion__content { display: grid; gap: $spacing-04; }
+  &__controls p, &__inspector p { @include type-style('body-compact-01'); color: $text-secondary; }
+
+  &__map-region { min-width: 0; min-height: 0; position: relative; padding: $spacing-05; display: flex; flex-direction: column; background: $layer; }
+  &__map-header { display: flex; justify-content: space-between; gap: $spacing-05; align-items: start; }
+  &__map-header h1 { @include type-style('heading-04'); margin-bottom: $spacing-02; }
+  &__map-header p { @include type-style('body-compact-01'); color: $text-secondary; max-width: 50rem; }
+  &__canvas { display: block; flex: 1; width: 100%; min-height: 0; cursor: crosshair; border: 1px solid $border-subtle-01; }
+  &__empty-map { display: grid; place-items: center; flex: 1; min-height: 28rem; color: $text-secondary; border: 1px dashed $border-strong-01; }
+  &__hover { position: absolute; left: $spacing-06; bottom: $spacing-06; max-width: 30rem; padding: $spacing-03; background: $layer-02; @include type-style('label-01'); }
+
+  &__inspector .cds--tile { margin-top: $spacing-04; padding: $spacing-05; background: $layer-02; }
+  &__inspector h2 { @include type-style('heading-03'); }
+  &__inspector h3 { @include type-style('heading-01'); margin: $spacing-06 0 $spacing-02; }
+  &__excerpt { border-left: 3px solid $border-interactive; padding-left: $spacing-03; }
+  &__inspector dl { display: grid; grid-template-columns: 6rem minmax(0, 1fr); gap: $spacing-03; @include type-style('body-compact-01'); }
+  &__inspector dt { color: $text-secondary; }
+  &__inspector dd { margin: 0; overflow-wrap: anywhere; }
+  &__actions { display: flex; flex-wrap: wrap; gap: $spacing-02; margin-top: $spacing-05; }
+  &__neighbour-list { display: grid; gap: 1px; max-height: 14rem; overflow-y: auto; background: $border-subtle-01; }
+  &__neighbour-list button { display: grid; gap: $spacing-02; width: 100%; padding: $spacing-03; border: 0; background: $layer-01; color: $text-primary; text-align: left; cursor: pointer; }
+  &__neighbour-list button:hover { background: $layer-hover-01; }
+  &__neighbour-list small { color: $text-secondary; }
+
+  &__tray { grid-column: 1 / -1; display: grid; grid-template-columns: max-content max-content minmax(12rem, 1fr) minmax(18rem, 32rem) max-content; gap: $spacing-04; align-items: center; padding: $spacing-04 $spacing-05; border-top: 1px solid $border-subtle-01; background: $layer-01; @include type-style('body-compact-01'); }
+  &__tray .cds--text-area__wrapper { min-width: 0; }
+
+  @include breakpoint-down(lg) { grid-template-columns: 15rem minmax(0, 1fr); &__inspector { display: none; } &__toolbar { grid-template-columns: max-content 13rem minmax(14rem, 1fr) max-content max-content; } &__scope { display: none; } &__tray { grid-template-columns: max-content minmax(12rem, 1fr) minmax(16rem, 1fr) max-content; } }
+  @include breakpoint-down(md) { height: auto; min-height: calc(100vh - 8.125rem); overflow: visible; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(28rem, 1fr) auto; &__controls { display: none; } &__toolbar { grid-template-columns: 1fr 1fr; } &__toolbar .cds--search { grid-column: 1 / -1; } &__tray { grid-template-columns: 1fr; } }
+}
+
 .visual-analytics-page {
   &__status-tags {
     display: flex;

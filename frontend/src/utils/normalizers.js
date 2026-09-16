@@ -317,6 +317,7 @@ export const normalizeChunkProvenance = (raw = {}) => ({
 })
 
 export const normalizeUmapProjection = (raw = {}) => ({
+  message: firstDefined(raw.message, null),
   points: toArray(raw.points).map((point, index) => ({
     id: firstDefined(point.id, point.chunkId, point.chunk_id, point.documentId, point.document_id, `point-${index}`),
     documentId: firstDefined(point.documentId, point.document_id, null),
@@ -325,6 +326,7 @@ export const normalizeUmapProjection = (raw = {}) => ({
     title: firstDefined(point.title, 'Untitled trace'),
     x: toNumber(firstDefined(point.x, point.umap_x), 0),
     y: toNumber(firstDefined(point.y, point.umap_y), 0),
+    z: toNumber(firstDefined(point.z, point.umap_z), null),
     year: firstDefined(point.year, point.publication_year, null),
     sourceType: firstDefined(point.sourceType, point.source_type, 'unknown'),
     themes: toArray(firstDefined(point.themes, point.ml_themes, [])),

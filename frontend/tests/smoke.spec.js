@@ -39,9 +39,11 @@ const routes = [
   },
   {
     path: '/semantic-atlas',
-    heading: 'Semantic atlas',
+    heading: 'Semantic Atlas',
+    usesPageGrid: false,
     assertions: async (page) => {
-      await expect(page.getByRole('heading', { level: 3, name: 'Metadata overlays and evidence surface scope' })).toBeVisible()
+      await expect(page.getByRole('heading', { level: 1, name: 'Semantic Atlas' })).toBeVisible()
+      await expect(page.getByLabel('Interactive UMAP embedding map').or(page.getByText('Chunk embeddings are not provisioned in the current database. This is a local system coverage state, not evidence of archival absence.'))).toBeVisible()
     }
   },
   {
@@ -78,8 +80,8 @@ for (const route of routes) {
   test(`smoke ${route.path}`, async ({ page }) => {
     await page.goto(route.path, { waitUntil: 'networkidle' })
     await expect(page.getByRole('heading', { level: 1, name: route.heading })).toBeVisible()
-    await expect(page.locator('main')).toBeVisible()
-    await expect(page.locator('.page-grid')).toBeVisible()
+    await expect(page.locator('#main-content')).toBeVisible()
+    if (route.usesPageGrid !== false) await expect(page.locator('.page-grid')).toBeVisible()
     await route.assertions(page)
   })
 }

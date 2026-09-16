@@ -683,30 +683,41 @@ def _get_table_columns(db, table_name: str) -> set[str]:
 
 
 def _get_database_scope_counts(db) -> Dict:
+    document_columns = _get_table_columns(db, "documents")
+    document_embedding_count = (
+        "COUNT(*) FILTER (WHERE embeddings IS NOT NULL)"
+        if "embeddings" in document_columns
+        else "0"
+    )
+    pdf_asset_count = "COUNT(*) FILTER (WHERE pdf_count > 0)" if "pdf_count" in document_columns else "0"
+    image_like_count = "COUNT(*) FILTER (WHERE file_type IN ('tiff', 'jpg', 'jpeg', 'png'))" if "file_type" in document_columns else "0"
     counts = db.execute(
         text(
-            """
+            f"""
             SELECT
                 COUNT(*) AS total_documents,
                 COUNT(*) FILTER (WHERE NULLIF(BTRIM(COALESCE(extracted_text, '')), '') IS NOT NULL) AS documents_with_extracted_text,
-                COUNT(*) FILTER (WHERE embeddings IS NOT NULL) AS documents_with_embeddings,
+                {document_embedding_count} AS documents_with_embeddings,
                 COUNT(*) FILTER (WHERE pid IS NOT NULL) AS total_documents_with_pid,
-                COUNT(*) FILTER (WHERE pdf_count > 0) AS documents_with_pdf_assets,
-                COUNT(*) FILTER (WHERE file_type IN ('tiff', 'jpg', 'jpeg', 'png')) AS image_like_documents
+                {pdf_asset_count} AS documents_with_pdf_assets,
+                {image_like_count} AS image_like_documents
             FROM documents
             """
         )
     ).fetchone()
-    chunk_counts = db.execute(
-        text(
-            """
-            SELECT
-                COUNT(*) FILTER (WHERE embedding_vector IS NOT NULL) AS embedded_chunks,
-                COUNT(DISTINCT document_id) FILTER (WHERE embedding_vector IS NOT NULL) AS documents_represented_by_chunks
-            FROM document_chunks
-            """
-        )
-    ).fetchone()
+    chunk_columns = _get_table_columns(db, "document_chunks")
+    chunk_counts = None
+    if chunk_columns:
+        chunk_counts = db.execute(
+            text(
+                """
+                SELECT
+                    COUNT(*) FILTER (WHERE embedding_vector IS NOT NULL) AS embedded_chunks,
+                    COUNT(DISTINCT document_id) FILTER (WHERE embedding_vector IS NOT NULL) AS documents_represented_by_chunks
+                FROM document_chunks
+                """
+            )
+        ).fetchone()
 
     return {
         "total_documents": int(counts.total_documents or 0),
@@ -715,8 +726,8 @@ def _get_database_scope_counts(db) -> Dict:
         "total_documents_with_pid": int(counts.total_documents_with_pid or 0),
         "documents_with_pdf_assets": int(counts.documents_with_pdf_assets or 0),
         "image_like_documents": int(counts.image_like_documents or 0),
-        "embedded_chunks": int(chunk_counts.embedded_chunks or 0),
-        "documents_represented_by_chunks": int(chunk_counts.documents_represented_by_chunks or 0),
+        "embedded_chunks": int(chunk_counts.embedded_chunks or 0) if chunk_counts else 0,
+        "documents_represented_by_chunks": int(chunk_counts.documents_represented_by_chunks or 0) if chunk_counts else 0,
     }
 
 
@@ -1312,8 +1323,16 @@ async def get_umap_projection(
     try:
         db_counts = _get_database_scope_counts(db)
         document_chunk_columns = _get_table_columns(db, "document_chunks") if point_type == "chunks" else set()
+        projection_point_columns = _get_table_columns(db, "semantic_atlas_projection_points")
+        if point_type == "chunks" and not document_chunk_columns:
+            return _empty_umap_response(
+                "chunks",
+                "Chunk embeddings are not provisioned in the current database. This is a local system coverage state, not evidence of archival absence.",
+                "document_chunks",
+            )
         chunk_citation_select = "dc.citation" if "citation" in document_chunk_columns else "NULL::jsonb AS citation"
         chunk_title_expr = "COALESCE(d.title, dc.citation->>'title', 'Untitled trace')" if "citation" in document_chunk_columns else "COALESCE(d.title, 'Untitled trace')"
+        projection_z_select = "pp.z" if "z" in projection_point_columns else "NULL::double precision AS z"
 
         atlas_projection = _get_completed_semantic_atlas_projection(db) if point_type == "chunks" else None
         if atlas_projection:
@@ -1343,7 +1362,8 @@ async def get_umap_projection(
                 dc.source_page,
                 dc.source_section,
                 pp.x,
-                pp.y
+                pp.y,
+                {projection_z_select}
             FROM semantic_atlas_projection_points pp
             JOIN document_chunks dc ON dc.chunk_id = pp.chunk_id
             JOIN documents d ON d.document_id = dc.document_id
@@ -1405,6 +1425,7 @@ async def get_umap_projection(
                     "title": record["title"],
                     "x": float(row.x),
                     "y": float(row.y),
+                    "z": float(row.z) if row.z is not None else None,
                     "year": record["year"],
                     "source_type": record["source_type"],
                     "themes": record["themes"],

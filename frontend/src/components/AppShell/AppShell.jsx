@@ -93,6 +93,9 @@ const AppShell = ({ currentTheme, onThemeToggle, children }) => {
   const [isDesktopSidebarCollapsed, setIsDesktopSidebarCollapsed] = useState(false)
   const isDark = currentTheme === 'g100'
   const navigationContext = getNavigationContext(location.pathname)
+  const isVisualAnalyticsWorkspace = navigationContext.primarySection.key === 'visual-analytics'
+  const secondaryItems = isVisualAnalyticsWorkspace ? [] : navigationContext.secondaryItems
+  const breadcrumbs = isVisualAnalyticsWorkspace ? [] : navigationContext.breadcrumbs
   const greetingName = user?.given_name || user?.name?.split(' ')?.[0] || user?.email?.split('@')?.[0] || 'there'
 
   const handleNavigate = (path) => {
@@ -175,13 +178,13 @@ const AppShell = ({ currentTheme, onThemeToggle, children }) => {
             ))}
           </SideNavItems>
 
-          {navigationContext.secondaryItems.length ? (
+          {secondaryItems.length ? (
             <>
               <div className="ddr-app-shell-mobile-nav__section-label">
                 {navigationContext.primarySection.label}
               </div>
               <SideNavItems>
-                {navigationContext.secondaryItems.map((item) => (
+                {secondaryItems.map((item) => (
                   <SideNavLink
                     key={item.key}
                     href={item.path}
@@ -202,13 +205,13 @@ const AppShell = ({ currentTheme, onThemeToggle, children }) => {
       ) : null}
 
       <div
-        className={`ddr-app-shell${navigationContext.secondaryItems.length ? ' ddr-app-shell--with-sidebar' : ''}${isDesktopSidebarCollapsed ? ' ddr-app-shell--sidebar-collapsed' : ''}`}
+        className={`ddr-app-shell${secondaryItems.length ? ' ddr-app-shell--with-sidebar' : ''}${isDesktopSidebarCollapsed ? ' ddr-app-shell--sidebar-collapsed' : ''}`}
       >
-        {navigationContext.secondaryItems.length ? (
+        {secondaryItems.length ? (
           <SecondaryNavigation
             activeItemKey={navigationContext.activeSecondaryItem?.key}
             isCollapsed={isDesktopSidebarCollapsed}
-            items={navigationContext.secondaryItems}
+            items={secondaryItems}
             onToggleCollapse={() => setIsDesktopSidebarCollapsed((value) => !value)}
             sectionLabel={navigationContext.primarySection.label}
           />
@@ -216,12 +219,12 @@ const AppShell = ({ currentTheme, onThemeToggle, children }) => {
 
         <main
           id="main-content"
-          className={`ddr-app-shell__main${navigationContext.secondaryItems.length ? '' : ' ddr-app-shell__main--standalone'}`}
+          className={`ddr-app-shell__main${secondaryItems.length ? '' : ' ddr-app-shell__main--standalone'}`}
         >
-          {navigationContext.breadcrumbs.length ? (
+          {breadcrumbs.length ? (
             <div className="ddr-app-shell__breadcrumbs">
               <Breadcrumb noTrailingSlash>
-                {navigationContext.breadcrumbs.map((item) => (
+                {breadcrumbs.map((item) => (
                   <BreadcrumbItem key={item.key}>
                     <Link to={item.path}>{item.label}</Link>
                   </BreadcrumbItem>
