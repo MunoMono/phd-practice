@@ -207,8 +207,19 @@ const VisualAnalyticsWorkbench = () => {
 
   useEffect(() => {
     if (!autoRotate || activeDimensions !== '3d') return undefined
-    const timer = window.setInterval(() => setAzimuth((current) => current >= 180 ? -180 : current + 1), 40)
-    return () => window.clearInterval(timer)
+    let animationFrame
+    let previousTime
+    const orbit = (time) => {
+      if (previousTime !== undefined && time - previousTime >= 32) {
+        setAzimuth((current) => current >= 180 ? -180 : current + 1)
+        previousTime = time
+      } else if (previousTime === undefined) {
+        previousTime = time
+      }
+      animationFrame = window.requestAnimationFrame(orbit)
+    }
+    animationFrame = window.requestAnimationFrame(orbit)
+    return () => window.cancelAnimationFrame(animationFrame)
   }, [autoRotate, activeDimensions])
 
   const updateFilter = (field, value) => setFilters((current) => ({ ...current, [field]: value }))
@@ -292,7 +303,7 @@ const VisualAnalyticsWorkbench = () => {
       </Accordion>
     </aside>
     <section className="visual-analytics-workbench__map-region">
-      <div className="visual-analytics-workbench__map-header"><div><h1>{VIEWS.find(([key]) => key === view)?.[1]}</h1><p>UMAP proximity is exploratory. Visual patterns are candidates for source investigation, not evidence of historical connection.</p></div><Tag type="blue">Visible: {visiblePoints.length}</Tag></div>
+      <div className="visual-analytics-workbench__map-header"><div><h1>{VIEWS.find(([key]) => key === view)?.[1]}</h1><p>UMAP proximity is exploratory. Visual patterns are candidates for source investigation, not evidence of historical connection.</p></div><div className="visual-analytics-workbench__map-actions">{activeDimensions === '3d' && <Button size="sm" kind="ghost" renderIcon={autoRotate ? Pause : Play} onClick={() => setAutoRotate((current) => !current)}>{autoRotate ? 'Pause orbit' : 'Start orbit'}</Button>}<Tag type="blue">Visible: {visiblePoints.length}</Tag></div></div>
       {loading ? <div className="visual-analytics-workbench__empty-map">Loading embedding surface...</div> : <EmbeddingCanvas points={visiblePoints} emptyMessage={projection.message} dimensions={activeDimensions} azimuth={azimuth} elevation={elevation} selectedIds={selectedIds} searchIds={searchIds} anchorId={anchorId} comparisonA={comparisonA} comparisonB={comparisonB} colorBy={filters.colorBy} labelBy={filters.labelBy} onSelect={selectPoint} onHover={setHovered} />}
       {hovered && <div className="visual-analytics-workbench__hover">{pointLabel(hovered)}{hovered.year ? ` (${hovered.year})` : ''}</div>}
     </section>

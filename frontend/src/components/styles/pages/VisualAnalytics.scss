@@ -43,6 +43,7 @@
 
   &__map-region { min-width: 0; min-height: 0; position: relative; padding: $spacing-05; display: flex; flex-direction: column; background: $layer; }
   &__map-header { display: flex; justify-content: space-between; gap: $spacing-05; align-items: start; }
+  &__map-actions { display: flex; gap: $spacing-03; align-items: center; }
   &__map-header h1 { @include type-style('heading-04'); margin-bottom: $spacing-02; }
   &__map-header p { @include type-style('body-compact-01'); color: $text-secondary; max-width: 50rem; }
   &__canvas { display: block; flex: 1; width: 100%; min-height: 0; cursor: crosshair; border: 1px solid $border-subtle-01; }
