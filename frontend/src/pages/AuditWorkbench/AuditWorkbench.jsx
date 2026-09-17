@@ -112,6 +112,7 @@ const AuditWorkbench = () => {
 
   const apparatusCards = useMemo(() => {
     const evidenceLinkedClaims = claims.filter((claim) => (claim.evidence_count || 0) > 0).length
+    const crossReadMappingCount = crossReadMap.reduce((total, passage) => total + (passage.mapping_count || passage.mappings?.length || 0), 0)
 
     return [
       {
