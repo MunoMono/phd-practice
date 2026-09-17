@@ -43,7 +43,9 @@
   }
 
   .claims-workbench__detail-copy {
-    margin-bottom: $spacing-04;
+    margin: 0 0 $spacing-04;
+    font-size: 1.125rem;
+    line-height: 1.45;
   }
 
   .claims-workbench__tag-row {
@@ -60,8 +62,9 @@
   }
 
   .claims-workbench__evidence-item {
+    border-left: 2px solid var(--cds-border-interactive);
     border-bottom: 1px solid $border-subtle-01;
-    padding-bottom: $spacing-04;
+    padding: 0 0 $spacing-04 $spacing-04;
 
     p {
       margin: $spacing-02 0 0;
@@ -82,5 +85,16 @@
 
   .claims-workbench__updated {
     margin-bottom: 0;
+  }
+
+  @media (max-width: 42rem) {
+    .claims-workbench__table-wrap .cds--data-table {
+      min-width: 31rem;
+    }
+
+    .claims-workbench__detail-actions {
+      align-items: flex-start;
+      flex-direction: column;
+    }
   }
 }

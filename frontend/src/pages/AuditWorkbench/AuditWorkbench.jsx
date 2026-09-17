@@ -111,30 +111,18 @@ const AuditWorkbench = () => {
   }, [selectedQueryId])
 
   const apparatusCards = useMemo(() => {
-    const backendHealthAvailable = Boolean(backendHealth && typeof backendHealth === 'object' && !Array.isArray(backendHealth) && backendHealth.status)
     const evidenceLinkedClaims = claims.filter((claim) => (claim.evidence_count || 0) > 0).length
-    const crossReadMappingCount = crossReadMap.reduce((total, passage) => total + (passage.mapping_count || passage.mappings?.length || 0), 0)
 
     return [
       {
-        label: 'Backend health',
-        value: loading ? 'Loading...' : backendHealthAvailable ? backendHealth.status : 'Unavailable',
-        note: loading ? 'Checking deployment health surface' : backendHealthAvailable ? 'Live /health status' : 'Health endpoint is not exposed through the current deployment.',
+        label: 'Apparatus connection',
+        value: loading ? 'Checking' : error ? 'Attention needed' : 'Online',
+        note: loading ? 'Connecting to live research records' : error ? 'One or more live research records could not be loaded' : 'Live research records are responding',
       },
       {
         label: 'Runtime readiness',
         value: loading ? 'Loading...' : runtimeStatus?.model_status || 'Unavailable',
-        note: loading ? 'Checking model state' : runtimeStatus?.model_ready ? 'Qwen3 8B ready' : 'Qwen3 8B unavailable',
-      },
-      {
-        label: 'Semantic reranker',
-        value: 'BAAI/bge-small-en-v1.5',
-        note: '384-dimensional local Mac embeddings; cosine reranks provenance-valid documentary passages only, with no whole-corpus vector index.',
-      },
-      {
-        label: 'Relevance reranker',
-        value: 'cross-encoder/ms-marco-MiniLM-L-6-v2',
-        note: 'Local Mac joint question-passage scoring over provenance-valid documentary candidates; it does not generate historical claims.',
+        note: loading ? 'Checking model state' : runtimeStatus?.model_ready ? 'Qwen3 8B ready for evidence-bound synthesis' : 'Model is not ready for synthesis',
       },
       {
         label: 'Query runs',
@@ -154,15 +142,10 @@ const AuditWorkbench = () => {
       {
         label: 'Claims',
         value: loading ? 'Loading...' : `${claims.length} total / ${evidenceLinkedClaims} evidence-linked`,
-        note: 'Claim-evidence apparatus outputs',
-      },
-      {
-        label: 'Authority register',
-        value: loading ? 'Loading...' : authoritySummary ? 'Available' : 'Unavailable',
-        note: loading ? 'Checking authority register state' : authoritySummary ? `${authoritySummary.totalRecords} records / ${authoritySummary.count} types` : 'Authority register not available.',
+        note: 'Claims ready for evidence review',
       },
     ]
-  }, [authoritySummary, backendHealth, claims, crossReadMap, runtimeStatus, loading, missingnessEvents.length, queryRuns.length])
+  }, [claims, error, loading, queryRuns.length, runtimeStatus])
 
   const selectedQueryRunExportsEnabled = Boolean(selectedQueryId)
 
@@ -271,8 +254,8 @@ const AuditWorkbench = () => {
 
       <Column>
         <Tile>
-          <PanelHeader title="Apparatus status" description="Live counts and readiness signals from the working apparatus." />
-          <div className="app-card-grid app-card-grid--dense app-card-grid--responsive">
+          <PanelHeader title="Operational overview" description="The live research apparatus at a glance." />
+          <div className="audit-workbench__status-grid">
             {apparatusCards.map((card) => (
               <div key={card.label} className="app-stat-card audit-workbench__status-card">
                 <strong className="app-stat-card__title">{card.label}</strong>

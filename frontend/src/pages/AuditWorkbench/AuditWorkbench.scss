@@ -1,6 +1,12 @@
 @use '@carbon/react/scss/spacing' as *;
 
 .audit-workbench {
+  &__status-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: $spacing-04;
+  }
+
   &__tag-row {
     margin-bottom: $spacing-05;
   }
@@ -15,5 +21,23 @@
 
   &__status-card {
     min-height: 100%;
+
+    .app-stat-card__value {
+      font-size: 1.5rem;
+      line-height: 1.25;
+      overflow-wrap: anywhere;
+    }
+  }
+
+  @media (max-width: 66rem) {
+    &__status-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  @media (max-width: 42rem) {
+    &__status-grid {
+      grid-template-columns: 1fr;
+    }
   }
 }

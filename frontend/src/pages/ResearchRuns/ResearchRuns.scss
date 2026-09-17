@@ -7,8 +7,10 @@
 .research-runs__summary {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.75rem;
+  gap: 0.5rem 1rem;
   align-items: center;
+  color: var(--cds-text-secondary);
+  font-size: 0.875rem;
 }
 
 .research-runs__question {
@@ -18,7 +20,14 @@
 
 .research-runs__evidence {
   border-top: 1px solid var(--cds-border-subtle-01);
-  padding-top: 1rem;
+  padding: 1rem 0;
+}
+
+.research-runs__evidence-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  align-items: start;
 }
 
 .research-runs__evidence p {
@@ -27,10 +36,11 @@
 }
 
 .research-runs__config {
-  max-height: 22rem;
+  max-height: 18rem;
   overflow: auto;
-  padding: 1rem;
-  background: var(--cds-layer-01);
+  padding: 0.75rem;
+  border-left: 2px solid var(--cds-border-subtle-01);
+  background: var(--cds-layer-accent-01);
   font-size: 0.8125rem;
   line-height: 1.45;
   white-space: pre-wrap;
@@ -47,4 +57,16 @@
 .research-runs__saved {
   display: inline-block;
   margin-left: 0.75rem;
+}
+
+@media (max-width: 42rem) {
+  .research-runs__summary {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .research-runs__evidence-head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
 }

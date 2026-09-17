@@ -163,21 +163,12 @@ const ClaimsWorkbench = () => {
       <Column>
         <PageHeader
           title="Claims and evidence"
-          description="Tie interpretive claims to source chunks, support levels, caveats, and reviewer status before export."
+          description="Review interpretive claims against retained source evidence before supervisor review or export."
           actions={(
             <Tag type="green" size="md">
               <CheckmarkOutline size={16} /> Evidence-gated
             </Tag>
           )}
-        />
-      </Column>
-
-      <Column>
-        <InlineNotification
-          lowContrast
-          kind="info"
-          title="Analytical output"
-          subtitle="This view produces a claim-evidence matrix. A claim cannot be exported as supported unless at least one evidence chunk is attached."
         />
       </Column>
 
@@ -201,8 +192,8 @@ const ClaimsWorkbench = () => {
       <Column lg={6} md={8} sm={4}>
         <Tile>
           <PanelHeader
-            title="Claim table"
-            description="Select a claim to inspect evidence coverage, support level, caveats, and reviewer status."
+            title="Claim register"
+            description="Select a claim to inspect its evidence, caveats, and review state."
             actions={(
               <div className="app-actions-row">
                 <Button kind="ghost" size="sm" renderIcon={Download} onClick={handleExportCsv}>Export claim-evidence CSV</Button>
@@ -245,6 +236,11 @@ const ClaimsWorkbench = () => {
                     </TableRow>
                   )
                 })}
+                {!loading && claims.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={4}>No persisted claims are available for review.</TableCell>
+                  </TableRow>
+                )}
               </TableBody>
               </Table>
             </TableContainer>
@@ -255,7 +251,7 @@ const ClaimsWorkbench = () => {
 
       <Column lg={6} md={8} sm={4}>
         <Tile>
-          <PanelHeader title="Claim detail" description="Update support level, caveats, and reviewer status while keeping evidence-chunk gating explicit." />
+          <PanelHeader title="Review record" description="Support status is constrained by retained evidence; caveats and reviewer assessment remain editable." />
           {selectedClaim && (
             <>
               <div className="claims-workbench__detail-head">
@@ -275,7 +271,6 @@ const ClaimsWorkbench = () => {
                   <SelectItem key={option.value} value={option.value} text={option.text} />
                 ))}
               </Select>
-              <InlineNotification lowContrast kind="info" title="Caveats" subtitle={selectedClaim.caveats || 'No caveats recorded yet.'} />
               <TextArea id="claim-caveats" labelText="Caveats" rows={5} value={selectedClaim.caveats || ''} onChange={(event) => handleClaimChange('caveats', event.target.value)} />
               <Select id="claim-reviewer-status" labelText="Reviewer status" value={selectedClaim.reviewer_status} onChange={(event) => handleClaimChange('reviewer_status', event.target.value)}>
                 {reviewerStatusOptions.map((option) => (
@@ -295,7 +290,7 @@ const ClaimsWorkbench = () => {
               )}
               <div className="claims-workbench__detail-actions">
                 <Button size="sm" onClick={saveClaim} disabled={saveState === 'saving'}>Save claim updates</Button>
-                {saveState === 'saved' && <span>Saved</span>}
+                {saveState === 'saved' && <Tag type="green" size="sm">Saved</Tag>}
               </div>
               <p className="claims-workbench__updated"><strong>Updated:</strong> {selectedClaim.updated_at}</p>
             </>
