@@ -427,7 +427,13 @@ const AuditWorkbench = () => {
         <Tile>
           <PanelHeader title="Export surface" description="Reach the existing apparatus exports from one place." />
           <div className="app-card-grid app-card-grid--dense">
-            <Select id="selected-query-run" labelText="Selected query run" value={selectedQueryId} onChange={(event) => setSelectedQueryId(event.target.value)}>
+            <Select
+              id="selected-query-run"
+              labelText="Selected query run"
+              title={selectedQueryId || (loading ? 'Loading query runs...' : queryRuns.length ? 'Choose a query run' : 'No query runs available')}
+              value={selectedQueryId}
+              onChange={(event) => setSelectedQueryId(event.target.value)}
+            >
               <SelectItem value="" text={loading ? 'Loading query runs...' : queryRuns.length ? 'Choose a query run' : 'No query runs available'} />
               {queryRuns.map((run) => (
                 <SelectItem key={run.query_id} value={run.query_id} text={`${run.query_id} · ${run.prompt}`} />
