@@ -8,7 +8,10 @@ from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel
 
 from app.core.database import LocalSessionLocal
-from app.models.research_outputs import Claim, ClaimEvidence, MissingnessEvent, QueryRun, QueryRunChunk, QueryRunExport
+from app.models.research_outputs import Claim, ClaimEvidence, MissingnessEvent, QueryRun, QueryRunChunk
+from app.services.claim_revision_service import record_claim_revision
+from app.services.provenance_event_service import record_provenance_event
+from app.services.provenance_integrity import claim_evidence_digest, query_run_chunk_digest, query_run_digest
 from app.services.provenance_service import ProvenanceService
 
 router = APIRouter()
@@ -100,6 +103,7 @@ def serialize_run_chunk(chunk: QueryRunChunk) -> dict[str, Any]:
         "provenance_json": chunk.provenance_json,
         "source_metadata": source_metadata,
         "provenance_available": chunk.provenance_json is not None,
+        "content_sha256": chunk.content_sha256,
         "created_at": chunk.created_at.isoformat() if chunk.created_at else None,
     }
 
@@ -116,6 +120,7 @@ def serialize_query_run(run: QueryRun, include_chunks: bool = False) -> dict[str
         "failure_reason": run.failure_reason,
         "retrieved_chunk_count": run.retrieved_chunk_count,
         "export_status": run.export_status,
+        "provenance_sha256": run.provenance_sha256,
         "created_at": run.created_at.isoformat() if run.created_at else None,
         "updated_at": run.updated_at.isoformat() if run.updated_at else None,
     }
@@ -184,10 +189,6 @@ def build_markdown_export(run: QueryRun) -> str:
         "Provenance availability is recorded per chunk. Missing provenance is preserved as unavailable, not dropped.",
         "",
     ])
-
-
-def record_export(db, query_id: str, export_type: str, export_payload: str) -> None:
-    db.add(QueryRunExport(query_id=query_id, export_type=export_type, export_payload=export_payload))
 
 
 def build_run_chunk_payload(source: QueryRunSourceInput, metadata_fallback: Optional[dict[str, Any]] = None) -> dict[str, Any]:
@@ -284,6 +285,10 @@ def build_missingness_event_values(run: QueryRun, request: QueryRunMissingnessRe
     }
 
 
+def requires_automatic_missingness(run: QueryRun) -> bool:
+    return bool(run.failed_or_partial) or run.retrieved_chunk_count == 0
+
+
 @router.get("")
 @router.get("/")
 async def list_query_runs():
@@ -347,6 +352,7 @@ async def create_query_run(request: QueryRunCreateRequest):
         for index, source in enumerate(sources):
             metadata_fallback = metadata_rows[index] if index < len(metadata_rows) else None
             chunk_payload = build_run_chunk_payload(source, metadata_fallback=metadata_fallback)
+            chunk_payload["content_sha256"] = query_run_chunk_digest(chunk_payload)
             persisted_chunks.append(QueryRunChunk(query_id=query_id, **chunk_payload))
 
         for chunk in persisted_chunks:
@@ -356,6 +362,54 @@ async def create_query_run(request: QueryRunCreateRequest):
         if run.retrieved_chunk_count == 0 and not run.failure_reason:
             run.failure_reason = "No supporting source chunks were returned."
             run.failed_or_partial = True
+
+        run.provenance_sha256 = query_run_digest(
+            {
+                "query_id": run.query_id,
+                "prompt": run.prompt,
+                "mode": run.mode,
+                "model": run.model,
+                "response": run.response,
+                "caveats": run.caveats,
+                "failed_or_partial": run.failed_or_partial,
+                "failure_reason": run.failure_reason,
+            },
+            [chunk.content_sha256 for chunk in persisted_chunks],
+        )
+
+        record_provenance_event(
+            db,
+            "query_run.recorded",
+            "query_run",
+            run.query_id,
+            {
+                "provenance_sha256": run.provenance_sha256,
+                "retrieved_chunk_count": run.retrieved_chunk_count,
+                "failed_or_partial": bool(run.failed_or_partial),
+            },
+        )
+        if requires_automatic_missingness(run):
+            existing_missingness = db.query(MissingnessEvent).filter(
+                MissingnessEvent.query_id == run.query_id,
+                MissingnessEvent.type == "retrieval",
+                MissingnessEvent.auto_generated.is_(True),
+            ).first()
+            if not existing_missingness:
+                event = MissingnessEvent(
+                    event_id=f"miss-{uuid.uuid4().hex[:12]}",
+                    auto_generated=True,
+                    **build_missingness_event_values(run, QueryRunMissingnessRequest(
+                        reviewer_note="Automatically created from a failed, partial, or empty Source Interrogation run.",
+                    )),
+                )
+                db.add(event)
+                record_provenance_event(
+                    db,
+                    "missingness.auto_created",
+                    "missingness_event",
+                    event.event_id,
+                    {"query_id": run.query_id, "type": event.type, "status": event.status},
+                )
 
         db.commit()
         db.refresh(run)
@@ -380,9 +434,6 @@ async def export_query_run_json(query_id: str):
     try:
         run = get_query_run_or_404(db, query_id)
         payload = json.dumps(serialize_query_run(run, include_chunks=True), indent=2) + "\n"
-        record_export(db, query_id, "json", payload)
-        run.export_status = "json"
-        db.commit()
         return PlainTextResponse(
             payload,
             media_type="application/json",
@@ -398,9 +449,6 @@ async def export_query_run_markdown(query_id: str):
     try:
         run = get_query_run_or_404(db, query_id)
         payload = build_markdown_export(run)
-        record_export(db, query_id, "markdown", payload)
-        run.export_status = "markdown"
-        db.commit()
         return PlainTextResponse(
             payload,
             media_type="text/markdown",
@@ -443,8 +491,22 @@ async def create_claim_from_query_run(query_id: str, request: QueryRunClaimReque
                     page_range=evidence_row.page_range,
                     citation_text=evidence_row.citation_text,
                     provenance_json=evidence_row.provenance_json,
+                    evidence_sha256=claim_evidence_digest({
+                        "claim_id": claim.claim_id,
+                        "chunk_id": evidence_row.chunk_id,
+                        "document_id": evidence_row.document_id,
+                        "page_range": evidence_row.page_range,
+                        "citation_text": evidence_row.citation_text,
+                        "provenance_json": evidence_row.provenance_json,
+                    }),
                 )
             )
+
+        record_claim_revision(db, claim, "claim.created_from_query_run")
+        record_provenance_event(
+            db, "claim.created", "claim", claim.claim_id,
+            {"query_id": run.query_id, "evidence_count": len(evidence_rows), "support_level": claim.support_level},
+        )
 
         db.commit()
         db.refresh(claim)

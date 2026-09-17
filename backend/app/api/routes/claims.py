@@ -1,6 +1,7 @@
 import csv
 import io
 import uuid
+from datetime import datetime
 from typing import Any, Literal, Optional
 
 from fastapi import APIRouter, HTTPException
@@ -10,6 +11,9 @@ from pydantic import BaseModel
 from app.core.database import LocalSessionLocal
 from app.models.document import DocumentChunk
 from app.models.research_outputs import Claim, ClaimEvidence
+from app.services.claim_revision_service import record_claim_revision
+from app.services.provenance_event_service import record_provenance_event
+from app.services.provenance_integrity import claim_evidence_digest
 from app.services.provenance_service import ProvenanceService
 
 router = APIRouter()
@@ -50,12 +54,15 @@ def serialize_evidence(evidence: ClaimEvidence) -> dict[str, Any]:
         "page_range": evidence.page_range,
         "citation_text": evidence.citation_text,
         "provenance_json": evidence.provenance_json,
+        "evidence_sha256": evidence.evidence_sha256,
+        "withdrawn_at": evidence.withdrawn_at.isoformat() if evidence.withdrawn_at else None,
+        "withdrawal_reason": evidence.withdrawal_reason,
         "created_at": evidence.created_at.isoformat() if evidence.created_at else None,
     }
 
 
 def serialize_claim(claim: Claim, include_evidence: bool = False) -> dict[str, Any]:
-    evidence_rows = claim.evidence or []
+    evidence_rows = [row for row in (claim.evidence or []) if row.withdrawn_at is None]
     payload = {
         "id": claim.id,
         "claim_id": claim.claim_id,
@@ -98,7 +105,7 @@ def get_export_payload(db) -> list[dict[str, Any]]:
     export_rows: list[dict[str, Any]] = []
 
     for claim in claims:
-        evidence_rows = claim.evidence or []
+        evidence_rows = [row for row in (claim.evidence or []) if row.withdrawn_at is None]
         has_evidence = len(evidence_rows) > 0
         downgraded = claim.support_level == "supported" and not has_evidence
         support_level = "unresolved" if downgraded else claim.support_level
@@ -142,6 +149,11 @@ async def list_claims():
 async def create_claim(request: ClaimCreateRequest):
     db = LocalSessionLocal()
     try:
+        if request.support_level == "supported":
+            raise HTTPException(
+                status_code=400,
+                detail="A claim cannot be marked supported until direct evidence is attached.",
+            )
         claim = Claim(
             claim_id=f"claim-{uuid.uuid4().hex[:12]}",
             claim_text=request.claim_text,
@@ -150,6 +162,11 @@ async def create_claim(request: ClaimCreateRequest):
             reviewer_status=request.reviewer_status,
         )
         db.add(claim)
+        record_claim_revision(db, claim, "claim.created")
+        record_provenance_event(
+            db, "claim.created", "claim", claim.claim_id,
+            {"support_level": claim.support_level, "reviewer_status": claim.reviewer_status},
+        )
         db.commit()
         db.refresh(claim)
         return serialize_claim(claim, include_evidence=True)
@@ -247,6 +264,14 @@ async def update_claim(claim_id: str, request: ClaimUpdateRequest):
     try:
         claim = get_claim_or_404(db, claim_id)
 
+        if request.support_level == "supported" and not any(
+            evidence.withdrawn_at is None for evidence in (claim.evidence or [])
+        ):
+            raise HTTPException(
+                status_code=400,
+                detail="A claim cannot be marked supported until direct evidence is attached.",
+            )
+
         if request.claim_text is not None:
             claim.claim_text = request.claim_text
         if request.support_level is not None:
@@ -256,6 +281,11 @@ async def update_claim(claim_id: str, request: ClaimUpdateRequest):
         if request.reviewer_status is not None:
             claim.reviewer_status = request.reviewer_status
 
+        record_claim_revision(db, claim, "claim.updated")
+        record_provenance_event(
+            db, "claim.updated", "claim", claim.claim_id,
+            {"support_level": claim.support_level, "reviewer_status": claim.reviewer_status},
+        )
         db.commit()
         db.refresh(claim)
         return serialize_claim(claim, include_evidence=True)
@@ -302,8 +332,20 @@ async def attach_claim_evidence(claim_id: str, request: ClaimEvidenceCreateReque
             page_range=page_range,
             citation_text=citation_text,
             provenance_json=provenance_json,
+            evidence_sha256=claim_evidence_digest({
+                "claim_id": claim.claim_id,
+                "chunk_id": request.chunk_id,
+                "document_id": document_id,
+                "page_range": page_range,
+                "citation_text": citation_text,
+                "provenance_json": provenance_json,
+            }),
         )
         db.add(evidence)
+        record_provenance_event(
+            db, "claim_evidence.attached", "claim_evidence", f"{claim.claim_id}:{request.chunk_id}",
+            {"claim_id": claim.claim_id, "chunk_id": request.chunk_id, "evidence_sha256": evidence.evidence_sha256},
+        )
         db.commit()
         db.refresh(evidence)
         return serialize_evidence(evidence)
@@ -323,8 +365,13 @@ async def remove_claim_evidence(claim_id: str, evidence_id: int):
         if not evidence:
             raise HTTPException(status_code=404, detail="Claim evidence not found")
 
-        db.delete(evidence)
+        evidence.withdrawn_at = datetime.utcnow()
+        evidence.withdrawal_reason = "Withdrawn by researcher through the claim-evidence API."
+        record_provenance_event(
+            db, "claim_evidence.withdrawn", "claim_evidence", f"{claim_id}:{evidence.chunk_id}",
+            {"claim_id": claim_id, "chunk_id": evidence.chunk_id, "evidence_sha256": evidence.evidence_sha256},
+        )
         db.commit()
-        return {"message": "Claim evidence removed", "evidence_id": evidence_id}
+        return {"message": "Claim evidence withdrawn", "evidence_id": evidence_id}
     finally:
         db.close()

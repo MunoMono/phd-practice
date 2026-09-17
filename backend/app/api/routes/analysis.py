@@ -25,6 +25,7 @@ from app.services.turin_question_policy import matching_turin_question_policy
 from app.services.turin_retrieval_v3_service import TurinRetrievalV3Service
 from app.services.researcher_ui_capture_service import CAPTURE_MODE, ResearcherUiCaptureService, build_one_shot_prompt, parse_one_shot_output, project_claim_provenance
 from app.services.authority_registry import AuthorityRegistry
+from app.services.provenance_integrity import experiment_evidence_digest, experiment_run_digest
 from app.models.research_outputs import ExperimentRun, ExperimentRunEvidence
 
 router = APIRouter()
@@ -759,17 +760,42 @@ def _persist_comparison_snapshot(
         structured_response_json={"answer": answer, "comparison": comparison},
         provenance_validation_json=provenance, status="completed", fixture_only=False,
     )
-    db.add(run)
+    evidence_records = []
     for source in sources:
-        db.add(ExperimentRunEvidence(
+        evidence_payload = {
+            "run_id": run_id,
+            "rank": source.get("rank") or 1,
+            "chunk_id": source["chunk_id"],
+            "document_id": source["document_id"],
+            "supplied_excerpt": source.get("text") or "",
+            "snapshot_json": source,
+        }
+        evidence_records.append(ExperimentRunEvidence(
             run_id=run_id, rank=source.get("rank") or 1, score=source.get("score"),
             document_id=source["document_id"], pid=source.get("pid"), archive_record_pid=source.get("archive_record_pid"),
             archive_resolution_status=source.get("archive_resolution_status") or "archive_resolved_current",
             page_start=source.get("page_start"), page_end=source.get("page_end"), chunk_id=source["chunk_id"],
             chunk_sequence=source.get("chunk_sequence"), excerpt=source.get("text") or "", supplied_excerpt=source.get("text") or "",
             included_in_context=True, original_chars=len(source.get("text") or ""), supplied_chars=len(source.get("text") or ""),
-            excerpted=False, snapshot_json=source,
+            excerpted=False, snapshot_json=source, evidence_sha256=experiment_evidence_digest(evidence_payload),
         ))
+    run.output_sha256 = experiment_run_digest(
+        {
+            "run_id": run.run_id,
+            "research_question": run.exact_research_question,
+            "corpus_version": run.corpus_version,
+            "git_commit": run.git_commit,
+            "retrieval_config_json": run.retrieval_config_json,
+            "model_parameters_json": run.model_parameters_json,
+            "structured_response_json": run.structured_response_json,
+            "provenance_validation_json": run.provenance_validation_json,
+            "status": run.status,
+        },
+        [item.evidence_sha256 for item in evidence_records],
+    )
+    db.add(run)
+    for evidence in evidence_records:
+        db.add(evidence)
     db.commit()
     return run_id
 

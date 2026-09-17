@@ -442,9 +442,22 @@ const AuditWorkbench = () => {
               <Button kind="ghost" size="sm" renderIcon={Download} onClick={handleExportClaimsMarkdown}>Claim-evidence Markdown</Button>
             </div>
             {selectedQueryRun && (
-              <p className="app-copy-reset app-text-muted">
-                Selected run: {selectedQueryRun.query_id} | Retrieved chunks: {selectedQueryRun.retrieved_chunk_count} | Failed/partial: {selectedQueryRun.failed_or_partial ? 'yes' : 'no'}
-              </p>
+              <>
+                <p className="app-copy-reset app-text-muted">
+                  Selected run: {selectedQueryRun.query_id} | Retrieved chunks: {selectedQueryRun.retrieved_chunk_count} | Failed/partial: {selectedQueryRun.failed_or_partial ? 'yes' : 'no'}
+                </p>
+                <InlineNotification
+                  lowContrast
+                  kind={selectedQueryRun.provenance_sha256 ? 'info' : 'warning'}
+                  title={selectedQueryRun.provenance_sha256 ? 'Integrity binding available' : 'Integrity binding unavailable'}
+                  subtitle={selectedQueryRun.provenance_sha256
+                    ? `SHA-256 ${selectedQueryRun.provenance_sha256}. ${selectedQueryRun.chunks?.filter((chunk) => chunk.content_sha256).length || 0}/${selectedQueryRun.chunks?.length || 0} retained source chunks are individually bound.`
+                    : 'This historical run was stored before SHA-256 provenance bindings were introduced.'}
+                />
+                <p className="app-text-muted app-copy-tight">
+                  A checksum detects changes to the retained record. It is not a digital signature, C2PA manifest, or assessment of a source's authenticity.
+                </p>
+              </>
             )}
           </div>
         </Tile>

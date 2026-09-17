@@ -24,6 +24,7 @@ class MissingnessEvent(LocalBase):
     status = Column(String(32), nullable=False, default="open", index=True)
     reviewer_note = Column(Text)
     follow_up_action = Column(Text)
+    auto_generated = Column(Boolean, nullable=False, default=False, index=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -75,9 +76,23 @@ class ClaimEvidence(LocalBase):
     page_range = Column(String(255))
     citation_text = Column(Text)
     provenance_json = Column(JSONB)
+    evidence_sha256 = Column(String(64), index=True)
+    withdrawn_at = Column(DateTime)
+    withdrawal_reason = Column(Text)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     claim = relationship("Claim", back_populates="evidence")
+
+
+class ClaimRevision(LocalBase):
+    __tablename__ = "claim_revisions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    claim_id = Column(String(255), ForeignKey("claims.claim_id", ondelete="RESTRICT"), nullable=False, index=True)
+    revision = Column(Integer, nullable=False)
+    reason = Column(String(128), nullable=False)
+    snapshot_json = Column(JSONB, nullable=False)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
 
 
 class QueryRun(LocalBase):
@@ -94,6 +109,7 @@ class QueryRun(LocalBase):
     failure_reason = Column(Text)
     retrieved_chunk_count = Column(Integer, nullable=False, default=0)
     export_status = Column(String(64))
+    provenance_sha256 = Column(String(64), index=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -114,6 +130,7 @@ class QueryRunChunk(LocalBase):
     citation_text = Column(Text)
     provenance_json = Column(JSONB)
     source_metadata_json = Column(JSONB)
+    content_sha256 = Column(String(64), index=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     query_run = relationship("QueryRun", back_populates="chunks")
@@ -129,6 +146,21 @@ class QueryRunExport(LocalBase):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     query_run = relationship("QueryRun", back_populates="exports")
+
+
+class ProvenanceEvent(LocalBase):
+    __tablename__ = "provenance_events"
+
+    id = Column(Integer, primary_key=True, index=True)
+    event_id = Column(String(255), unique=True, nullable=False, index=True)
+    event_type = Column(String(128), nullable=False, index=True)
+    subject_type = Column(String(64), nullable=False, index=True)
+    subject_id = Column(String(255), nullable=False, index=True)
+    actor = Column(String(255), nullable=False, default="system")
+    previous_event_sha256 = Column(String(64), index=True)
+    event_sha256 = Column(String(64), nullable=False, unique=True, index=True)
+    payload_json = Column(JSONB, nullable=False)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
 
 
 class ExperimentRun(LocalBase):
@@ -184,6 +216,7 @@ class ExperimentRun(LocalBase):
     display_response_json = Column(JSONB)
     structured_response_json = Column(JSONB)
     provenance_validation_json = Column(JSONB)
+    output_sha256 = Column(String(64), index=True)
     status = Column(String(64), nullable=False, index=True)
     error_code = Column(String(128))
     error_message = Column(Text)
@@ -257,6 +290,7 @@ class ExperimentRunEvidence(LocalBase):
     excerpted = Column(Boolean)
     exclusion_reason = Column(String(128))
     snapshot_json = Column(JSONB, nullable=False)
+    evidence_sha256 = Column(String(64), index=True)
 
     experiment_run = relationship("ExperimentRun", back_populates="evidence")
 
