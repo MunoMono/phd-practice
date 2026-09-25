@@ -454,6 +454,19 @@ class ExploratoryInterrogationTests(unittest.TestCase):
             analysis._catalogue_authorities("When was the DDR formally constituted?")
             self.assertIn("ref_ddr_period", resolve.call_args.args[2])
 
+    def test_catalogue_authority_lookup_failure_keeps_retrieval_available(self):
+        from sqlalchemy.exc import ProgrammingError
+
+        with patch.object(analysis, "LocalSessionLocal", return_value=FakeDatabase()), patch.object(
+            analysis.AuthorityRegistry,
+            "resolve",
+            side_effect=ProgrammingError("SELECT", {}, Exception("database_authorities is absent")),
+        ):
+            self.assertEqual(
+                analysis._catalogue_authorities("Why did the Department of Design Research close?"),
+                [],
+            )
+
     def test_named_period_matches_period_register_label(self):
         rows = [{"authority_id": "1973-79", "label": "Peak productivity", "description": "A register description.", "code": None, "metadata": {}}]
         self.assertEqual(analysis.AuthorityRegistry._period_matches("What did the Peak productivity period cover?", rows), rows)

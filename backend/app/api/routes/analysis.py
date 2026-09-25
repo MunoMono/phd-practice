@@ -12,6 +12,7 @@ import re
 import uuid
 import time
 from sqlalchemy import bindparam, text
+from sqlalchemy.exc import SQLAlchemyError
 
 from app.services.inference_service import InferenceTimeoutError, get_inference_service
 from app.core.database import LocalSessionLocal
@@ -209,8 +210,12 @@ def _catalogue_authorities(query: str, limit: int = 5) -> list[dict[str, Any]]:
         return []
     db = LocalSessionLocal()
     try:
-        contexts = AuthorityRegistry().resolve(db, query, authority_types)
-        return [context.model_dump() for context in contexts[:limit]]
+        try:
+            contexts = AuthorityRegistry().resolve(db, query, authority_types)
+            return [context.model_dump() for context in contexts[:limit]]
+        except SQLAlchemyError:
+            logger.warning("Authority registry unavailable; continuing without authority context")
+            return []
     finally:
         db.close()
 

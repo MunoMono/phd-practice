@@ -106,8 +106,21 @@ TURIN_QUESTION_POLICIES = load_question_policies(
 )
 
 
+def _is_ddr_closure_rationale_question(question: str) -> bool:
+    normalized = " ".join(question.lower().split())
+    concerns_ddr = "ddr" in normalized or "department of design research" in normalized
+    concerns_closure = any(term in normalized for term in ("close", "closed", "closure", "closing"))
+    asks_for_rationale = any(term in normalized for term in ("why", "reason", "rationale", "cause"))
+    return concerns_ddr and concerns_closure and asks_for_rationale
+
+
 def matching_turin_question_policy(question: str) -> QuestionEvidencePolicy | None:
-    return next((policy for policy in TURIN_QUESTION_POLICIES if policy.matches(question)), None)
+    matched_policy = next((policy for policy in TURIN_QUESTION_POLICIES if policy.matches(question)), None)
+    if matched_policy is not None:
+        return matched_policy
+    if _is_ddr_closure_rationale_question(question):
+        return next(policy for policy in TURIN_QUESTION_POLICIES if policy.policy_id == "SM1")
+    return None
 
 
 def validate_turin_question_policies() -> None:

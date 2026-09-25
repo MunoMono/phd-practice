@@ -48,6 +48,15 @@ class ArchiveFirstNominationTests(unittest.TestCase):
         self.assertEqual(temporal_policy.stage_fallback, {"final_synthesis": "EMPTY_TYPED_SYNTHESIS"})
         self.assertEqual(missingness_policy.stage_fallback, {"source_analysis": "CONTEXTUAL_ONLY"})
 
+    def test_natural_language_ddr_closure_rationale_uses_sm1_reservation(self):
+        policy = matching_turin_question_policy(
+            "Why did the Department of Design Research close?"
+        )
+
+        self.assertIsNotNone(policy)
+        self.assertEqual(policy.policy_id, "SM1")
+        self.assertEqual(policy.reservation_type, "SCOPED_MISSINGNESS")
+
     def test_quoted_concepts_preserve_explicit_multi_word_concepts(self):
         self.assertEqual(
             TurinArchiveFirstRetrievalService._quoted_concepts(
