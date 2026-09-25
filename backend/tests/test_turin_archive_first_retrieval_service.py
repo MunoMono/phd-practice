@@ -1,5 +1,6 @@
 import sys
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
@@ -56,6 +57,27 @@ class ArchiveFirstNominationTests(unittest.TestCase):
         self.assertIsNotNone(policy)
         self.assertEqual(policy.policy_id, "SM1")
         self.assertEqual(policy.reservation_type, "SCOPED_MISSINGNESS")
+
+    def test_scoped_missingness_reservation_is_exclusive(self):
+        service = TurinArchiveFirstRetrievalService()
+        reserved_results = [
+            {"document_id": "frayling", "chunk_id": "frayling-chunk"},
+            {"document_id": "rector", "chunk_id": "rector-chunk"},
+        ]
+
+        with patch.object(service, "_explicit_title_document_ids", return_value=[]), patch.object(
+            service, "_is_archive_scope_overview_question", return_value=False
+        ), patch.object(service, "_configured_document_page_results", return_value=[]), patch.object(
+            service, "_configured_reservation_results", return_value=reserved_results
+        ), patch.object(service, "_asset_rows") as asset_rows:
+            retrieval = service.retrieve(
+                object(), "Why did the Department of Design Research close?", 5, "corpus-test"
+            )
+
+        self.assertEqual(retrieval["results"], reserved_results)
+        self.assertEqual(retrieval["transparency"]["policy_id"], "SM1")
+        self.assertTrue(retrieval["diagnostics"]["configured_reservation_exclusive"])
+        asset_rows.assert_not_called()
 
     def test_quoted_concepts_preserve_explicit_multi_word_concepts(self):
         self.assertEqual(

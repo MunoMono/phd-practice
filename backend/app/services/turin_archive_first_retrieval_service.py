@@ -354,6 +354,25 @@ class TurinArchiveFirstRetrievalService:
     def retrieve(self, db: Any, question: str, selected_top_k: int, corpus_version: str) -> dict[str, Any]:
         plan = self.planner.build_plan(db, question)
         policy = matching_turin_question_policy(question)
+        results = self._configured_document_page_results(db, question, corpus_version)
+        if not results:
+            results = self._configured_reservation_results(db, question)
+        if results and policy and policy.reservation_type == "SCOPED_MISSINGNESS":
+            return {
+                "results": results,
+                "transparency": {
+                    "strategy": "configured_question_policy_reservation_v1",
+                    "policy_id": policy.policy_id,
+                },
+                "diagnostics": {
+                    "archive_candidate_count": 0,
+                    "retrieved_documentary_source_count": len(results),
+                    "configured_reservation_exclusive": True,
+                },
+                "archival_discovery": [], "document_availability": [],
+                "archival_context_only": [], "corpus_representation_gaps": [],
+            }
+        plan = self.planner.build_plan(db, question)
         source_selection = policy.source_selection or {} if policy else {}
         required_source_families = set(source_selection.get("required_source_families", []))
         assets = self._asset_rows(db)
@@ -371,9 +390,6 @@ class TurinArchiveFirstRetrievalService:
         nominations.sort(key=lambda item: (-item["score"], str(item.get("asset_pid") or item.get("asset_id"))))
         nominations = nominations[:MAX_ARCHIVE_CANDIDATES]
         query_terms = set(_terms(question))
-        results = self._configured_document_page_results(db, question, corpus_version)
-        if not results:
-            results = self._configured_reservation_results(db, question)
         if not results:
             results = self._documentary_quoted_concept_results(
                 db, question, corpus_version, min(MAX_DOCUMENTARY_QUOTED_CONCEPT_SOURCES, selected_top_k)
