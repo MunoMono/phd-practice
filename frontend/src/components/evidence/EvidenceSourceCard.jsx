@@ -76,18 +76,20 @@ const EvidenceSourceCard = ({
     INFERENCE_ONLY: 'Inference only',
     NOT_RELEVANT: 'Not relevant'
   }[source.evidenceClassification?.relationship_to_question || source.evidenceClassification?.classification]
+  const title = source.title || 'Document title not yet exposed by endpoint.'
 
   return (
     <Tile id={id} className="evidence-source-card">
       <div className="evidence-source-card__header">
         <div>
           <h4>Source {source.sourceId || index + 1}</h4>
-          <p>{source.title || 'Document title not yet exposed by endpoint.'}</p>
+          <p>{title} | {source.date || 'Date not recorded'}</p>
         </div>
         <div className="evidence-source-card__header-actions">
           <SourceAiLabel source={source} classificationLabel={classificationLabel} />
           <dl className="evidence-source-card__status" aria-label="Source retrieval status">
             <div><dt>Archive ID</dt><dd>{source.pid || 'Unavailable'}</dd></div>
+            <div><dt>Answer use</dt><dd>{source.evidenceState || 'Retrieved candidate'}</dd></div>
             <div><dt>Relation</dt><dd>{classificationLabel || 'Not classified'}</dd></div>
             <div><dt>Status</dt><dd>{source.provenanceStatus || 'Unavailable'}</dd></div>
           </dl>

@@ -15,7 +15,7 @@ import {
 import { Copy, Download, Launch, Search, Checkmark } from '@carbon/icons-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { exportExperimentRunJson, getExperimentRun, getResearcherUiCapture, interrogateExploratory, retrieveExploratoryV3 } from '../../api/experiments'
+import { exportExperimentRunJson, getArchiveScopes, getExperimentRun, getResearcherUiCapture, interrogateExploratory, retrieveExploratoryV3 } from '../../api/experiments'
 import { createMissingnessEventFromQueryRun, createQueryRun } from '../../api/queryRuns'
 import { listDocuments } from '../../api/documents'
 import { getRuntimeModelInfo } from '../../api/runtime'
@@ -76,7 +76,10 @@ const findQueryNamedDocument = (query, documents) => {
 }
 
 const AnswerAiLabel = ({ answerOrigin, model, sourceCount, confidence, queryId }) => {
-  const isDeterministicFallback = answerOrigin === 'deterministic_evidence_bound_fallback'
+  const isDeterministicFallback = [
+    'deterministic_evidence_bound_fallback',
+    'curated_cited_evidence_synthesis'
+  ].includes(answerOrigin)
 
   return (
     <AILabel size="xs" textLabel="Explain AI involvement in this answer">
@@ -104,6 +107,34 @@ const AnswerAiLabel = ({ answerOrigin, model, sourceCount, confidence, queryId }
         </AILabelActions>
       </AILabelContent>
     </AILabel>
+  )
+}
+
+const answerStatePresentation = {
+  synthesis_valid: { title: 'Answer', kind: 'success', subtitle: 'Validated synthesis with resolvable source citations.' },
+  synthesis_partial: { title: 'Partial synthesis', kind: 'warning', subtitle: 'Supported material is shown, but one or more validation checks remain under review.' },
+  synthesis_unavailable: { title: 'Synthesis unavailable', kind: 'warning', subtitle: 'Relevant evidence was retrieved, but a validated synthesis could not be produced for this run.' },
+  evidential_limit: { title: 'Evidential limit', kind: 'info', subtitle: 'The current evidence surface does not establish the requested proposition.' }
+}
+
+const AnswerStateNotice = ({ trace }) => {
+  const presentation = answerStatePresentation[trace?.answerState]
+  if (!presentation) return null
+  const records = trace.stageExecution?.records || {}
+  const failedStage = Object.entries(records).find(([, record]) => ['failed', 'partial'].includes(record.status))
+  const citedCount = trace.sourceUsage?.cited_source_numbers?.length || 0
+
+  return (
+    <div className="tracer__answer-state">
+      <InlineNotification lowContrast hideCloseButton kind={presentation.kind} title={presentation.title} subtitle={presentation.subtitle} />
+      {['synthesis_partial', 'synthesis_unavailable'].includes(trace.answerState) && (
+        <details>
+          <summary>Run diagnostics</summary>
+          <p>Retrieved sources: {trace.sources.length}. Cited sources: {citedCount}. Answer origin: {trace.answerOrigin || 'unavailable'}.</p>
+          {failedStage && <p>Stage: {failedStage[0]}. Reason: {failedStage[1].failure_message || failedStage[1].failure_code || 'unavailable'}.</p>}
+        </details>
+      )}
+    </div>
   )
 }
 
@@ -145,7 +176,7 @@ const mapRetrievedSources = (retrievedEvidence = []) => retrievedEvidence.map((s
   chunkId: source.chunk_id,
   documentId: source.document_id,
   pid: canonicalAssetPid,
-  date: source.archive_nomination?.display_date || source.snapshot?.date || source.date || null,
+  date: source.display_date || source.archive_nomination?.display_date || source.snapshot?.date || source.date || null,
   archiveRecordPid: provenance?.archive_record_pid || source.archive_record_pid,
   rank: source.rank,
   title: source.snapshot?.title || source.snapshot?.catalogue_metadata?.title || source.title || source.document_id,
@@ -250,6 +281,7 @@ const mapPersistedRunToTrace = (run) => {
     answer: response.answer || '',
     response: response.answer || '',
     answerOrigin: run.answer_origin || 'qwen_generated_synthesis',
+    answerState: run.answer_state || null,
     model: run.model?.name || 'Granite experiment',
     retrievedChunkIds: sources.map((source) => source.chunkId).filter(Boolean),
     citations: sources.map((source) => source.citation).filter(Boolean),
@@ -309,6 +341,7 @@ const mapCaptureToTrace = (capture) => {
     answer: capture.answer || '',
     response: capture.answer || '',
     answerOrigin: capture.answer_origin || 'qwen_generated_synthesis',
+    answerState: capture.answer_state || null,
     model: capture.model_config?.display_name || capture.model_config?.model || 'Qwen researcher capture',
     retrievedChunkIds: sources.map((source) => source.chunkId).filter(Boolean),
     citations: sources.map((source) => source.citation).filter(Boolean),
@@ -400,13 +433,15 @@ const displayCaptureAnswer = (trace) => {
 const AnswerWithSourceLinks = ({ trace }) => {
   if (trace?.answerParagraphs?.length > 0) {
     return trace.answerParagraphs.map((paragraph, paragraphIndex) => (
-      <p key={`answer-paragraph-${paragraphIndex}`}>
-        {paragraph.claims.map((claim, claimIndex) => {
+      <div className="tracer__answer-paragraph" key={`answer-paragraph-${paragraphIndex}`}>
+        {paragraph.title && <h4>{paragraph.title}</h4>}
+        <p>
+          {paragraph.claims.map((claim, claimIndex) => {
           const sourceNumbers = claim.sourceNumbers || claim.source_numbers || []
           const authorityNumbers = claim.authorityNumbers || claim.authority_numbers || []
           return (
             <span key={`answer-claim-${paragraphIndex}-${claimIndex}`}>
-            {claim.text}{' '}
+            {claim.text}
             {sourceNumbers.length > 0 && <sup className="tracer__source-citation">
               {sourceNumbers.map((sourceNumber, citationIndex) => (
                 <span key={sourceNumber}>{citationIndex > 0 ? ', ' : ''}<a href={`#source-${sourceNumber}`} aria-label={`Jump to source ${sourceNumber}`}>{sourceNumber}</a></span>
@@ -419,18 +454,12 @@ const AnswerWithSourceLinks = ({ trace }) => {
             </sup>}{' '}
             </span>
           )
-        })}
-      </p>
+          })}
+        </p>
+      </div>
     ))
   }
-  const answer = displayCaptureAnswer(trace)
-  const parts = answer.split(/(\[\d+(?:\s*,\s*\d+)*\])/g)
-  return parts.map((part, index) => {
-    const match = /^\[([\d,\s]+)\]$/.exec(part)
-    if (!match) return part
-    const citations = match[1].split(',').map((value) => value.trim()).filter(Boolean)
-    return <sup className="tracer__source-citation" key={`${part}-${index}`}>{citations.map((citation, citationIndex) => <span key={citation}>{citationIndex > 0 ? ', ' : ''}<a href={`#source-${citation}`} aria-label={`Jump to source ${citation}`}>{citation}</a></span>)}</sup>
-  })
+  return displayCaptureAnswer(trace)
 }
 
 const getRetrievalDiagnosticItems = (diagnostics) => {
@@ -510,6 +539,8 @@ const EvidenceTracer = () => {
   const [activeSession] = useState(() => loadSourceInterrogationSession())
   const [query, setQuery] = useState(() => activeSession?.query || '')
   const [availableDocuments, setAvailableDocuments] = useState([])
+  const [archiveScopes, setArchiveScopes] = useState([])
+  const [archiveRecordPid, setArchiveRecordPid] = useState('')
   const [firstDocumentId, setFirstDocumentId] = useState(() => activeSession?.firstDocumentId || '')
   const [secondDocumentId, setSecondDocumentId] = useState(() => activeSession?.secondDocumentId || '')
   const [mode, setMode] = useState(() => activeSession?.mode || 'runtime')
@@ -563,6 +594,14 @@ const EvidenceTracer = () => {
   useEffect(() => {
     let cancelled = false
     getRuntimeModelInfo().then((info) => !cancelled && setRuntimeInfo(info)).catch(() => !cancelled && setRuntimeInfo(null))
+    return () => { cancelled = true }
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    getArchiveScopes()
+      .then((payload) => !cancelled && setArchiveScopes(payload.scopes || []))
+      .catch(() => !cancelled && setArchiveScopes([]))
     return () => { cancelled = true }
   }, [])
 
@@ -663,6 +702,7 @@ const EvidenceTracer = () => {
 
   const handleTrace = async () => {
     const isComparison = mode === 'comparison'
+    const selectedChunkIds = (searchParams.get('selectedChunkIds') || '').split(',').map((value) => value.trim()).filter(Boolean)
     if (!query.trim() || loading || !['runtime', 'comparison', 'archive-first-one-shot', 'retrieval-v3'].includes(mode) || (isComparison && (!firstDocumentId || !secondDocumentId))) {
       return
     }
@@ -677,19 +717,34 @@ const EvidenceTracer = () => {
     setSavedRunLoadError('')
 
     try {
-      const queryNamedDocument = !firstDocumentId && !isComparison
-        ? findQueryNamedDocument(query, availableDocuments)
-        : null
-      const targetDocumentIds = [firstDocumentId || queryNamedDocument?.id, secondDocumentId].filter(Boolean)
+      const targetDocumentIds = isComparison
+        ? [firstDocumentId, secondDocumentId].filter(Boolean)
+        : []
       const analysis = mode === 'retrieval-v3'
-        ? await retrieveExploratoryV3(query, { top_k: 5 })
+        ? await retrieveExploratoryV3(query, { top_k: 8 })
         : await interrogateExploratory(query, {
-          top_k: 5,
+          top_k: 8,
+          ...(selectedChunkIds.length > 0 ? { selected_chunk_ids: selectedChunkIds } : {}),
+          ...(mode === 'runtime' && archiveRecordPid ? { archive_record_pid: archiveRecordPid } : {}),
           ...(targetDocumentIds.length > 0 ? { target_document_ids: targetDocumentIds } : {}),
           mode: mode === 'archive-first-one-shot' ? 'archive_first_one_shot' : isComparison ? 'comparison' : 'exploratory'
         })
-      const enrichedSources = mapRetrievedSources(analysis.retrieved_evidence || analysis.final_five)
+      const sourceUsage = analysis.source_usage || {}
+      const retainedSourceIds = new Set(sourceUsage.retained_evidence_source_ids || [])
+      const citedSourceNumbers = new Set(sourceUsage.cited_source_numbers || [])
+      const enrichedSources = mapRetrievedSources(analysis.retrieved_evidence || analysis.final_five).map((source, index) => ({
+        ...source,
+        evidenceState: citedSourceNumbers.has(index + 1)
+          ? 'Cited support'
+          : retainedSourceIds.has(`${source.documentId}:${source.chunkId}`)
+            ? 'Retained evidence'
+            : 'Retrieved candidate'
+      }))
 
+      const researcherFacingParagraphs = analysis.researcher_facing?.answer_paragraphs || []
+      const answerParagraphs = researcherFacingParagraphs.length > 0
+        ? researcherFacingParagraphs
+        : analysis.answer_paragraphs || []
       const nextTrace = {
         queryId: analysis.run_id || analysis.capture_id || analysis.query_id,
         prompt: query,
@@ -698,9 +753,11 @@ const EvidenceTracer = () => {
         retrievalMethod: analysis.retrieval_method || null,
         retrieval: analysis.retrieval || null,
         answer: analysis.answer || (mode === 'retrieval-v3' ? 'Retrieval-only diagnostic completed. No model inference was requested.' : ''),
-        answerParagraphs: analysis.answer_paragraphs || [],
+        answerParagraphs,
         response: analysis.answer || '',
         answerOrigin: analysis.answer_origin || (mode === 'retrieval-v3' ? 'retrieval_only' : 'qwen_generated_synthesis'),
+        answerState: analysis.answer_state || null,
+        sourceUsage,
         model: analysis.model?.display_name || analysis.model?.name || (mode === 'retrieval-v3' ? 'Retrieval v3 (model-neutral)' : 'Active local runtime'),
         retrievedChunkIds: enrichedSources.map((source) => source.chunkId).filter(Boolean),
         citations: enrichedSources.map((source) => source.citation).filter(Boolean),
@@ -724,14 +781,17 @@ const EvidenceTracer = () => {
         claimProvenanceResult: analysis.provenance_validation?.claim_provenance
           ? { valid: analysis.provenance_validation.valid, claim_count: analysis.provenance_validation.claim_count }
           : null,
-        authorityEvidence: mapAuthorityEvidence(analysis.authority_evidence),
+        authorityEvidence: mapAuthorityEvidence(analysis.researcher_facing?.authority_evidence || []),
+        diagnosticAuthorityEvidence: mapAuthorityEvidence(analysis.authority_evidence),
           archivalAssociations: analysis.archival_associations || [],
         authorityRoles: analysis.authority_roles || null,
-        documentaryEvidence: analysis.documentary_evidence || [],
+        documentaryEvidence: analysis.researcher_facing?.documentary_evidence || [],
+        diagnosticDocumentaryEvidence: analysis.documentary_evidence || [],
         contextualEvidence: analysis.contextual_evidence || [],
         inferences: analysis.inferences || [],
         contradictions: analysis.contradictions || [],
         missingness: analysis.missingness || [],
+        evidentialLimits: analysis.researcher_facing?.evidential_limits || [],
         retrievalDiagnostics: analysis.retrieval_diagnostics || { ...(analysis.diagnostics || {}), retrieval_adequacy: analysis.retrieval_adequacy },
         retrievalV3: mode === 'retrieval-v3' ? analysis : null,
         followUpQueries: analysis.follow_up_queries || [],
@@ -784,6 +844,7 @@ const EvidenceTracer = () => {
         failureReason: traceError.message || 'Evidence trace failed.',
         caveats: [traceError.message || 'Evidence trace failed.'],
         sources: [],
+        evidentialLimits: [],
         inferenceProvenance: null
       }
 
@@ -1007,14 +1068,18 @@ const EvidenceTracer = () => {
               <SelectItem value="retrieval-v3" text="Retrieval v3 diagnostic (no model)" />
               <SelectItem value="agent" text="Agent trace, unavailable" disabled />
             </Select>
-            <Select id="first-document" labelText={`Target document A${mode === 'comparison' ? '' : ' (optional)'}`} value={firstDocumentId} onChange={(e) => setFirstDocumentId(e.target.value)}>
-              <SelectItem value="" text={mode === 'comparison' ? 'Select document A' : 'Search the eligible corpus'} />
+            {mode === 'runtime' && <Select id="archive-scope" labelText="Archive scope" value={archiveRecordPid} onChange={(e) => setArchiveRecordPid(e.target.value)}>
+              <SelectItem value="" text="All eligible archive sources" />
+              {archiveScopes.map((scope) => <SelectItem key={scope.record_pid} value={scope.record_pid} text={scope.label} />)}
+            </Select>}
+            {mode === 'comparison' && <Select id="first-document" labelText="Document A" value={firstDocumentId} onChange={(e) => setFirstDocumentId(e.target.value)}>
+              <SelectItem value="" text="Select document A" />
               {availableDocuments.map((document) => <SelectItem key={document.id} value={document.id} text={document.title} />)}
-            </Select>
-            <Select id="second-document" labelText="Target document B (comparison)" value={secondDocumentId} onChange={(e) => setSecondDocumentId(e.target.value)} disabled={!firstDocumentId}>
-              <SelectItem value="" text="No comparison document" />
+            </Select>}
+            {mode === 'comparison' && <Select id="second-document" labelText="Document B" value={secondDocumentId} onChange={(e) => setSecondDocumentId(e.target.value)} disabled={!firstDocumentId}>
+              <SelectItem value="" text="Select document B" />
               {availableDocuments.filter((document) => document.id !== firstDocumentId).map((document) => <SelectItem key={document.id} value={document.id} text={document.title} />)}
-            </Select>
+            </Select>}
             {mode === 'comparison' && <p>Comparison is limited to passages retrieved independently from documents A and B. Unsupported agreement, difference, or omission remains unestablished.</p>}
             {mode === 'archive-first-one-shot' && <p>This non-formal compatibility workflow makes one Qwen call and does not run the staged evidence pipeline.</p>}
           </div>
@@ -1122,7 +1187,9 @@ const EvidenceTracer = () => {
         <Tile className="tracer__panel">
           <PanelHeader
             title="Answer"
-            description={['deterministic_catalogue_result', 'deterministic_archive_collection_result', 'targeted_document_evidence_limit', 'deterministic_direct_source_fallback', 'deterministic_cited_evidence_synthesis'].includes(traceData?.answerOrigin)
+            description={traceData?.answerOrigin === 'curated_cited_evidence_synthesis'
+              ? 'Curated, passage-mapped synthesis from the retrieved archival evidence. No model synthesis was used.'
+              : ['deterministic_catalogue_result', 'deterministic_archive_collection_result', 'targeted_document_evidence_limit', 'deterministic_direct_source_fallback', 'deterministic_cited_evidence_synthesis'].includes(traceData?.answerOrigin)
               ? 'Direct archive or database-authority result. No model synthesis was used.'
               : 'Model-assisted response with explicit source-backing, caveats, and export controls. Generated answers remain provisional until checked against retrieved source chunks.'}
             actions={traceData && (
@@ -1135,6 +1202,8 @@ const EvidenceTracer = () => {
               />
             )}
           />
+
+          {traceData && <AnswerStateNotice trace={traceData} />}
 
           <div className="tracer__answer-body">
             {traceData ? <AnswerWithSourceLinks trace={traceData} /> : 'No answer returned yet. Submit a query to begin evidence tracing.'}
@@ -1161,10 +1230,9 @@ const EvidenceTracer = () => {
                   {traceData.comparison.evidence_limits?.map((limit, index) => <p key={`comparison-limit-${index}`}><strong>Limit:</strong> {limit}</p>)}
                 </section>
               )}
-              <section aria-label="Database authority context">
+              {traceData.authorityEvidence?.length > 0 && <section aria-label="Database authority context">
                 <h4>Database authority context</h4>
-                {traceData.authorityEvidence?.length > 0
-                  ? traceData.authorityEvidence.map((item, authorityIndex) => (
+                {traceData.authorityEvidence.map((item, authorityIndex) => (
                     <p key={item.authority_id} id={`authority-${authorityIndex + 1}`}>
                       {item.authority_type === 'ddr_projects'
                         ? `Job ${item.job_number} | ${item.title} | Funder: ${item.funder_name || 'unavailable'} | Duration: ${item.duration_text || 'unavailable'} | Project lead: ${item.project_lead_name || 'unavailable'}`
@@ -1172,22 +1240,19 @@ const EvidenceTracer = () => {
                           ? `${item.label} | ${item.authority_type} | ${item.authority_classification || 'database authority record'}${item.description ? ` | ${item.description}` : ''}`
                           : `${item.assertion} | Staff code: ${item.authority_id || 'unavailable'} | ${item.role || 'Role unavailable'} | ${item.tenure?.start_date || 'start unavailable'} to ${item.tenure?.end_date || 'end unavailable'}`}
                     </p>
-                  ))
-                  : <p>No database authority assertion was supplied as answer evidence for this run.</p>}
-                {traceData.authorityRoles && traceData.authorityEvidence?.length > 0 && <>
+                  ))}
+                {traceData.authorityRoles && <>
                   <p>Planner entity resolution: {traceData.authorityRoles.planner_entity_resolution?.length > 0 ? traceData.authorityRoles.planner_entity_resolution.map((item) => `${item.label} (${item.authority_type})`).join('; ') : 'None'}.</p>
                   <p>Controlled lexical expansion: {traceData.authorityRoles.controlled_lexical_expansion?.used ? 'Yes' : 'No'}.</p>
                   <p>Authority retrieval nomination influence: {traceData.authorityRoles.retrieval_nomination?.used ? 'Yes' : 'No'}.</p>
                   <p>Authority context supplied to Qwen: {traceData.authorityRoles.qwen_authority_context?.supplied ? 'Yes' : 'No'}.</p>
                   <p>Persisted authority audit: {traceData.authorityRoles.persisted_authority_audit?.persisted ? 'Yes' : 'No'}.</p>
                 </>}
-              </section>
-              <section aria-label="Documentary evidence">
+              </section>}
+              {traceData.documentaryEvidence?.length > 0 && <section aria-label="Documentary evidence">
                 <h4>Documentary evidence</h4>
-                {traceData.documentaryEvidence?.length > 0
-                  ? traceData.documentaryEvidence.map((item, index) => <p key={item.claim_id || item.chunk_id || index}>{item.claim_text || item.claim}</p>)
-                  : <p>No documentary claim is asserted beyond the retrieved source stack.</p>}
-              </section>
+                {traceData.documentaryEvidence.map((item, index) => <p key={item.claim_id || item.chunk_id || index}>{item.text || item.claim_text || item.claim}</p>)}
+              </section>}
               <section aria-label="Archival metadata associations">
                 <h4>Archival metadata associations</h4>
                 {traceData.archivalAssociations?.length > 0
@@ -1230,8 +1295,8 @@ const EvidenceTracer = () => {
               </section>
               <section aria-label="Evidential limits">
                 <h4>Evidential limits</h4>
-                {(traceData.evidentialLimits || scopedLimits).length > 0
-                  ? (traceData.evidentialLimits || scopedLimits).map((item, index) => (
+                {traceData.evidentialLimits.length > 0
+                  ? traceData.evidentialLimits.map((item, index) => (
                     <p key={item.claim_id || `${item.category}-${index}`}>
                       <strong>{missingnessOriginLabel(item)}:</strong> {item.claim_text || item.explanation}
                     </p>
@@ -1241,6 +1306,10 @@ const EvidenceTracer = () => {
                 {traceData.captureDerivedLimits?.length > 0 && <p>These are limits of the selected documentary passages in this immutable capture, not evidence of archival absence.</p>}
                 {traceData.captureAuditSummary && <p><strong>Capture audit:</strong> {traceData.captureAuditSummary}</p>}
               </section>
+              <details className="tracer__raw-capture">
+                <summary>Diagnostic response fields</summary>
+                <p>Raw authority records: {traceData.diagnosticAuthorityEvidence?.length || 0}. Raw documentary claims: {traceData.diagnosticDocumentaryEvidence?.length || 0}. Raw pipeline limits: {traceData.missingness?.length || 0}.</p>
+              </details>
               <section aria-label="Source provenance">
                 <h4>Source provenance</h4>
                 <p>{traceData.sourceProvenance?.valid ? 'PASS' : 'Requires researcher review.'} Documentary passage archival/document/page chain: {traceData.sourceProvenance?.source_count ?? traceData.sources.length} source{(traceData.sourceProvenance?.source_count ?? traceData.sources.length) === 1 ? '' : 's'}.</p>

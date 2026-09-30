@@ -3,7 +3,7 @@ API route for the active Turin local inference runtime.
 """
 
 import asyncio
-from fastapi import APIRouter, HTTPException, Depends, Query
+from fastapi import APIRouter, HTTPException, Depends, Query, Request
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from typing import List, Optional, Dict, Any, Literal
 from datetime import datetime
@@ -11,6 +11,7 @@ import logging
 import re
 import uuid
 import time
+from enum import Enum
 from sqlalchemy import bindparam, text
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -20,12 +21,17 @@ from app.core.config import settings
 from app.services.metadata_roles import extract_metadata_roles
 from app.services.retrieval_validation_service import RetrievalValidationRequest, RetrievalValidationService
 from app.services.exploratory_retrieval_service import ExploratoryRetrievalService
-from app.services.turin_archive_first_retrieval_service import TurinArchiveFirstRetrievalService
-from app.services.turin_evidence_pipeline_service import EvidencePacketBuilder, StagedEvidencePipeline
+from app.services.turin_archive_first_retrieval_service import ARCHIVE_ASSET_SNAPSHOT_VERSION, TurinArchiveFirstRetrievalService
+from app.services.archive_question_preset_service import matching_archive_question_preset
+from app.services.ml_triage_claim_moves import evaluate_required_claim_moves
+from app.services.ml_triage_uat_manifest import matching_canonical_uat_case
+from app.services.turin_evidence_pipeline_service import EvidencePacketBuilder, StagedEvidencePipeline, readable_claim_text, researcher_prose_issues
+from app.services.turin_evidence_pipeline_service import EvidencePacketBuilder, EvidencePipelineStageError, StagedEvidencePipeline
 from app.services.turin_question_policy import matching_turin_question_policy
 from app.services.turin_retrieval_v3_service import TurinRetrievalV3Service
 from app.services.researcher_ui_capture_service import CAPTURE_MODE, ResearcherUiCaptureService, build_one_shot_prompt, parse_one_shot_output, project_claim_provenance
 from app.services.authority_registry import AuthorityRegistry
+from app.services.turin_question_route import classify_question_route
 from app.services.provenance_integrity import experiment_evidence_digest, experiment_run_digest
 from app.models.research_outputs import ExperimentRun, ExperimentRunEvidence
 
@@ -58,13 +64,17 @@ class ExploratoryInterrogationRequest(BaseModel):
     query: str = Field(min_length=1, max_length=4000)
     mode: Literal["exploratory", "comparison", CAPTURE_MODE] = "exploratory"
     question_id: str | None = Field(default=None, max_length=64)
-    top_k: int = Field(default=5, ge=1, le=20)
+    top_k: int = Field(default=8, ge=1, le=20)
+    archive_record_pid: str | None = Field(default=None, max_length=32)
     target_document_ids: list[str] = Field(default_factory=list, max_length=2)
+    selected_chunk_ids: list[str] = Field(default_factory=list, max_length=20)
 
     @model_validator(mode="after")
     def validate_document_selection(self):
         if self.mode == "comparison" and len(self.target_document_ids) != 2:
             raise ValueError("Comparison mode requires exactly two selected documents.")
+        if self.selected_chunk_ids and self.target_document_ids:
+            raise ValueError("Select either document targets or specific passages, not both.")
         return self
 
 
@@ -112,8 +122,24 @@ PIPELINE_DERIVED_LIMITS = {
 }
 
 
+class AnswerState(str, Enum):
+    SYNTHESIS_VALID = "synthesis_valid"
+    SYNTHESIS_PARTIAL = "synthesis_partial"
+    SYNTHESIS_UNAVAILABLE = "synthesis_unavailable"
+    EVIDENTIAL_LIMIT = "evidential_limit"
+
+
+def _is_archive_scope_overview_request(request: ExploratoryInterrogationRequest) -> bool:
+    return bool(request.archive_record_pid) and bool(re.search(
+        r"\b(?:key take\s*aways?|main (?:arguments?|themes?)|central (?:arguments?|themes?)|overall argument|broadly)\b",
+        request.query,
+        flags=re.IGNORECASE,
+    ))
+
+
 def _catalogue_question_subject(query: str) -> str | None:
     patterns = (
+        r"^according to (?:the )?.+?\bauthorit(?:y|ies)\b,?\s*(?P<subject>.+?)\??$",
         r"^what projects did (?P<subject>.+?) work on\??$",
         r"^what documents (?:by|mention) (?P<subject>.+?) (?:are )?available\??$",
         r"^what documents mention (?P<subject>.+?)\??$",
@@ -122,12 +148,22 @@ def _catalogue_question_subject(query: str) -> str | None:
         r"^what (?:was|is) (?P<subject>.+?)(?:'s|’s) involvement (?:at|with|in) (?:the )?ddr\??$",
         r"^what role did (?P<subject>.+?) (?:hold|have)\??$",
         r"^when did (?P<subject>.+?) work at ddr\??$",
+        r"^(?:tell me )?what (?P<subject>.+?) did at the ddr(?:,? and when(?: please)?)?\??$",
+        r"^when was (?P<subject>.+?) at the ddr\??$",
+        r"^when was (?P<subject>.+?) at the ddr and what did (?:he|she|they) do there\??$",
     )
-    normalised = " ".join(query.strip().split())
+    normalised = " ".join(query.strip().split()).rstrip(".?! ")
     for pattern in patterns:
         match = re.match(pattern, normalised, flags=re.IGNORECASE)
         if match:
             return match.group("subject").strip(" ?. ")
+    if re.search(
+        r"\b(?:key take\s*aways?|main (?:arguments?|themes?)|central (?:arguments?|themes?)|"
+        r"overall argument|implications?|significance|analyse|analyze|synthesi[sz]e|overview)\b",
+        normalised,
+        flags=re.IGNORECASE,
+    ):
+        return None
     if re.match(r"^(?:what|which|who|when)\b", normalised, flags=re.IGNORECASE) and re.search(
         r"\b(?:documents?|records?|projects?|job|students?|degree|thesis|period|funder|lead|first|constituted|constitution)\b",
         normalised,
@@ -135,6 +171,24 @@ def _catalogue_question_subject(query: str) -> str | None:
     ):
         return normalised.rstrip("?")
     return None
+
+
+def _requires_documentary_evidence(query: str) -> bool:
+    return bool(re.search(
+        r"\b(?:documents?|records?|documentary|surviving|teaching|curriculum|practice|"
+        r"reports?|traces?|what do|what does|show)\b",
+        query,
+        flags=re.IGNORECASE,
+    ))
+
+
+def _is_authority_only_question(query: str, authority_evidence: list[dict[str, Any]]) -> bool:
+    """Recognise controlled-authority questions without relying on their initial wh-word."""
+    return bool(
+        authority_evidence
+        and re.match(r"^according to (?:the )?.+?\bauthorit(?:y|ies)\b", query.strip(), flags=re.IGNORECASE)
+        and not _requires_documentary_evidence(query)
+    )
 
 
 def _collection_question_subject(query: str) -> str | None:
@@ -179,6 +233,62 @@ def _collection_membership_records(subject: str, limit: int) -> list[dict[str, A
     return records
 
 
+def _hydrate_source_display_dates(sources: list[dict[str, Any]]) -> None:
+    """Add the governed archival display date to each retrieved source in place."""
+    identities = {
+        str(identity)
+        for source in sources
+        for identity in (
+            source.get("asset_pid"),
+            source.get("asset_id"),
+            (source.get("provenance") or {}).get("asset_pid"),
+            (source.get("provenance") or {}).get("asset_id"),
+        )
+        if identity
+    }
+    if not identities:
+        return
+
+    db = LocalSessionLocal()
+    try:
+        rows = db.execute(
+            text(
+                """
+                SELECT asset_pid, asset_id, display_date
+                FROM turin_archive_asset_snapshots
+                WHERE source_snapshot_version = :snapshot_version
+                  AND (asset_pid IN :identities OR asset_id IN :identities)
+                """
+            ).bindparams(bindparam("identities", expanding=True)),
+            {"snapshot_version": ARCHIVE_ASSET_SNAPSHOT_VERSION, "identities": sorted(identities)},
+        ).mappings().all()
+    finally:
+        db.close()
+
+    dates_by_identity = {
+        str(identity): row["display_date"]
+        for row in rows
+        if row["display_date"]
+        for identity in (row["asset_pid"], row["asset_id"])
+        if identity
+    }
+    for source in sources:
+        provenance = source.get("provenance") or {}
+        source["display_date"] = next(
+            (
+                dates_by_identity[str(identity)]
+                for identity in (
+                    source.get("asset_pid"),
+                    source.get("asset_id"),
+                    provenance.get("asset_pid"),
+                    provenance.get("asset_id"),
+                )
+                if identity and str(identity) in dates_by_identity
+            ),
+            None,
+        )
+
+
 def _collection_membership_response(subject: str, records: list[dict[str, Any]]) -> dict[str, Any] | None:
     if not records:
         return None
@@ -196,28 +306,135 @@ def _collection_membership_response(subject: str, records: list[dict[str, Any]])
 def _catalogue_authorities(query: str, limit: int = 5) -> list[dict[str, Any]]:
     """Read direct lookup authorities separately from documentary evidence."""
     question = query.lower()
-    authority_types = AuthorityRegistry().selected_types(query)
-    if any(term in question for term in ("degree", "thesis")):
+    if "database authorit" in question and any(term in question for term in ("employment", "role", "job title", "trajectory")):
+        authority_types = ["agent_employment"]
+    elif "project authorit" in question:
+        authority_types = ["ddr_projects"]
+    elif "controlled ddr period" in question or "ddr periods" in question:
+        authority_types = ["ref_ddr_period"]
+    elif "methodology registry" in question:
+        authority_types = ["ref_methodology"]
+    else:
+        authority_types = AuthorityRegistry().selected_types(query)
+    if any(term in question for term in ("degree", "thesis")) and "ref_students" not in authority_types:
         authority_types.append("ref_students")
-    if any(term in question for term in ("constituted", "constitution")):
+    if any(term in question for term in ("constituted", "constitution")) and "ref_ddr_period" not in authority_types:
         authority_types.append("ref_ddr_period")
-    if any(term in question for term in ("project", "job ", "job number", "funder")):
+    if any(term in question for term in ("project", "job ", "job number", "funder")) and "ddr_projects" not in authority_types:
         authority_types.append("ddr_projects")
     authority_types = list(dict.fromkeys(authority_types))
-    if "ddr_projects" in authority_types:
-        authority_types = [authority_type for authority_type in authority_types if authority_type != "agent_employment"]
     if not authority_types:
         return []
     db = LocalSessionLocal()
     try:
         try:
             contexts = AuthorityRegistry().resolve(db, query, authority_types)
-            return [context.model_dump() for context in contexts[:limit]]
+            controlled_vocabularies = {"ref_ddr_period", "ref_methodology"}
+            selected_contexts = contexts if set(authority_types).issubset(controlled_vocabularies) else contexts[:limit]
+            return [context.model_dump() for context in selected_contexts]
         except SQLAlchemyError:
             logger.warning("Authority registry unavailable; continuing without authority context")
             return []
     finally:
         db.close()
+
+
+def _person_authority_response(
+    subject: str,
+    sources: list[dict[str, Any]],
+    authority_evidence: list[dict[str, Any]],
+) -> dict[str, Any] | None:
+    """Combine a staff authority fact with only passages that explicitly name that person."""
+    employment = [
+        authority for authority in authority_evidence
+        if authority.get("authority_type") == "agent_employment"
+    ]
+    if not employment:
+        return None
+
+    subject_terms = set(re.findall(r"[a-z]{3,}", subject.lower()))
+    authority_claims, documentary_claims = [], []
+    for authority_number, authority in enumerate(authority_evidence, start=1):
+        if authority.get("authority_type") != "agent_employment":
+            continue
+        fields = authority.get("fields") or {}
+        name = fields.get("name") or fields.get("label") or subject
+        role = fields.get("job_title_label") or fields.get("job_title_code") or "role unavailable"
+        start = fields.get("start_date") or "an unavailable start date"
+        end = fields.get("end_date") or "an unavailable end date"
+        authority_claims.append({
+            "text": f"The DDR employment register records {name} as {role} from {start} to {end}.",
+            "authority_numbers": [authority_number],
+        })
+
+    for source_number, source in enumerate(sources, start=1):
+        excerpt = " ".join(str(source.get("excerpt") or source.get("text") or "").split())
+        excerpt_terms = set(re.findall(r"[a-z]{3,}", excerpt.lower()))
+        if not excerpt or not subject_terms.issubset(excerpt_terms):
+            continue
+        documentary_claims.append({
+            "text": f"A surviving passage names {subject}: \"{excerpt}\"",
+            "source_numbers": [source_number],
+        })
+
+    paragraphs = []
+    if authority_claims:
+        paragraphs.append({"claims": authority_claims})
+    if documentary_claims:
+        paragraphs.append({"claims": documentary_claims})
+    else:
+        paragraphs.append({"claims": [{
+            "text": f"The retrieved passages do not themselves state a specific activity by {subject}; the employment record establishes appointment and tenure, not a complete account of duties.",
+        }]})
+    return {
+        "answer": "",
+        "answer_paragraphs": paragraphs,
+        "records": [],
+        "subject": subject,
+    }
+
+
+def _named_employment_authority(authority_evidence: list[dict[str, Any]]) -> dict[str, Any] | None:
+    return next(
+        (authority for authority in authority_evidence if authority.get("authority_type") == "agent_employment"),
+        None,
+    )
+
+
+def _deterministic_authority_response(authority_evidence: list[dict[str, Any]]) -> dict[str, Any]:
+    """Render controlled authority fields without a documentary or model claim."""
+    claims = []
+    for authority in authority_evidence:
+        fields = authority.get("fields") or {}
+        authority_id = str(authority.get("authority_id") or "")
+        authority_type = str(authority.get("authority_type") or "")
+        label = str(fields.get("label") or fields.get("name") or fields.get("title") or authority_id)
+        if authority_type == "agent_employment":
+            values = [
+                fields.get("job_title_trajectory") or fields.get("job_title_label") or fields.get("job_title_code"),
+                fields.get("start_date"),
+                fields.get("end_date"),
+            ]
+        elif authority_type == "ddr_projects":
+            values = [fields.get("project_lead_name"), fields.get("funder_name"), fields.get("duration_text") or fields.get("start_year")]
+        else:
+            values = [fields.get("code"), fields.get("description"), fields.get("definition")]
+        detail = "; ".join(str(value) for value in values if value not in (None, ""))
+        text_value = f"{label}: {detail}." if detail else f"{label}."
+        claim_id = f"authority:{authority_type}:{authority_id}" if authority_id else f"authority:{authority_type}:{len(claims) + 1}"
+        claims.append({
+            "claim_id": claim_id,
+            "claim_type": "DATABASE_AUTHORITY",
+            "text": text_value,
+            "supporting_source_ids": [],
+            "supporting_evidence_card_ids": [],
+            "supporting_authority_ids": [authority_id] if authority_id else [],
+        })
+    return {
+        "answer": "\n".join(claim["text"] for claim in claims),
+        "answer_paragraphs": [{"claims": [{"text": claim["text"], "claim_ids": [claim["claim_id"]]} for claim in claims]}] if claims else [],
+        "final_claim_plan": {"claims": claims, "overall_limit_ids": []},
+    }
 
 
 def _catalogue_response(query: str, retrieval: dict[str, Any], authority_evidence: list[dict[str, Any]]) -> dict[str, Any] | None:
@@ -226,6 +443,21 @@ def _catalogue_response(query: str, retrieval: dict[str, Any], authority_evidenc
     sources = retrieval["results"]
     if not subject:
         return None
+
+    project_match = re.search(r"\bjob\s+(\d+)\b", query, flags=re.IGNORECASE)
+    if re.match(r"^according to .*\bproject authority\b", query, flags=re.IGNORECASE) and project_match:
+        project_id = project_match.group(1)
+        used = [authority for authority in authority_evidence if authority.get("authority_type") == "ddr_projects" and str(authority.get("authority_id")) == project_id]
+        if used:
+            fields = used[0].get("fields") or {}
+            requested_fields = (("project lead", "project_lead_name", ("project lead", "who led", "led by")), ("funder", "funder_name", ("funder", "funded by", "who funded")), ("duration", "duration_text", ("duration",)))
+            facts = [f"{label}: {fields.get(field) or 'not established in the project authority'}" for label, field, terms in requested_fields if any(term in query.lower() for term in terms)]
+            claim = f"Job {project_id} project authority records " + "; ".join(facts) + "."
+            return {"answer": claim, "answer_paragraphs": [{"claims": [{"text": claim, "authority_numbers": [1]}]}], "records": [], "subject": subject, "used_authorities": used, "unused_authorities": [authority for authority in authority_evidence if authority not in used]}
+
+    person_response = _person_authority_response(subject, sources, authority_evidence)
+    if person_response and person_response["answer"] and not sources:
+        return person_response
 
     records = []
     for source_number, source in enumerate(sources, start=1):
@@ -333,7 +565,174 @@ def _catalogue_response(query: str, retrieval: dict[str, Any], authority_evidenc
         ],
         "records": unique_records,
         "subject": subject,
+        "used_authorities": authority_evidence,
+        "unused_authorities": [],
     }
+
+
+def _source_analysis_projection(source_artifacts: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], dict[str, int | str]]:
+    results, counts = [], {"DIRECT_SUPPORT": 0, "CONTEXTUAL_ONLY": 0, "INFERENCE_ONLY": 0, "NOT_RELEVANT": 0}
+    for artifact in source_artifacts:
+        analysis, telemetry, generation = artifact.get("analysis") or {}, artifact.get("execution_telemetry") or {}, artifact.get("generation") or {}
+        relationship = analysis.get("relationship_to_question")
+        if relationship in counts:
+            counts[relationship] += 1
+        results.append({"source_id": (artifact.get("packet") or {}).get("source_id"), "status": artifact.get("status", "failed"), "relationship_to_question": relationship, "direct_claims": analysis.get("direct_claims", []), "contextual_claims": analysis.get("contextual_claims", []), "possible_inferences": analysis.get("possible_inferences", []), "not_established": analysis.get("not_established", []), "parse_success": "parse_error" not in artifact, "schema_success": "parse_error" not in artifact, "input_tokens": generation.get("prompt_eval_count"), "output_tokens": generation.get("eval_count"), "stop_reason": generation.get("done_reason"), "runtime_seconds": round((artifact.get("duration_ms") or 0) / 1000, 3), "failure_code": artifact.get("failure_code"), "failure_message": artifact.get("failure_message")})
+    successful = sum(item["status"] == "success" for item in results)
+    return results, {"attempted_sources": len(results), "successful_sources": successful, "failed_sources": len(results) - successful, "direct_support_sources": counts["DIRECT_SUPPORT"], "contextual_sources": counts["CONTEXTUAL_ONLY"], "inference_only_sources": counts["INFERENCE_ONLY"], "not_relevant_sources": counts["NOT_RELEVANT"], "source_analysis_stage_status": "success" if successful == len(results) else ("partial" if successful else "failed")}
+
+
+def _project_researcher_facing_response(
+    final_claim_plan: dict[str, Any], evidence_cards: list[dict[str, Any],],
+    sources: list[dict[str, Any]], authority_evidence: list[dict[str, Any]],
+    evidence_map: dict[str, Any], route_family: str,
+    final_synthesis: dict[str, Any] | None = None,
+    narrative_artifact: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Project validated answer-level prose with application-owned citations."""
+    source_numbers = {
+        f"{source['document_id']}:{source['chunk_id']}": index
+        for index, source in enumerate(sources, start=1)
+        if source.get("document_id") and source.get("chunk_id")
+    }
+    card_sources = {
+        card.get("evidence_card_id"): card.get("source_id")
+        for card in evidence_cards
+        if card.get("validation_status") == "VALIDATED"
+    }
+    authority_numbers = {
+        str(authority.get("authority_id")): index
+        for index, authority in enumerate(authority_evidence, start=1)
+        if authority.get("authority_id") is not None
+    }
+    limit_texts = {
+        f"limit-{index}": str(text)
+        for index, text in enumerate(evidence_map.get("NOT_ESTABLISHED", []), start=1)
+    }
+    claims = []
+    for plan_claim in final_claim_plan.get("claims", []):
+        claim_type = plan_claim.get("claim_type")
+        source_ids = set(plan_claim.get("supporting_source_ids") or [])
+        card_source_ids = {
+            card_sources.get(card_id)
+            for card_id in plan_claim.get("supporting_evidence_card_ids") or []
+        }
+        if claim_type in {"DIRECT_DOCUMENTARY", "QUALIFIED_SYNTHESIS"} and (
+            not source_ids or source_ids != card_source_ids or not source_ids.issubset(source_numbers)
+        ):
+            continue
+        authority_ids = plan_claim.get("supporting_authority_ids") or []
+        if claim_type == "DATABASE_AUTHORITY" and not authority_ids:
+            continue
+        text_value = " ".join(str(plan_claim.get("text") or "").split())
+        if not text_value:
+            continue
+        claims.append({
+            "text": text_value,
+            "claim_ids": [plan_claim["claim_id"]],
+            "limit_ids": plan_claim.get("limit_ids") or [],
+            "source_numbers": sorted(source_numbers[source_id] for source_id in source_ids),
+            "authority_numbers": sorted(authority_numbers[authority_id] for authority_id in authority_ids if authority_id in authority_numbers),
+            "claim_type": claim_type,
+        })
+    limits = [
+        {"limit_id": limit_id, "explanation": limit_texts[limit_id], "origin": "validated_final_plan"}
+        for limit_id in final_claim_plan.get("overall_limit_ids") or []
+        if limit_id in limit_texts
+    ]
+    authority_claims = [claim for claim in claims if claim["claim_type"] == "DATABASE_AUTHORITY"]
+    documentary_claims = [claim for claim in claims if claim["claim_type"] != "DATABASE_AUTHORITY"]
+    claims_by_id = {claim["claim_ids"][0]: claim for claim in claims if claim.get("claim_ids")}
+    answer_level_prose = (narrative_artifact or {}).get("prose_granularity") == "answer_level"
+    per_source_fallback = (narrative_artifact or {}).get("prose_granularity") == "per_claim_fallback"
+    prose_by_paragraph: dict[int, list[dict[str, Any]]] = {}
+    if answer_level_prose or final_synthesis:
+        for narrative_claim in (final_synthesis or {}).get("synthesis_claims", []):
+            claim_ids = narrative_claim.get("claim_ids") or []
+            supporting_claims = [claims_by_id[claim_id] for claim_id in claim_ids if claim_id in claims_by_id]
+            if not claim_ids or len(supporting_claims) != len(claim_ids):
+                continue
+            text_value = " ".join(str(narrative_claim.get("text") or "").split())
+            if not text_value or (
+                not readable_claim_text(text_value)
+                if per_source_fallback
+                else researcher_prose_issues(text_value)
+            ):
+                continue
+            prose_by_paragraph.setdefault(narrative_claim.get("paragraph", 1), []).append(
+                {
+                    "text": text_value,
+                    "claim_ids": claim_ids,
+                    "limit_ids": narrative_claim.get("limit_ids") or [],
+                    "source_numbers": sorted({
+                        source_number
+                        for claim in supporting_claims
+                        for source_number in claim["source_numbers"]
+                    }),
+                    "authority_numbers": sorted({
+                        authority_number
+                        for claim in supporting_claims
+                        for authority_number in claim["authority_numbers"]
+                    }),
+                }
+            )
+    prose_paragraphs = [
+        {"claims": claims}
+        for _, claims in sorted(prose_by_paragraph.items())
+    ]
+    if route_family == "HYBRID_AUTHORITY_DOCUMENTARY":
+        paragraphs = [
+            *([{"title": "Database authority", "claims": authority_claims}] if authority_claims else []),
+            *[
+                {**paragraph, "title": "Documentary argument" if index == 0 else None}
+                for index, paragraph in enumerate(prose_paragraphs)
+            ],
+        ]
+    elif route_family == "SCOPED_MISSINGNESS":
+        paragraphs = [
+            {**paragraph, "title": "Historical argument" if index == 0 else None}
+            for index, paragraph in enumerate(prose_paragraphs)
+        ]
+    else:
+        paragraphs = [
+            {**paragraph, "title": "Supported comparison" if route_family == "DOCUMENTARY" and any(
+                claims_by_id.get(claim_id, {}).get("claim_type") == "QUALIFIED_SYNTHESIS"
+                for claim_id in paragraph["claims"][0].get("claim_ids", [])
+            ) else ("Research answer" if index == 0 else None)}
+            for index, paragraph in enumerate(prose_paragraphs)
+        ]
+    used_authority_numbers = {number for claim in authority_claims for number in claim["authority_numbers"]}
+    return {
+        "route_family": route_family,
+        "answer_paragraphs": [paragraph for paragraph in paragraphs if paragraph["claims"]],
+        "documentary_evidence": [claim for claim in documentary_claims if claim["source_numbers"]],
+        "authority_evidence": [authority for index, authority in enumerate(authority_evidence, start=1) if index in used_authority_numbers],
+        "evidential_limits": limits,
+    }
+
+
+def _sources_in_answer_order(
+    sources: list[dict[str, Any]], final_claim_plan: dict[str, Any], final_synthesis: dict[str, Any]
+) -> list[dict[str, Any]]:
+    """Order source cards by their first supporting claim in the rendered argument."""
+    source_by_id = {
+        f"{source.get('document_id')}:{source.get('chunk_id')}": source
+        for source in sources
+        if source.get("document_id") and source.get("chunk_id")
+    }
+    claims_by_id = {
+        claim.get("claim_id"): claim
+        for claim in final_claim_plan.get("claims", [])
+        if claim.get("claim_id")
+    }
+    ordered_ids: list[str] = []
+    for narrative_claim in final_synthesis.get("synthesis_claims", []):
+        for claim_id in narrative_claim.get("claim_ids") or []:
+            for source_id in claims_by_id.get(claim_id, {}).get("supporting_source_ids") or []:
+                if source_id in source_by_id and source_id not in ordered_ids:
+                    ordered_ids.append(source_id)
+    ordered_sources = [source_by_id[source_id] for source_id in ordered_ids]
+    return [*ordered_sources, *(source for source in sources if source not in ordered_sources)]
 
 
 def _project_staged_exploratory_response(
@@ -376,15 +775,114 @@ def _project_staged_exploratory_response(
         for index, source in enumerate(retrieval["results"], start=1)
         if source.get("document_id") and source.get("chunk_id")
     }
-    narrative_claims = final_synthesis.get("synthesis_claims", [])
+    claim_plan = pipeline.get("final_claim_plan") or {}
+    claim_plan_by_id = {
+        claim.get("claim_id"): claim
+        for claim in claim_plan.get("claims", [])
+        if claim.get("claim_id")
+    }
+    evidence_cards_by_id = {
+        card.get("evidence_card_id"): card
+        for card in evidence_map.get("EVIDENCE_CARDS", [])
+        if card.get("evidence_card_id")
+        and card.get("validation_status") == "VALIDATED"
+        and card.get("source_id") in source_numbers
+    }
+
+    def documentary_claim_has_valid_card(claim: dict[str, Any]) -> bool:
+        if claim.get("claim_type") not in {"DIRECT_DOCUMENTARY", "QUALIFIED_SYNTHESIS"}:
+            return True
+        supporting_source_ids = set(claim.get("supporting_source_ids") or [])
+        supporting_card_ids = claim.get("supporting_evidence_card_ids") or []
+        cards = [evidence_cards_by_id.get(card_id) for card_id in supporting_card_ids]
+        card_source_ids = {card["source_id"] for card in cards if card}
+        return bool(supporting_source_ids and cards) and card_source_ids == supporting_source_ids
+
+    renderable_claim_plan_by_id = {
+        claim_id: claim
+        for claim_id, claim in claim_plan_by_id.items()
+        if documentary_claim_has_valid_card(claim)
+    }
+    cross_source_inference_provenance = []
+    inference_sources = cross_source.get("cross_source_inference_sources", {})
+    for index, inference in enumerate(cross_source.get("cross_source_inferences", []), start=1):
+        inference_id = f"cross-source-inference-{index}"
+        supporting_source_ids = list(dict.fromkeys(inference_sources.get(inference, [])))
+        compiled_claim_ids = sorted(
+            claim_id for claim_id, claim in claim_plan_by_id.items()
+            if inference_id in claim.get("supporting_cross_source_inference_ids", [])
+        )
+        cross_source_inference_provenance.append({
+            "inference_id": inference_id,
+            "text": inference,
+            "supporting_source_ids": supporting_source_ids,
+            "supporting_source_numbers": sorted({
+                source_numbers[source_id]
+                for source_id in supporting_source_ids
+                if source_id in source_numbers
+            }),
+            "compiled_claim_ids": compiled_claim_ids,
+            "status": "accepted" if compiled_claim_ids else "rejected_unmapped",
+        })
+    rejected_cross_source_inferences = list(
+        (pipeline.get("cross_source_artifact") or {}).get("rejected_inferences", [])
+    )
+    cross_source_inference_diagnostics = {
+        "cross_source_inferences_total": len(cross_source_inference_provenance),
+        "cross_source_inferences_mapped": sum(item["status"] == "accepted" for item in cross_source_inference_provenance),
+        "cross_source_inferences_unmapped": sum(item["status"] != "accepted" for item in cross_source_inference_provenance),
+        "cross_source_inferences_rejected": len(rejected_cross_source_inferences),
+        "cross_source_status": (pipeline.get("stage_execution") or {}).get("cross_source_analysis", {}).get("status", "success"),
+        "cross_source_failure_code": (pipeline.get("cross_source_artifact") or {}).get("failure_code"),
+        "cross_source_stop_reason": (pipeline.get("cross_source_artifact") or {}).get("cross_source_stop_reason"),
+        "cross_source_truncated": bool((pipeline.get("cross_source_artifact") or {}).get("cross_source_truncated")),
+    }
+    narrative_claims = []
+    for claim in final_synthesis.get("synthesis_claims", []):
+        claim_ids = claim.get("claim_ids", [])
+        if claim_ids:
+            if not set(claim_ids).issubset(renderable_claim_plan_by_id):
+                continue
+            supporting_source_ids = [
+                source_id
+                for claim_id in claim_ids
+                for source_id in renderable_claim_plan_by_id[claim_id].get("supporting_source_ids", [])
+            ]
+            narrative_claims.append({
+                **claim,
+                "source_numbers": sorted({
+                    source_numbers[source_id]
+                    for source_id in supporting_source_ids
+                    if source_id in source_numbers
+                }),
+                "authority_ids": sorted({
+                    authority_id
+                    for claim_id in claim_ids
+                    for authority_id in renderable_claim_plan_by_id[claim_id].get("supporting_authority_ids", [])
+                }),
+            })
     cited_narrative_numbers = {
         source_number
         for claim in narrative_claims
         for source_number in claim.get("source_numbers", [])
     }
-    narrative_coverage_complete = bool(narrative_claims) and cited_narrative_numbers == set(source_numbers.values())
+    source_document_ids = {
+        source_number: source["document_id"]
+        for source_number, source in enumerate(retrieval["results"], start=1)
+        if source.get("document_id")
+    }
+    cited_document_ids = {
+        source_document_ids[source_number]
+        for source_number in cited_narrative_numbers
+        if source_number in source_document_ids
+    }
+    narrative_coverage_complete = bool(narrative_claims) and cited_narrative_numbers.issubset(set(source_document_ids))
+    narrative_citations_resolvable = bool(narrative_claims) and cited_narrative_numbers.issubset(set(source_document_ids)) and all(
+        claim.get("source_numbers") or claim.get("authority_ids")
+        for claim in narrative_claims
+    )
     answer_paragraphs = []
-    if narrative_coverage_complete:
+    if narrative_citations_resolvable:
         paragraphs: dict[int, list[str]] = {}
         claims_by_paragraph: dict[int, list[dict[str, Any]]] = {}
         for claim in narrative_claims:
@@ -395,6 +893,9 @@ def _project_staged_exploratory_response(
             claims_by_paragraph.setdefault(claim["paragraph"], []).append({
                 "text": claim["text"].strip(),
                 "source_numbers": citations,
+                "claim_ids": claim.get("claim_ids", []),
+                "limit_ids": claim.get("limit_ids", []),
+                "authority_ids": claim.get("authority_ids", []),
             })
         rendered_paragraphs = [" ".join(paragraphs[paragraph]) for paragraph in sorted(paragraphs)]
         answer_paragraphs = [
@@ -403,21 +904,61 @@ def _project_staged_exploratory_response(
         ]
         if rendered_paragraphs:
             answer = "\n\n".join(rendered_paragraphs)
-            answer_origin = "qwen_cited_evidence_synthesis"
-    cited_claims = []
-    for claim in documentary_evidence:
-        source_id = claim.get("source_id")
-        claim_text = " ".join(str(claim.get("claim") or "").split())
-        citation = source_numbers.get(source_id)
-        if claim_text and citation:
-            cited_claims.append(f"{claim_text} [{citation}]")
-    if cited_claims and not answer_origin:
-        answer = (
-            "The retained documentary evidence supports the following findings: "
-            f"{' '.join(cited_claims)} "
-            "These findings are limited to the cited passages."
+            answer_origin = (
+                "curated_cited_evidence_synthesis"
+                if (pipeline.get("narrative_artifact") or {}).get("deterministic_fallback")
+                == "CURATED_ELECTROHOME_PASSAGE_SYNTHESIS"
+                else "qwen_cited_evidence_synthesis"
+            )
+    if (
+        (
+            (pipeline.get("narrative_artifact") or {}).get("deterministic_fallback")
+            or (pipeline.get("stage_execution") or {}).get("cross_source_analysis", {}).get("status") == "failed"
         )
-        answer_origin = "deterministic_cited_evidence_synthesis"
+        and not answer_origin
+    ):
+        fallback_claims = []
+    explicit_title_sources = str(
+        retrieval.get("transparency", {}).get("strategy") or ""
+    ).startswith("explicit_source_title_")
+    explicit_person_sources = (
+        retrieval.get("transparency", {}).get("strategy")
+        == "explicit_person_authority_v1"
+    )
+    if explicit_person_sources and documentary_evidence and not answer_origin:
+        person_claims = []
+        for claim in documentary_evidence:
+            source_id = claim.get("source_id")
+            claim_text = " ".join(str(claim.get("claim") or "").split())
+            citation = source_numbers.get(source_id)
+            if claim_text and citation:
+                person_claims.append({"text": claim_text, "source_numbers": [citation]})
+        if person_claims:
+            answer_paragraphs = [{"claims": person_claims}]
+            answer = " ".join(claim["text"] for claim in person_claims)
+            answer_origin = "validated_person_evidence_synthesis"
+    deterministic_claims = []
+    for plan_claim in renderable_claim_plan_by_id.values():
+        if plan_claim.get("claim_type") != "DIRECT_DOCUMENTARY":
+            continue
+        claim_text = " ".join(str(plan_claim.get("text") or "").split())
+        supporting_source_ids = plan_claim.get("supporting_source_ids") or []
+        citations = sorted({
+            source_numbers[source_id]
+            for source_id in supporting_source_ids
+            if source_id in source_numbers
+        })
+        if claim_text and citations and not (
+            explicit_title_sources
+            and claim_text == "The named document addresses the question in the cited passage."
+        ):
+            deterministic_claims.append({
+                "text": claim_text,
+                "claim_ids": [plan_claim["claim_id"]],
+                "limit_ids": plan_claim.get("limit_ids", []),
+                "source_numbers": citations,
+                "authority_ids": [],
+            })
     direct_support_sources = [
         source for source in retrieval["results"]
         if (next((item for item in evidence_map["source_classifications"] if item["source_id"] == f"{source['document_id']}:{source['chunk_id']}"), {}).get("relationship_to_question") == "DIRECT_SUPPORT")
@@ -425,10 +966,12 @@ def _project_staged_exploratory_response(
     selected_document_sources = (
         retrieval.get("transparency", {}).get("strategy") == "explicit_document_selection_v1"
     )
-    fallback_sources = direct_support_sources or (
-        retrieval["results"] if selected_document_sources else []
+    fallback_sources = (
+        retrieval["results"]
+        if selected_document_sources or explicit_title_sources
+        else direct_support_sources
     )
-    if fallback_sources and not documentary_evidence:
+    if fallback_sources and (not documentary_evidence or (explicit_title_sources and not answer_origin)):
         passages = []
         for source in fallback_sources:
             source_id = f"{source['document_id']}:{source['chunk_id']}"
@@ -439,51 +982,109 @@ def _project_staged_exploratory_response(
             citation = source_numbers[source_id]
             passages.append((source_id, title, excerpt, citation, source))
         if passages:
-            statements = " ".join(
-                f"In '{title}', the retained passage states: \"{excerpt}\" [{citation}]"
-                for _, title, excerpt, citation, _ in passages
-            )
             answer = (
-                "The selected documentary evidence establishes the following source-specific points. "
-                f"{statements} "
-                "These statements remain limited to the retained passages and do not by themselves establish matters beyond their explicit wording."
+                "Relevant passages were retained, but no validated documentary claim could be produced for this run. "
+                "Inspect the retrieved sources and diagnostic trail."
             )
-            answer_origin = "deterministic_cited_evidence_synthesis"
-            documentary_evidence = [
-                {
-                    "claim": excerpt,
-                    "source_id": source_id,
-                    "chunk_ids": [source["chunk_id"]],
-                    "page": source.get("page_start"),
-                    "origin": "documentary",
-                }
-                for source_id, _, excerpt, _, source in passages
-            ]
+            answer_origin = "unvalidated_source_passages"
+    stage_records = pipeline.get("stage_execution") or {}
+    source_analysis_results, source_analysis_summary = _source_analysis_projection(pipeline.get("source_analyses") or [])
+    source_analysis_status = (stage_records.get("source_analysis") or {}).get("status", "success")
+    has_failed_pipeline_stage = any(
+        stage not in {"cross_source_analysis", "narrative_repair"}
+        and record.get("status") == "failed"
+        for stage, record in stage_records.items()
+    )
+    evidence_analysis_completed = source_analysis_status == "success" and not has_failed_pipeline_stage
+    validation_results = pipeline.get("narrative_validation") or []
+    has_repairable_validation_failure = any(
+        result.get("status") == "fail" and result.get("severity") == "repairable"
+        for result in validation_results
+    )
     if not answer_origin and retrieval["results"] and not evidence_map["DIRECT_DOCUMENTARY"]:
-        source_labels = []
-        for source in retrieval["results"][:5]:
-            title = str(source.get("snapshot", {}).get("title") or source.get("title") or source.get("document_id") or "Untitled record")
-            provenance = source.get("provenance") or {}
-            asset_pid = provenance.get("asset_pid") or source.get("asset_pid") or source.get("pid") or "unavailable"
-            page = source.get("page_start") or source.get("source_page") or "unavailable"
-            source_labels.append(f"{title} (Asset PID {asset_pid}, p. {page})")
-        if source_labels:
+        if (
+            rejected_cross_source_inferences
+            or (stage_records.get("cross_source_analysis") or {}).get("status") == "failed"
+        ) and not claim_plan.get("claims"):
             answer = (
-                f"The selected records - {'; '.join(source_labels)} - do not provide a direct documentary description that answers this question. "
-                "They may provide context, but the supplied passages do not establish a broader DDR account."
+                "Relevant evidence was retrieved, but no validated cross-source synthesis "
+                "could be produced for this run. Inspect the retained sources and diagnostic trail."
             )
-            answer_paragraphs = [{
-                "claims": [{
-                    "text": answer,
-                    "source_numbers": list(source_numbers.values()),
-                }],
-            }]
-            answer_origin = "deterministic_evidence_limit"
+            answer_paragraphs = []
+            answer_origin = "pipeline_synthesis_unavailable"
+        else:
+            source_labels = []
+            for source in retrieval["results"][:5]:
+                title = str(source.get("snapshot", {}).get("title") or source.get("title") or source.get("document_id") or "Untitled record")
+                provenance = source.get("provenance") or {}
+                asset_pid = provenance.get("asset_pid") or source.get("asset_pid") or source.get("pid") or "unavailable"
+                page = source.get("page_start") or source.get("source_page") or "unavailable"
+                source_labels.append(f"{title} (Asset PID {asset_pid}, p. {page})")
+            if source_labels and evidence_analysis_completed:
+                answer = (
+                    f"The selected records - {'; '.join(source_labels)} - do not provide a direct documentary description that answers this question. "
+                    "They may provide context, but the supplied passages do not establish a broader DDR account."
+                )
+                answer_paragraphs = [{
+                    "claims": [{
+                        "text": answer,
+                        "source_numbers": list(source_numbers.values()),
+                    }],
+                }]
+                answer_origin = "deterministic_evidence_limit"
+    if answer_origin == "deterministic_evidence_limit":
+        answer_state = AnswerState.EVIDENTIAL_LIMIT
+    elif answer_origin in {"unvalidated_source_passages", "pipeline_synthesis_unavailable"}:
+        answer_state = AnswerState.SYNTHESIS_UNAVAILABLE
+    elif not evidence_analysis_completed and retrieval["results"]:
+        answer = (
+            "Relevant evidence was retrieved, but a validated synthesis could not be produced for this run. "
+            "Inspect the retained sources and diagnostic trail."
+        )
+        answer_paragraphs = []
+        answer_origin = answer_origin or "pipeline_synthesis_unavailable"
+        answer_state = AnswerState.SYNTHESIS_UNAVAILABLE
+    elif answer_origin and (
+        source_analysis_status == "partial"
+        or has_repairable_validation_failure
+        or (stage_records.get("cross_source_analysis") or {}).get("status") == "failed"
+    ):
+        answer_state = AnswerState.SYNTHESIS_PARTIAL
+    elif answer_origin and retrieval.get("transparency", {}).get("route_family") in {"DOCUMENTARY", "HYBRID_AUTHORITY_DOCUMENTARY"} and not any(
+        claim.get("claim_type") == "DIRECT_DOCUMENTARY"
+        for claim in renderable_claim_plan_by_id.values()
+    ):
+        answer = (
+            "Relevant evidence was retrieved, but no validated final documentary claim "
+            "could be produced for this run. Inspect the retained sources and diagnostic trail."
+        )
+        answer_paragraphs = []
+        answer_origin = "pipeline_synthesis_unavailable"
+        answer_state = AnswerState.SYNTHESIS_UNAVAILABLE
+    elif answer_origin:
+        answer_state = AnswerState.SYNTHESIS_VALID
+    else:
+        if retrieval["results"]:
+            answer = (
+                "Relevant evidence was retrieved, but readable, validated research prose "
+                "could not be produced for this run. Inspect the retained sources and diagnostic trail."
+            )
+            answer_origin = "pipeline_synthesis_unavailable"
+        answer_state = AnswerState.SYNTHESIS_UNAVAILABLE
+    cited_source_numbers = sorted({
+        source_number
+        for paragraph in answer_paragraphs
+        for claim in paragraph.get("claims", [])
+        for source_number in claim.get("source_numbers", [])
+    })
     response = {
         "answer": answer,
         "answer_paragraphs": answer_paragraphs,
         "answer_origin": answer_origin,
+        "answer_state": answer_state.value,
         "documentary_evidence": documentary_evidence,
+        "evidence_cards": evidence_map.get("EVIDENCE_CARDS", []),
+        "rejected_evidence_cards": evidence_map.get("REJECTED_EVIDENCE_CARDS", []),
         "authority_evidence": evidence_map.get("DATABASE_AUTHORITY", []),
         "archival_associations": evidence_map.get("ARCHIVAL_METADATA", []),
         "contextual_evidence": [
@@ -491,6 +1092,9 @@ def _project_staged_exploratory_response(
             for claim in evidence_map["CONTEXTUAL"]
         ],
         "inferences": interpretations,
+        "cross_source_inference_provenance": cross_source_inference_provenance,
+        "cross_source_inference_diagnostics": cross_source_inference_diagnostics,
+        "final_claim_plan": claim_plan,
         "contradictions": [
             {"description": value, "origin": "model", "stage": "cross_source"}
             for value in cross_source.get("differences_or_contradictions", [])
@@ -518,14 +1122,96 @@ def _project_staged_exploratory_response(
             "classification": "EXPLORATORY / NON-FORMAL INTERROGATION",
             "stages": [call["stage"] for call in pipeline.get("inference_calls", [])],
             "call_count": len(pipeline.get("inference_calls", [])),
+            "records": stage_records,
+            "validation_results": validation_results,
             "narrative_coverage": {
                 "complete": narrative_coverage_complete,
                 "required_source_ids": list(source_numbers),
                 "returned_source_numbers": sorted(cited_narrative_numbers),
             },
         },
+        "source_usage": {
+            "retrieved_source_numbers": sorted(source_document_ids),
+            "retained_evidence_source_ids": sorted({claim["source_id"] for claim in documentary_evidence}),
+            "cited_source_numbers": cited_source_numbers,
+            "unused_source_numbers": sorted(set(source_document_ids) - set(cited_source_numbers)),
+        },
+        "source_analysis_results": source_analysis_results,
+        "source_analysis_summary": source_analysis_summary,
     }
     return response
+
+
+def _synthesis_unavailable_response(
+    request: ExploratoryInterrogationRequest,
+    retrieval: dict[str, Any],
+    *,
+    stage: str,
+    failure_code: str,
+    failure_message: str,
+    authority_evidence: list[dict[str, Any]] | None = None,
+    model: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    sources = retrieval["results"]
+    authority_evidence = authority_evidence or []
+    return {
+        "query_id": f"exploratory-{uuid.uuid4().hex[:12]}",
+        "mode": request.mode,
+        "response_schema": "turin-evidence-pipeline-v2-exploratory-projection",
+        "status": "completed",
+        "answer": "Relevant evidence was retrieved, but a validated synthesis could not be produced for this run. Inspect the retained sources and diagnostic trail.",
+        "answer_paragraphs": [],
+        "answer_origin": "pipeline_synthesis_unavailable",
+        "answer_state": AnswerState.SYNTHESIS_UNAVAILABLE.value,
+        "model": model or {"name": "unavailable", "display_name": "Active local runtime", "runtime": "failed"},
+        "retrieved_evidence": sources,
+        "documentary_evidence": [],
+        "authority_evidence": authority_evidence,
+        "archival_associations": [],
+        "contextual_evidence": [],
+        "inferences": [],
+        "contradictions": [],
+        "missingness": [],
+        "source_usage": {
+            "retrieved_source_numbers": list(range(1, len(sources) + 1)),
+            "retained_evidence_source_ids": [],
+            "cited_source_numbers": [],
+            "unused_source_numbers": list(range(1, len(sources) + 1)),
+        },
+        "evidence_anchors": [
+            source.get("evidence_anchor") or {
+                "document_id": source.get("document_id"),
+                "chunk_id": source.get("chunk_id"),
+                "page": source.get("page_start"),
+            }
+            for source in sources
+            if source.get("chunk_id")
+        ],
+        "authority_roles": {
+            "resolved_deterministic_authority": bool(authority_evidence),
+            "qwen_authority_context": {"supplied": False},
+        },
+        "stage_execution": {
+            "classification": "EXPLORATORY / NON-FORMAL INTERROGATION",
+            "stages": [stage],
+            "call_count": 0,
+            "records": {
+                stage: {
+                    "status": "failed",
+                    "failure_code": failure_code,
+                    "failure_message": failure_message,
+                    "parse_success": False,
+                    "schema_valid": False,
+                    "repair_attempted": False,
+                    "repair_success": None,
+                },
+            },
+        },
+        "retrieval": retrieval.get("transparency", {}),
+        "retrieval_diagnostics": retrieval.get("diagnostics", {}),
+        "corpus_version": settings.TURIN_ARCHIVE_FIRST_CORPUS_VERSION,
+        "persisted": False,
+    }
 
 
 def build_expanded_query(query: str) -> str:
@@ -845,12 +1531,13 @@ def get_researcher_ui_capture(capture_id: str):
 
 
 @exploratory_router.post("/interrogate")
-async def interrogate_exploratory_corpus(request: ExploratoryInterrogationRequest):
+async def interrogate_exploratory_corpus(request: ExploratoryInterrogationRequest, http_request: Request = None):
     """Run an ephemeral Qwen-backed corpus interrogation without formal-run persistence."""
     if request.mode not in {"exploratory", "comparison", CAPTURE_MODE}:
         raise HTTPException(status_code=400, detail="Unsupported source interrogation mode.")
     started = time.perf_counter()
-    collection_subject = _collection_question_subject(request.query) if request.mode == "exploratory" and not request.target_document_ids else None
+    scope_overview_request = _is_archive_scope_overview_request(request)
+    collection_subject = _collection_question_subject(request.query) if request.mode == "exploratory" and not request.target_document_ids and not request.archive_record_pid else None
     collection = _collection_membership_response(
         collection_subject,
         _collection_membership_records(collection_subject, request.top_k),
@@ -860,6 +1547,7 @@ async def interrogate_exploratory_corpus(request: ExploratoryInterrogationReques
             "query_id": f"exploratory-collection-{uuid.uuid4().hex[:12]}", "mode": "exploratory",
             "response_schema": "turin-archive-collection-membership-v1", "status": "completed",
             "answer": collection["answer"], "answer_origin": "deterministic_archive_collection_result",
+            "answer_state": AnswerState.SYNTHESIS_VALID.value,
             "model": {"name": "none", "display_name": "Archive collection lookup", "runtime": "deterministic"},
             "runtime": {"model_status": "not_used"}, "retrieved_evidence": [],
             "archival_discovery": collection["records"], "document_availability": [], "corpus_representation_gaps": [], "archival_context_only": [],
@@ -873,23 +1561,67 @@ async def interrogate_exploratory_corpus(request: ExploratoryInterrogationReques
             "retrieval_diagnostics": {"archive_collection_media_count": len(collection["records"])}, "timings": {"total_backend_request_ms": round((time.perf_counter() - started) * 1000, 1)},
             "inference_calls": [], "corpus_version": settings.TURIN_ARCHIVE_FIRST_CORPUS_VERSION, "persisted": False,
         }
-    authority_evidence = _catalogue_authorities(request.query, request.top_k) if request.mode == "exploratory" and not request.target_document_ids else []
+    route_decision = classify_question_route(request.query)
+    thematic_preset = matching_archive_question_preset(request.query)
+    thematic_document_question = thematic_preset is not None
+    authority_evidence = _catalogue_authorities(request.query, request.top_k) if (
+        request.mode == "exploratory"
+        and not request.target_document_ids
+        and not scope_overview_request
+        and (route_decision.family == "HYBRID_AUTHORITY_DOCUMENTARY" or not thematic_document_question)
+    ) else []
     retrieval_started = time.perf_counter()
-    try:
-        retrieval = _retrieve_exploratory(request)
-    except HTTPException:
-        if not _catalogue_question_subject(request.query) or not authority_evidence:
-            raise
+    if route_decision.family == "AUTHORITY_ONLY":
         retrieval = {
             "results": [], "archival_discovery": [], "document_availability": [],
             "corpus_representation_gaps": [], "archival_context_only": [],
-            "transparency": {"resolved_entities": [], "query_variants": []},
+            "transparency": {"strategy": "deterministic_authority_lookup_v1", "route_family": route_decision.family, "route_decision": route_decision.as_dict(), "resolved_entities": [], "query_variants": []},
             "diagnostics": {"archive_candidate_count": 0, "retrieved_documentary_source_count": 0},
         }
+    else:
+        try:
+            retrieval = _retrieve_exploratory(request)
+            retrieval["transparency"]["route_family"] = route_decision.family
+            retrieval["transparency"]["route_decision"] = route_decision.as_dict()
+        except HTTPException:
+            if not _catalogue_question_subject(request.query) or not authority_evidence:
+                raise
+            retrieval = {
+                "results": [], "archival_discovery": [], "document_availability": [],
+                "corpus_representation_gaps": [], "archival_context_only": [],
+                "transparency": {"resolved_entities": [], "query_variants": []},
+                "diagnostics": {"archive_candidate_count": 0, "retrieved_documentary_source_count": 0},
+            }
     retrieval_ms = round((time.perf_counter() - retrieval_started) * 1000, 1)
     sources = retrieval["results"]
+    _hydrate_source_display_dates(sources)
+    scoped_overview = retrieval.get("transparency", {}).get("strategy") == "archive_scope_overview_v1"
+    if route_decision.family == "AUTHORITY_ONLY":
+        authority_response = _deterministic_authority_response(authority_evidence)
+        return {
+            "query_id": f"exploratory-authority-{uuid.uuid4().hex[:12]}", "mode": "exploratory",
+            "response_schema": "turin-authority-result-v2", "status": "completed",
+            "answer": authority_response["answer"], "answer_paragraphs": authority_response["answer_paragraphs"],
+            "answer_origin": "deterministic_authority_result", "answer_state": AnswerState.SYNTHESIS_VALID.value,
+            "model": {"name": "none", "display_name": "Authority lookup", "runtime": "deterministic"}, "runtime": {"model_status": "not_used"},
+            "retrieved_evidence": [], "archival_discovery": [], "document_availability": [], "corpus_representation_gaps": [], "archival_context_only": [],
+            "provenance_validation": {"valid": bool(authority_evidence), "source_count": 0, "claim_count": len(authority_response["answer_paragraphs"]), "claim_provenance": []},
+            "documentary_evidence": [], "authority_evidence": authority_evidence, "archival_associations": [], "contextual_evidence": [], "inferences": [], "contradictions": [], "missingness": [],
+            "authority_roles": {"planner_entity_resolution": [], "controlled_lexical_expansion": {"used": False, "variants": []}, "retrieval_nomination": {"used": False}, "qwen_authority_context": {"supplied": False}, "persisted_authority_audit": {"persisted": False}},
+            "stage_execution": {"classification": "DETERMINISTIC AUTHORITY LOOKUP", "stages": ["authority_lookup"], "call_count": 0},
+            "source_classifications": [], "selected_sources_accounted_for": {"count": 0, "total": 0}, "retrieval": retrieval["transparency"], "retrieval_diagnostics": retrieval["diagnostics"],
+            "timings": {"query_planning_and_retrieval_ms": retrieval_ms, "total_backend_request_ms": round((time.perf_counter() - started) * 1000, 1)}, "inference_calls": [],
+            "corpus_version": settings.TURIN_ARCHIVE_FIRST_CORPUS_VERSION, "persisted": False, "final_claim_plan": authority_response["final_claim_plan"],
+        }
     catalogue = _catalogue_response(request.query, retrieval, authority_evidence)
-    if catalogue and request.mode == "exploratory" and not request.target_document_ids:
+    if (
+        catalogue
+        and request.mode == "exploratory"
+        and not request.target_document_ids
+        and not scoped_overview
+        and not _requires_documentary_evidence(request.query)
+        and not (_named_employment_authority(authority_evidence) and sources)
+    ):
         return {
             "query_id": f"exploratory-catalogue-{uuid.uuid4().hex[:12]}",
             "mode": "exploratory",
@@ -898,6 +1630,7 @@ async def interrogate_exploratory_corpus(request: ExploratoryInterrogationReques
             "answer": catalogue["answer"],
             "answer_paragraphs": catalogue["answer_paragraphs"],
             "answer_origin": "deterministic_catalogue_result",
+            "answer_state": AnswerState.SYNTHESIS_VALID.value,
             "model": {"name": "none", "display_name": "Catalogue lookup", "runtime": "deterministic"},
             "runtime": {"model_status": "not_used"},
             "retrieved_evidence": sources,
@@ -906,7 +1639,7 @@ async def interrogate_exploratory_corpus(request: ExploratoryInterrogationReques
             "corpus_representation_gaps": retrieval["corpus_representation_gaps"],
             "archival_context_only": retrieval["archival_context_only"],
             "provenance_validation": {"valid": all(bool(source.get("provenance")) for source in sources), "source_count": len(sources), "claim_count": 0, "claim_provenance": []},
-            "documentary_evidence": [], "authority_evidence": authority_evidence, "archival_associations": [], "contextual_evidence": [],
+            "documentary_evidence": [], "authority_evidence": catalogue.get("used_authorities", authority_evidence), "unused_authorities": catalogue.get("unused_authorities", []), "archival_associations": [], "contextual_evidence": [],
             "inferences": [], "contradictions": [], "missingness": [],
             "authority_roles": {"planner_entity_resolution": retrieval["transparency"].get("resolved_entities", []), "controlled_lexical_expansion": {"used": any(variant["kind"].startswith("entity_") for variant in retrieval["transparency"].get("query_variants", [])), "variants": retrieval["transparency"].get("query_variants", [])}, "retrieval_nomination": {"used": True}, "qwen_authority_context": {"supplied": False}, "persisted_authority_audit": {"persisted": False}},
             "stage_execution": {"classification": "DETERMINISTIC CATALOGUE LOOKUP", "stages": ["archive_first_retrieval"], "call_count": 0},
@@ -921,6 +1654,7 @@ async def interrogate_exploratory_corpus(request: ExploratoryInterrogationReques
             "query_id": f"exploratory-targeted-limit-{uuid.uuid4().hex[:12]}", "mode": request.mode,
             "response_schema": "turin-targeted-document-limit-v1", "status": "completed",
             "answer": limitation, "answer_origin": "targeted_document_evidence_limit",
+            "answer_state": AnswerState.EVIDENTIAL_LIMIT.value,
             "model": {"name": "none", "display_name": "Targeted document retrieval", "runtime": "deterministic"},
             "runtime": {"model_status": "not_used"}, "retrieved_evidence": [],
             "archival_discovery": retrieval["archival_discovery"], "document_availability": retrieval["document_availability"],
@@ -969,22 +1703,64 @@ async def interrogate_exploratory_corpus(request: ExploratoryInterrogationReques
             })
         finally:
             capture_db.close()
-        return {"capture_id": capture_id, "query_id": capture_id, "question_id": request.question_id, "mode": CAPTURE_MODE, "capture_classification": "RESEARCHER_UI_CAPTURE", "status": "completed", "answer": generated["raw_response"], "model": {"name": model_info["model"], "display_name": model_info["display_name"], "runtime": model_info["runtime"]}, "runtime": model_info, "retrieved_evidence": classified_sources, "archival_discovery": retrieval["archival_discovery"], "document_availability": retrieval["document_availability"], "corpus_representation_gaps": retrieval["corpus_representation_gaps"], "archival_context_only": retrieval["archival_context_only"], "provenance_validation": provenance, "documentary_evidence": [], "contextual_evidence": [], "inferences": [], "missingness": [{"category": "not_established", "explanation": claim["claim_text"]} for claim in limits], "source_classifications": source_classifications, "selected_sources_accounted_for": {"count": len(classified_sources), "total": len(classified_sources)}, "retrieval": retrieval["transparency"], "retrieval_diagnostics": retrieval["diagnostics"], "timings": {"query_planning_and_retrieval_ms": retrieval_ms}, "inference_calls": [{"stage": "researcher_ui_capture_one_shot", "count": 1}], "corpus_version": settings.TURIN_ARCHIVE_FIRST_CORPUS_VERSION, "persisted": True}
+        return {"capture_id": capture_id, "query_id": capture_id, "question_id": request.question_id, "mode": CAPTURE_MODE, "capture_classification": "RESEARCHER_UI_CAPTURE", "status": "completed", "answer": generated["raw_response"], "answer_state": AnswerState.SYNTHESIS_VALID.value, "model": {"name": model_info["model"], "display_name": model_info["display_name"], "runtime": model_info["runtime"]}, "runtime": model_info, "retrieved_evidence": classified_sources, "archival_discovery": retrieval["archival_discovery"], "document_availability": retrieval["document_availability"], "corpus_representation_gaps": retrieval["corpus_representation_gaps"], "archival_context_only": retrieval["archival_context_only"], "provenance_validation": provenance, "documentary_evidence": [], "contextual_evidence": [], "inferences": [], "missingness": [{"category": "not_established", "explanation": claim["claim_text"]} for claim in limits], "source_classifications": source_classifications, "selected_sources_accounted_for": {"count": len(classified_sources), "total": len(classified_sources)}, "retrieval": retrieval["transparency"], "retrieval_diagnostics": retrieval["diagnostics"], "timings": {"query_planning_and_retrieval_ms": retrieval_ms}, "inference_calls": [{"stage": "researcher_ui_capture_one_shot", "count": 1}], "corpus_version": settings.TURIN_ARCHIVE_FIRST_CORPUS_VERSION, "persisted": True}
     try:
         packet_started = time.perf_counter()
-        packets = _build_exploratory_packets(sources)
+        named_document = str(
+            retrieval.get("transparency", {}).get("strategy") or ""
+        ).startswith("explicit_source_title_") or scoped_overview
+        packets = _build_exploratory_packets(sources, named_document=named_document)
         packet_ms = round((time.perf_counter() - packet_started) * 1000, 1)
+        diagnostic_snapshot = None
+        if http_request and http_request.headers.get("X-ML-Triage-Diagnostic-Snapshot") == "true":
+            diagnostic_snapshot = {
+                "run_id": http_request.headers["X-ML-Triage-Run-ID"],
+                "uat_id": http_request.headers["X-ML-Triage-UAT-ID"],
+                "route": retrieval.get("transparency", {}).get("strategy"),
+                "corpus": {"version": settings.TURIN_ARCHIVE_FIRST_CORPUS_VERSION},
+                "resolved_authority_records": authority_evidence,
+                "authority_context_passed_to_final": [],
+            }
         pipeline = await StagedEvidencePipeline(inference_service).run(
             request.query,
             packets,
             policy=matching_turin_question_policy(request.query),
+            allow_document_content_claims=True,
+            thematic_document_question=thematic_document_question,
+            diagnostic_snapshot=diagnostic_snapshot,
+            route_family=route_decision.family,
+        )
+    except EvidencePipelineStageError as exc:
+        return _synthesis_unavailable_response(
+            request,
+            retrieval,
+            stage=exc.stage,
+            failure_code="pipeline_stage_error",
+            failure_message=str(exc),
+            authority_evidence=authority_evidence,
+            model=inference_service.get_model_info(),
         )
     except InferenceTimeoutError as exc:
-        raise HTTPException(status_code=504, detail={"error": "inference_timeout", "stage": exc.stage, "message": str(exc)}) from exc
+        raise HTTPException(status_code=504, detail={
+            "error": "inference_timeout",
+            "stage": exc.stage,
+            "message": str(exc),
+            "answer_state": AnswerState.SYNTHESIS_UNAVAILABLE.value,
+            "answer_origin": "pipeline_timeout",
+            "retrieved_source_count": len(sources),
+        }) from exc
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except ValueError as exc:
-        raise HTTPException(status_code=422, detail=f"Evidence classification failed validation: {exc}") from exc
+        return _synthesis_unavailable_response(
+            request,
+            retrieval,
+            stage="evidence_validation",
+            failure_code="pipeline_validation_error",
+            failure_message=str(exc),
+            authority_evidence=authority_evidence,
+            model=inference_service.get_model_info(),
+        )
     model_info = inference_service.get_model_info()
     classifications = {item["source_id"]: item for item in pipeline["evidence_map"]["source_classifications"]}
     classified_sources = []
@@ -1001,7 +1777,48 @@ async def interrogate_exploratory_corpus(request: ExploratoryInterrogationReques
         }
         for index, claim in enumerate(pipeline["final_synthesis"]["direct_documentary_claims"], start=1)
     ]
+    projection_started = time.perf_counter()
+    sources = _sources_in_answer_order(sources, pipeline["final_claim_plan"], pipeline["final_synthesis"])
+    retrieval["results"] = sources
     projection = _project_staged_exploratory_response(pipeline, retrieval)
+    projection_ms = round((time.perf_counter() - projection_started) * 1000, 1)
+    projection["authority_evidence"] = authority_evidence
+    projection["authority_roles"]["resolved_deterministic_authority"] = bool(authority_evidence)
+    if route_decision.family == "HYBRID_AUTHORITY_DOCUMENTARY":
+        authority_projection = _deterministic_authority_response(authority_evidence)
+        authority_claims = authority_projection["final_claim_plan"]["claims"]
+        if authority_claims:
+            projection["final_claim_plan"]["claims"] = [
+                *authority_claims,
+                *projection["final_claim_plan"].get("claims", []),
+            ]
+            projection["answer_paragraphs"] = [
+                {
+                    "claims": [
+                        {
+                            "text": claim["text"],
+                            "claim_ids": [claim["claim_id"]],
+                            "source_numbers": [],
+                            "authority_numbers": [index],
+                        }
+                        for index, claim in enumerate(authority_claims, start=1)
+                    ]
+                },
+                *projection["answer_paragraphs"],
+            ]
+        if not authority_evidence:
+            projection["answer_state"] = AnswerState.SYNTHESIS_UNAVAILABLE.value
+            projection["answer_origin"] = "required_authority_unavailable"
+            projection["answer"] = (
+                "A required database authority component could not be resolved; "
+                "a hybrid synthesis is unavailable for this run."
+            )
+    projection["researcher_facing"] = _project_researcher_facing_response(
+        projection["final_claim_plan"], projection["evidence_cards"], sources,
+        authority_evidence, pipeline["evidence_map"], route_decision.family,
+        final_synthesis=pipeline["final_synthesis"],
+        narrative_artifact=pipeline.get("narrative_artifact"),
+    )
     narrative_artifact = pipeline.get("narrative_artifact") or {}
     source_classification_counts: dict[str, int] = {}
     for classification in pipeline["evidence_map"]["source_classifications"]:
@@ -1021,6 +1838,8 @@ async def interrogate_exploratory_corpus(request: ExploratoryInterrogationReques
         "answer": projection["answer"],
         "answer_paragraphs": projection["answer_paragraphs"],
         "answer_origin": projection["answer_origin"],
+        "answer_state": projection["answer_state"],
+        "researcher_facing": projection["researcher_facing"],
         "model": {"name": model_info["model"], "display_name": model_info["display_name"], "runtime": model_info["runtime"]},
         "runtime": model_info,
         "retrieved_evidence": classified_sources,
@@ -1030,12 +1849,20 @@ async def interrogate_exploratory_corpus(request: ExploratoryInterrogationReques
         "archival_context_only": retrieval["archival_context_only"],
         "provenance_validation": {"valid": all(bool(source.get("provenance")) for source in sources) and provenance["source_analyses"]["valid"] and provenance["final_synthesis"]["valid"], "source_count": len(sources), "claim_count": len(claim_provenance), "claim_provenance": claim_provenance, **provenance},
         "documentary_evidence": projection["documentary_evidence"],
+        "evidence_cards": projection["evidence_cards"],
+        "rejected_evidence_cards": projection["rejected_evidence_cards"],
         "authority_evidence": projection["authority_evidence"],
+        "final_claim_plan": projection["final_claim_plan"],
+        "cross_source_inference_provenance": projection["cross_source_inference_provenance"],
+        "cross_source_inference_diagnostics": projection["cross_source_inference_diagnostics"],
+        "source_analysis_results": projection["source_analysis_results"],
+        "source_analysis_summary": projection["source_analysis_summary"],
         "archival_associations": projection["archival_associations"],
         "contextual_evidence": projection["contextual_evidence"],
         "inferences": projection["inferences"],
         "contradictions": projection["contradictions"],
         "missingness": projection["missingness"],
+        "source_usage": projection["source_usage"],
         "authority_roles": projection["authority_roles"],
         "stage_execution": {
             **projection["stage_execution"],
@@ -1050,12 +1877,31 @@ async def interrogate_exploratory_corpus(request: ExploratoryInterrogationReques
         "selected_sources_accounted_for": {"count": len(pipeline["evidence_map"]["source_classifications"]), "total": len(sources)},
         "retrieval": retrieval["transparency"],
         "retrieval_diagnostics": retrieval_diagnostics,
-        "timings": {"query_planning_and_retrieval_ms": retrieval_ms, "source_packet_construction_ms": packet_ms, **pipeline.get("timings", {}), "total_backend_request_ms": round((time.perf_counter() - started) * 1000, 1)},
+        "timings": {"query_planning_and_retrieval_ms": retrieval_ms, "source_packet_construction_ms": packet_ms, "response_projection_ms": projection_ms, **pipeline.get("timings", {}), "total_backend_request_ms": round((time.perf_counter() - started) * 1000, 1)},
+        "execution_telemetry": pipeline.get("execution_telemetry", {}),
+        "diagnostic_stage_snapshot": pipeline.get("diagnostic_snapshot"),
         "inference_calls": pipeline.get("inference_calls", []),
         "corpus_version": settings.TURIN_ARCHIVE_FIRST_CORPUS_VERSION,
         "persisted": False,
         **({"comparison": _comparison_projection(request.target_document_ids, classified_sources, claim_provenance)} if request.mode == "comparison" else {}),
     }
+    if canonical_case := matching_canonical_uat_case(request.query):
+        claim_move_coverage = evaluate_required_claim_moves({
+            "required_claim_moves": "; ".join(canonical_case.required_claim_moves),
+            "question_class": canonical_case.question_class,
+        }, response)
+        response["benchmark_diagnostics"] = {
+            "uat_id": canonical_case.uat_id,
+            "priority": canonical_case.priority,
+            "required_claim_moves": claim_move_coverage,
+        }
+        uncovered_moves = [
+            item for item in claim_move_coverage["statuses"]
+            if item["status"] == "NOT_COVERED"
+        ]
+        if canonical_case.priority == "P0" and uncovered_moves and response["answer_state"] == AnswerState.SYNTHESIS_VALID.value:
+            response["answer_state"] = AnswerState.SYNTHESIS_PARTIAL.value
+            response["answer_origin"] = "required_claim_move_gate"
     if request.mode == "comparison":
         comparison_db = LocalSessionLocal()
         try:
@@ -1076,13 +1922,73 @@ def _retrieve_exploratory(request: ExploratoryInterrogationRequest) -> dict[str,
     db = LocalSessionLocal()
     try:
         service = TurinArchiveFirstRetrievalService()
-        if request.target_document_ids:
+        if request.selected_chunk_ids:
+            retrieval = service.retrieve_selected_chunks(
+                db, request.selected_chunk_ids, settings.TURIN_ARCHIVE_FIRST_CORPUS_VERSION
+            )
+        elif request.target_document_ids:
             retrieval = service.retrieve_selected_documents(
                 db, request.query, request.target_document_ids, settings.TURIN_ARCHIVE_FIRST_CORPUS_VERSION
             )
+        elif (
+            (canonical_case := matching_canonical_uat_case(request.query))
+            and canonical_case.question_class in {"DOCUMENTARY", "HYBRID_AUTHORITY_DOCUMENTARY"}
+            and canonical_case.archive_asset_pids
+        ):
+            controlled = service.retrieve_manifest_assets(
+                db,
+                request.query,
+                settings.TURIN_ARCHIVE_FIRST_CORPUS_VERSION,
+                canonical_case.archive_asset_pids,
+                request.top_k,
+                canonical_case.uat_id,
+            )
+            if len(controlled["results"]) < request.top_k:
+                supplemental = (
+                    service.retrieve(
+                        db, request.query, request.top_k, settings.TURIN_ARCHIVE_FIRST_CORPUS_VERSION,
+                        request.archive_record_pid,
+                    )
+                    if request.archive_record_pid
+                    else service.retrieve(
+                        db, request.query, request.top_k, settings.TURIN_ARCHIVE_FIRST_CORPUS_VERSION,
+                    )
+                )
+                selected_keys = {
+                    (source.get("document_id"), source.get("chunk_id"))
+                    for source in controlled["results"]
+                }
+                for source in supplemental["results"]:
+                    source_key = (source.get("document_id"), source.get("chunk_id"))
+                    if source_key not in selected_keys and len(controlled["results"]) < request.top_k:
+                        controlled["results"].append(source)
+                        selected_keys.add(source_key)
+                controlled["diagnostics"]["supplemental_result_count"] = len(controlled["results"]) - len(
+                    controlled["diagnostics"]["expected_ids_retrieved"]
+                )
+                controlled["transparency"]["supplemental_strategy"] = supplemental["transparency"].get("strategy")
+            retrieval = controlled
+        elif preset := matching_archive_question_preset(request.query):
+            retrieval = service.retrieve_archive_scope_overview(
+                db,
+                request.query,
+                settings.TURIN_ARCHIVE_FIRST_CORPUS_VERSION,
+                preset.record_pid,
+                max(request.top_k, 8),
+                thematic_terms=preset.documentary_terms,
+                preset_id=preset.preset_id,
+            )
+            retrieval["transparency"]["archive_question_preset"] = preset.preset_id
         else:
-            retrieval = service.retrieve(
-                db, request.query, request.top_k, settings.TURIN_ARCHIVE_FIRST_CORPUS_VERSION
+            retrieval = (
+                service.retrieve(
+                    db, request.query, request.top_k, settings.TURIN_ARCHIVE_FIRST_CORPUS_VERSION,
+                    request.archive_record_pid,
+                )
+                if request.archive_record_pid
+                else service.retrieve(
+                    db, request.query, request.top_k, settings.TURIN_ARCHIVE_FIRST_CORPUS_VERSION,
+                )
             )
         for source in retrieval["results"]:
             if source.get("document_id") == "doc_930287260339_cf797b8d4ce2":
@@ -1098,10 +2004,37 @@ def _retrieve_exploratory(request: ExploratoryInterrogationRequest) -> dict[str,
         db.close()
 
 
-def _build_exploratory_packets(sources: list[dict[str, Any]]):
+@exploratory_router.get("/archive-scopes")
+async def list_archive_scopes():
+    """Return the controlled parent-record boundaries available for scoped interrogation."""
     db = LocalSessionLocal()
     try:
-        return EvidencePacketBuilder().build(db, sources)
+        rows = db.execute(text("""
+            SELECT record_pid, MIN(COALESCE(record_title, label)) AS label, COUNT(*) AS asset_count
+            FROM turin_archive_asset_snapshots
+            WHERE source_snapshot_version = :snapshot_version
+              AND use_for_ml = TRUE
+              AND record_pid IS NOT NULL
+            GROUP BY record_pid
+            ORDER BY label, record_pid
+        """), {"snapshot_version": "turin-archive-asset-snapshot-v1"}).mappings().all()
+        return {"scopes": [
+            {"record_pid": str(row["record_pid"]), "label": str(row["label"] or row["record_pid"]), "asset_count": row["asset_count"]}
+            for row in rows
+        ]}
+    finally:
+        db.close()
+
+
+def _build_exploratory_packets(sources: list[dict[str, Any]], named_document: bool = False):
+    db = LocalSessionLocal()
+    try:
+        return EvidencePacketBuilder().build(
+            db,
+            sources,
+            max_sources=8 if named_document else 5,
+            local_token_budget=700 if named_document else 1800,
+        )
     finally:
         db.close()
 
@@ -1114,7 +2047,7 @@ async def retrieve_exploratory_corpus(request: ExploratoryInterrogationRequest, 
     if v == 3:
         db = LocalSessionLocal()
         try:
-            retrieval = TurinRetrievalV3Service().retrieve(db, request.query, request.top_k, "corpus_f40d78dbce52")
+            retrieval = TurinRetrievalV3Service().retrieve(db, request.query, request.top_k, settings.TURIN_ARCHIVE_FIRST_CORPUS_VERSION)
         finally:
             db.close()
         return {"mode": "exploratory", "version": 3, "persisted": False, "model_inference": False, **retrieval}
