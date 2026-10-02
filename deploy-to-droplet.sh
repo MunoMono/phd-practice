@@ -36,7 +36,7 @@ if [[ "${GIT_DEPLOY_TREE_DIRTY}" == "true" ]]; then
 fi
 
 echo "📤 Syncing local application source to droplet..."
-rsync -avz --delete \
+rsync -avz \
     --exclude '.git' \
     --exclude '.env' \
     --exclude '.env.*' \
@@ -49,6 +49,7 @@ rsync -avz --delete \
     --exclude '.mypy_cache' \
     --exclude '.DS_Store' \
     --exclude '.prod-sync' \
+    --exclude 'artifacts/' \
     --exclude 'backups' \
     --exclude 'logs' \
     --exclude 'frontend/test-results' \

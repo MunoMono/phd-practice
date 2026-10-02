@@ -42,7 +42,13 @@ def _terms(value: str) -> list[str]:
 class ExploratoryQueryPlanner:
     """Produces a bounded, deterministic lexical plan from natural-language input."""
 
-    def build_plan(self, db: Any, query: str) -> dict[str, Any]:
+    def build_plan(
+        self,
+        db: Any,
+        query: str,
+        entity_anchors: list[dict[str, str]] | None = None,
+        documentary_anchors: list[str] | None = None,
+    ) -> dict[str, Any]:
         normalised = " ".join(query.split())
         query_text = _normalise(normalised)
         authority_rows = db.execute(text("SELECT authority_type, authority_id, label FROM database_authorities WHERE label IS NOT NULL ORDER BY authority_type, label")).mappings().all()
@@ -54,6 +60,20 @@ class ExploratoryQueryPlanner:
             if len(_terms(label)) >= 2 and label_text in query_text:
                 resolved_entities.append({"label": label, "authority_type": row["authority_type"], "authority_id": str(row["authority_id"]), "source": "database_authorities"})
                 entity_terms.update(_terms(label))
+        for entity in entity_anchors or []:
+            label = str(entity.get("label") or "").strip()
+            if label and not any(_normalise(label) == _normalise(item["label"]) for item in resolved_entities):
+                resolved_entities.append(dict(entity))
+                entity_terms.update(_terms(label))
+        for anchor in documentary_anchors or []:
+            if anchor and not any(_normalise(anchor) == _normalise(item["label"]) for item in resolved_entities):
+                resolved_entities.append({
+                    "label": anchor,
+                    "authority_type": "documentary_anchor",
+                    "authority_id": _normalise(anchor),
+                    "source": "hybrid_documentary_anchor",
+                })
+                entity_terms.update(_terms(anchor))
         resolved_entities = resolved_entities[:3]
         concepts = [term for term in _terms(normalised) if term not in entity_terms][:5]
         variants: list[dict[str, str]] = []
@@ -169,17 +189,40 @@ class ExploratoryRetrievalService:
     @staticmethod
     def _passage_quality(text_value: str) -> tuple[bool, list[str]]:
         text = " ".join(str(text_value or "").split())
+        sentence_end = re.search(r"[.!?](?:\s|$)", text[:240])
+        if len(text) > 240 and sentence_end:
+            text = text[:sentence_end.end()].strip()
         lower = text.lower()
         reasons: list[str] = []
         if "<!-- image -->" in lower or lower in {"[image]", "image"}:
             reasons.append("image_marker")
-        if len(text) < 40:
+        if len(text) < 24:
             reasons.append("too_short")
         alphabetic = sum(character.isalpha() for character in text)
         if not text or alphabetic / max(len(text), 1) < 0.45:
             reasons.append("low_alphabetic_content")
-        if len(_terms(text)) < 5:
+        terms = _terms(text)
+        if len(terms) < 4:
             reasons.append("low_information")
+        if text.count("|") >= 2 or "---" in text:
+            reasons.append("table_or_layout_fragment")
+        sentence_end = re.search(r"[.!?](?:\s|$)", text)
+        if not sentence_end:
+            reasons.append("incomplete_textual_span")
+        lexical_tokens = re.findall(r"[a-zA-Z]{2,}", lower)
+        repeated_ratio = max(
+            (lexical_tokens.count(token) for token in set(lexical_tokens)), default=0
+        ) / max(len(lexical_tokens), 1)
+        if not sentence_end and repeated_ratio >= 0.30:
+            reasons.append("repetitive_incomplete_fragment")
+        predicate_terms = {
+            "agreed", "are", "became", "can", "could", "describe", "described", "describes", "did", "does", "established",
+            "has", "have", "identified", "identifies", "is", "led", "may", "might", "records",
+            "recommended", "recommends", "required", "requires", "showed", "shows", "was", "were",
+            "will", "would",
+        }
+        if not predicate_terms.intersection(lexical_tokens):
+            reasons.append("no_documentary_predicate")
         return not reasons, reasons
 
     @staticmethod

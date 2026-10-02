@@ -12,10 +12,8 @@ COPY frontend/package*.json ./
 # Install dependencies
 RUN npm ci
 
-# Copy source code and canonical documentation sources.
+# Copy source code.
 COPY frontend/ ./
-COPY docs/turin_experiment/technology-statement-of-work-turin-experiment-v0.2.md /app/docs/turin_experiment/
-COPY docs/turin_experiment/using-the-turin-research-instrument.md /app/docs/turin_experiment/
 
 # Build the application
 RUN npm run build

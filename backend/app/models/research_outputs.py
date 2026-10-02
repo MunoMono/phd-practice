@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, Column, DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, Column, DateTime, Float, ForeignKey, Integer, LargeBinary, String, Text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 
@@ -146,6 +146,25 @@ class QueryRunExport(LocalBase):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     query_run = relationship("QueryRun", back_populates="exports")
+
+
+class ContentCredentialAsset(LocalBase):
+    """Immutable C2PA-signed export for a retained research query run."""
+    __tablename__ = "content_credential_assets"
+
+    id = Column(Integer, primary_key=True, index=True)
+    asset_id = Column(String(255), unique=True, nullable=False, index=True)
+    query_id = Column(String(255), ForeignKey("query_runs.query_id", ondelete="RESTRICT"), nullable=False, index=True)
+    asset_format = Column(String(128), nullable=False)
+    asset_bytes = Column(LargeBinary, nullable=False)
+    asset_sha256 = Column(String(64), nullable=False, unique=True, index=True)
+    manifest_sha256 = Column(String(64), index=True)
+    validation_state = Column(String(64), nullable=False, index=True)
+    validation_status_json = Column(JSONB, nullable=False)
+    signer_subject = Column(String(512))
+    signer_trust = Column(String(64), nullable=False, default="untrusted_research", index=True)
+    created_by = Column(String(255), nullable=False, default="system")
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
 
 
 class ProvenanceEvent(LocalBase):

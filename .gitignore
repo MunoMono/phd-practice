@@ -20,6 +20,7 @@ logs/
 # Environment
 .env
 .env.local
+secrets/c2pa/
 
 # IDE
 .vscode/

@@ -94,3 +94,58 @@
     font-weight: 600;
   }
 }
+
+.corpus-reader {
+  display: grid;
+  gap: $spacing-05;
+
+  &__heading {
+    display: flex;
+    gap: $spacing-04;
+    justify-content: space-between;
+
+    h3,
+    p {
+      margin: 0;
+    }
+
+    p {
+      @include type-style('body-01');
+      color: $text-secondary;
+      margin-top: $spacing-03;
+    }
+  }
+
+  &__list {
+    display: grid;
+    gap: $spacing-04;
+    max-height: 48rem;
+    overflow-y: auto;
+  }
+
+  &__passage {
+    border-top: 1px solid $border-subtle-01;
+    padding-top: $spacing-04;
+
+    p {
+      @include type-style('body-01');
+      line-height: 1.55;
+      white-space: pre-wrap;
+    }
+  }
+
+  &__passage-meta {
+    @include type-style('label-01');
+    display: flex;
+    flex-wrap: wrap;
+    gap: $spacing-03;
+    color: $text-secondary;
+  }
+
+  &__selection {
+    display: grid;
+    gap: $spacing-04;
+    border-top: 1px solid $border-subtle-01;
+    padding-top: $spacing-05;
+  }
+}

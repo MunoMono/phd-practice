@@ -8,10 +8,11 @@ from typing import List, Optional
 from pydantic import BaseModel
 
 from app.core.database import LocalSessionLocal
+from app.core.config import settings
 
 router = APIRouter()
 
-CURRENT_TURIN_CORPUS_VERSION = 'corpus_f40d78dbce52'
+CURRENT_TURIN_CORPUS_VERSION = settings.TURIN_ARCHIVE_FIRST_CORPUS_VERSION
 
 
 class SearchResult(BaseModel):

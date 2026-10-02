@@ -12,6 +12,8 @@ export const interrogateExploratory = (query, options = {}) => apiRequest('/api/
 	}
 })
 
+export const getArchiveScopes = () => apiRequest('/api/analysis/archive-scopes')
+
 export const retrieveExploratoryV3 = (query, options = {}) => apiRequest('/api/analysis/retrieve?v=3', {
 	method: 'POST',
 	body: {

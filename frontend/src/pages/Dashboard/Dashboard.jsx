@@ -137,7 +137,12 @@ const Dashboard = () => {
       }))
     : [
         { label: 'Local inference runtime', detail: 'Qwen-powered source analysis is available when the active model is ready.' },
-        { label: 'Frozen corpus', detail: '95 controlled-ingestible source documents and 12,884 current chunks are available for retrieval.' },
+        {
+          label: 'Frozen corpus',
+          detail: analyticalSurface
+            ? `${formatCount(analyticalSurface.composition?.controlled_ingestible_sources)} searchable source documents and ${formatCount(analyticalSurface.composition?.current_chunks)} current chunks are available for retrieval.`
+            : 'Current corpus composition is loading.'
+        },
         { label: 'Immutable experiments', detail: 'Saved runs preserve retrieval, supplied evidence, model configuration, and export history.' }
       ]
 

@@ -2,10 +2,11 @@ import { InlineNotification, Tag } from '@carbon/react'
 import { Search } from '@carbon/icons-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { getAuthoritySummary } from '../../api/authorities'
-import { listDocuments, getDocument, getDocumentAnnotations, syncDocumentMetadata } from '../../api/documents'
+import { getAuthorityRegister, getAuthoritySummary } from '../../api/authorities'
+import { listDocuments, getDocument, getDocumentAnnotations, getDocumentChunks, syncDocumentMetadata } from '../../api/documents'
 import { getArchiveRecordSiblings, autocompleteSearch } from '../../api/search'
 import CorpusSearchPanel from '../../components/corpus/CorpusSearchPanel'
+import DocumentChunkReader from '../../components/corpus/DocumentChunkReader'
 import DocumentTable from '../../components/corpus/DocumentTable'
 import DocumentDetailPanel from '../../components/corpus/DocumentDetailPanel'
 import PageHeader from '../../components/layout/PageHeader'
@@ -14,7 +15,8 @@ import { PageGrid, PageColumn as Column } from '../../components/layout/PageGrid
 const defaultFilters = {
   keyword: '',
   year: '',
-  status: ''
+  status: '',
+  authorityId: ''
 }
 
 const CorpusExplorer = () => {
@@ -33,6 +35,9 @@ const CorpusExplorer = () => {
   const [selectedDetail, setSelectedDetail] = useState(null)
   const [suggestions, setSuggestions] = useState({ documents: [], themes: [], entities: [] })
   const [authoritySummary, setAuthoritySummary] = useState(null)
+  const [authorityRecords, setAuthorityRecords] = useState([])
+  const [chunkReader, setChunkReader] = useState({ chunks: [], access: {}, loading: false, error: '' })
+  const [selectedChunks, setSelectedChunks] = useState({})
 
   useEffect(() => {
     let isCancelled = false
@@ -45,7 +50,8 @@ const CorpusExplorer = () => {
       try {
         const payload = await listDocuments({
           year: filters.year || undefined,
-          status: filters.status || undefined
+          status: filters.status || undefined,
+          authority_id: filters.authorityId || undefined
         })
 
         if (isCancelled) {
@@ -97,16 +103,20 @@ const CorpusExplorer = () => {
     return () => {
       isCancelled = true
     }
-  }, [filters.year, filters.status, handoffDocumentId, handoffPid, handoffRequested])
+  }, [filters.year, filters.status, filters.authorityId, handoffDocumentId, handoffPid, handoffRequested])
 
   useEffect(() => {
     let isCancelled = false
 
-    const loadAuthoritySummary = async () => {
+    const loadAuthorityContext = async () => {
       try {
-        const payload = await getAuthoritySummary()
+        const [summary, records] = await Promise.all([
+          getAuthoritySummary(),
+          getAuthorityRegister({ limit: 500 })
+        ])
         if (!isCancelled) {
-          setAuthoritySummary(payload)
+          setAuthoritySummary(summary)
+          setAuthorityRecords(records)
         }
       } catch (authorityError) {
         if (!isCancelled) {
@@ -115,7 +125,7 @@ const CorpusExplorer = () => {
       }
     }
 
-    loadAuthoritySummary()
+    loadAuthorityContext()
 
     return () => {
       isCancelled = true
@@ -184,6 +194,29 @@ const CorpusExplorer = () => {
   }, [documents, selectedDocumentId])
 
   useEffect(() => {
+    if (!selectedDocumentId) {
+      setChunkReader({ chunks: [], access: {}, loading: false, error: '' })
+      return undefined
+    }
+
+    let isCancelled = false
+    setChunkReader({ chunks: [], access: {}, loading: true, error: '' })
+    getDocumentChunks(selectedDocumentId, { limit: 100 })
+      .then((payload) => {
+        if (!isCancelled) {
+          setChunkReader({ chunks: payload.chunks, access: payload.access, loading: false, error: '' })
+        }
+      })
+      .catch((chunkError) => {
+        if (!isCancelled) {
+          setChunkReader({ chunks: [], access: {}, loading: false, error: chunkError.message || 'Failed to load permitted passages.' })
+        }
+      })
+
+    return () => { isCancelled = true }
+  }, [selectedDocumentId])
+
+  useEffect(() => {
     const query = filters.keyword.trim()
 
     if (query.length < 2) {
@@ -249,6 +282,22 @@ const CorpusExplorer = () => {
     return result
   }
 
+  const handleToggleChunk = (chunk) => {
+    setSelectedChunks((current) => {
+      if (current[chunk.chunk_id]) {
+        const remaining = { ...current }
+        delete remaining[chunk.chunk_id]
+        return remaining
+      }
+      return { ...current, [chunk.chunk_id]: chunk }
+    })
+  }
+
+  const handleSynthesizeSelected = (question, chunkIds) => {
+    const params = new URLSearchParams({ query: question, selectedChunkIds: chunkIds.join(',') })
+    navigate(`/source-interrogation?${params.toString()}`)
+  }
+
   return (
     <PageGrid className="corpus-explorer-page">
       <Column>
@@ -309,6 +358,7 @@ const CorpusExplorer = () => {
         <CorpusSearchPanel
           filters={filters}
           suggestions={suggestions}
+          authorityRecords={authorityRecords}
           onChange={setFilters}
           onReset={() => setFilters(defaultFilters)}
         />
@@ -339,6 +389,18 @@ const CorpusExplorer = () => {
             if (source?.page_count) params.set('pageRange', `1-${source.page_count}`)
             navigate(`/absences${params.size ? `?${params.toString()}` : ''}`)
           }}
+        />
+      </Column>
+
+      <Column lg={10}>
+        <DocumentChunkReader
+          chunks={chunkReader.chunks}
+          loading={chunkReader.loading}
+          error={chunkReader.error}
+          access={chunkReader.access}
+          selectedChunks={selectedChunks}
+          onToggleChunk={handleToggleChunk}
+          onSynthesize={handleSynthesizeSelected}
         />
       </Column>
     </PageGrid>

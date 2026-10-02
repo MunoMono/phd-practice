@@ -6,6 +6,7 @@ BACKEND_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BACKEND_ROOT))
 
 from app.services.exploratory_retrieval_service import ExploratoryQueryPlanner, ExploratoryRetrievalService
+from app.services.turin_question_route import decompose_hybrid_question
 
 
 class Rows:
@@ -44,6 +45,26 @@ class ExploratoryQueryPlannerTests(unittest.TestCase):
         variants = {variant["query"] for variant in plan["query_variants"]}
         self.assertIn('"Design Analysis Project"', variants)
         self.assertIn('"Job 170"', variants)
+
+    def test_hybrid_documentary_plan_preserves_structured_authority_and_job_anchors(self):
+        question = (
+            "According to the database record, who is recorded as leading Job 170, "
+            "and what do its surviving reports establish about research needs?"
+        )
+        decomposition = decompose_hybrid_question(question)
+        self.assertIsNotNone(decomposition)
+        authority_plan = self.planner.build_plan(self.db, question)
+
+        plan = self.planner.build_plan(
+            self.db,
+            decomposition.documentary_query,
+            entity_anchors=authority_plan["resolved_entities"],
+            documentary_anchors=decomposition.documentary_anchors,
+        )
+
+        self.assertEqual(plan["normalised_query"], "what do its surviving reports establish about research needs?")
+        self.assertIn("Job 170", [entity["label"] for entity in plan["resolved_entities"]])
+        self.assertIn('"Job 170"', [variant["query"] for variant in plan["query_variants"]])
 
     def test_variants_are_deterministic_and_bounded(self):
         query = "Example Person and design learning in the department"
@@ -88,6 +109,90 @@ class ExploratoryQueryPlannerTests(unittest.TestCase):
     def test_metadata_only_source_has_no_eligible_documentary_passage(self):
         rows = [{"chunk_id": "image", "chunk_text": "<!-- image -->", "score": 1.0, "source_section": None}]
         self.assertIsNone(ExploratoryRetrievalService._select_best_passage(rows, {"example", "person"}))
+
+    def test_coherent_passage_beats_high_scoring_fragment_within_source(self):
+        rows = [
+            {
+                "chunk_id": "fragment",
+                "chunk_text": "Research needs report research needs and research needs, design, report",
+                "score": 9.0,
+                "source_section": "Research needs",
+            },
+            {
+                "chunk_id": "coherent",
+                "chunk_text": "The report identifies staff training and technical support as the research needs for the project.",
+                "score": 0.2,
+                "source_section": "Research needs",
+            },
+        ]
+
+        selected = ExploratoryRetrievalService._select_best_passage(
+            rows, {"research", "needs", "project"}
+        )
+
+        self.assertEqual(selected["chunk_id"], "coherent")
+
+    def test_short_coherent_passage_remains_eligible(self):
+        rows = [{
+            "chunk_id": "concise",
+            "chunk_text": "The report recommends staff training.",
+            "score": 0.2,
+            "source_section": "Recommendations",
+        }]
+
+        selected = ExploratoryRetrievalService._select_best_passage(
+            rows, {"report", "training"}
+        )
+
+        self.assertEqual(selected["chunk_id"], "concise")
+
+    def test_unpunctuated_label_is_not_an_adequate_proposition(self):
+        rows = [{
+            "chunk_id": "label",
+            "chunk_text": "Design Education: Textiles etc.",
+            "score": 9.0,
+            "source_section": "Curriculum vitae",
+        }]
+
+        self.assertIsNone(ExploratoryRetrievalService._select_best_passage(
+            rows, {"janet", "daley"}
+        ))
+
+    def test_overlong_text_without_early_sentence_is_not_an_adequate_proposition(self):
+        rows = [{
+            "chunk_id": "overlong",
+            "chunk_text": "The report records " + ("a continuing programme of design work " * 12),
+            "score": 9.0,
+            "source_section": "Findings",
+        }]
+
+        self.assertIsNone(ExploratoryRetrievalService._select_best_passage(
+            rows, {"report", "design"}
+        ))
+
+    def test_overlong_chunk_with_thin_first_sentence_is_not_an_adequate_proposition(self):
+        rows = [{
+            "chunk_id": "thin-first-sentence",
+            "chunk_text": "Not many people. " + ("The report records a documented design activity. " * 8),
+            "score": 9.0,
+            "source_section": "Interview",
+        }]
+
+        self.assertIsNone(ExploratoryRetrievalService._select_best_passage(
+            rows, {"report", "design"}
+        ))
+
+    def test_fragment_only_source_has_no_adequate_proposition(self):
+        rows = [{
+            "chunk_id": "fragment",
+            "chunk_text": "Research needs report research needs and research needs, design, report",
+            "score": 9.0,
+            "source_section": "Research needs",
+        }]
+
+        self.assertIsNone(ExploratoryRetrievalService._select_best_passage(
+            rows, {"research", "needs", "project"}
+        ))
 
     def test_snapshot_identity_fills_legacy_empty_document_columns(self):
         candidate = {"document_id": "doc-1", "archive_record_pid": None, "asset_pid": None, "asset_id": None, "asset_id_or_asset_pid": None}

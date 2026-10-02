@@ -42,6 +42,7 @@ services:
       POSTGRES_HOST: db
       POSTGRES_PORT: 5432
       POSTGRES_DB: ${POSTGRES_DB:-testamentary-traces}
+      TURIN_INFERENCE_PROVIDER: ${TURIN_INFERENCE_PROVIDER:-ollama}
       TURIN_MODEL: ${TURIN_MODEL:-qwen3:8b-q4_K_M}
       TURIN_RUNTIME_VERSION: ${TURIN_RUNTIME_VERSION:-turin-runtime-v2}
       TURIN_QWEN_NUM_CTX: ${TURIN_QWEN_NUM_CTX:-16384}
@@ -51,6 +52,7 @@ services:
       TURIN_QWEN_TEMPERATURE: ${TURIN_QWEN_TEMPERATURE:-0.2}
       TURIN_MAX_INPUT_TOKENS: ${TURIN_MAX_INPUT_TOKENS:-12000}
       TURIN_TIMEOUT_SECONDS: ${TURIN_TIMEOUT_SECONDS:-180}
+      TURIN_ARCHIVE_FIRST_CORPUS_VERSION: ${TURIN_ARCHIVE_FIRST_CORPUS_VERSION:-corpus_turin_targeted_5b176946674f}
       OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://ollama:11434}
       S3_BUCKET: ${S3_BUCKET}
       S3_ENDPOINT: ${S3_ENDPOINT}
@@ -61,6 +63,7 @@ services:
     volumes:
       # Mount source code for hot reload
       - ./backend/app:/app/app:ro
+      - ./backend/config:/app/config:ro
       - backend_logs:/app/logs
       - model_cache:/root/.cache/huggingface
     depends_on:

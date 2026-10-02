@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     
     # API
     API_V1_PREFIX: str = "/api/v1"
-    ALLOWED_ORIGINS: List[str] = ["http://localhost:3000", "http://localhost:5173", "https://innovationdesign.io"]
+    ALLOWED_ORIGINS: List[str] = ["http://localhost:3000", "http://localhost:5173", "http://localhost:5174", "https://innovationdesign.io"]
     
     # Auth0
     AUTH0_DOMAIN: str = "dev-i4m880asz7y6j5sk.us.auth0.com"
@@ -67,6 +67,17 @@ class Settings(BaseSettings):
     S3_ENDPOINT: str = ""
     S3_ACCESS_KEY: str = ""
     S3_SECRET_KEY: str = ""
+
+    # C2PA signing defaults to disabled. Research mode uses a read-only key mount;
+    # production use should delegate signing to a protected external service.
+    C2PA_SIGNING_ENABLED: bool = False
+    C2PA_SIGNING_MODE: str = "external"
+    C2PA_SIGNER_URL: str = ""
+    C2PA_SIGNER_CLIENT_CERT_PATH: str = "/run/c2pa/signer-client.pem"
+    C2PA_SIGNING_CERTIFICATE_PATH: str = "/run/c2pa/certificate.pem"
+    C2PA_SIGNING_KEY_PATH: str = "/run/c2pa/private-key.pem"
+    C2PA_SIGNING_KEY_PASSPHRASE: str = ""
+    C2PA_TRUST_LIST_URL: str = "https://raw.githubusercontent.com/c2pa-org/conformance-public/main/trust-list/trust-list.json"
     
     # Logging
     LOG_LEVEL: str = "INFO"

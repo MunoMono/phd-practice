@@ -1,6 +1,6 @@
 import { Button, Select, SelectItem, Tag, TextInput, Tile } from '@carbon/react'
 
-const CorpusSearchPanel = ({ filters, suggestions, onChange, onReset }) => {
+const CorpusSearchPanel = ({ filters, suggestions, authorityRecords, onChange, onReset }) => {
   const updateField = (field, value) => {
     onChange((current) => ({
       ...current,
@@ -50,6 +50,18 @@ const CorpusSearchPanel = ({ filters, suggestions, onChange, onReset }) => {
           <SelectItem text="Failed" value="failed" />
         </Select>
 
+        <Select
+          id="corpus-authority"
+          labelText="Linked authority"
+          value={filters.authorityId}
+          onChange={(event) => updateField('authorityId', event.target.value)}
+        >
+          <SelectItem text="All linked authorities" value="" />
+          {authorityRecords.map((authority) => (
+            <SelectItem key={authority.authority_id} value={authority.authority_id} text={authority.label || authority.authority_id} />
+          ))}
+        </Select>
+
         <div className="app-actions-row app-actions-row--comfortable">
           <Button kind="secondary" onClick={onReset}>Reset filters</Button>
         </div>
@@ -82,9 +94,9 @@ const CorpusSearchPanel = ({ filters, suggestions, onChange, onReset }) => {
         </div>
 
         <div>
-          <h4 className="corpus-panel__section-title">Next metadata step</h4>
+          <h4 className="corpus-panel__section-title">Authority context</h4>
           <p className="corpus-panel__empty">
-            PID, authority, media, embeddings, and ML coverage filters will become first-class once the list endpoint exposes those fields directly.
+            This filter uses exact authority links held by local source records. Authority terms provide archival context and navigation; they are not source-document evidence.
           </p>
         </div>
       </div>

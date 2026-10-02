@@ -1,4 +1,4 @@
-const SESSION_KEY = 'innovation-design.source-interrogation.active.v1'
+const SESSION_KEY = 'innovation-design.source-interrogation.active.v2'
 
 export const loadSourceInterrogationSession = () => {
   try {

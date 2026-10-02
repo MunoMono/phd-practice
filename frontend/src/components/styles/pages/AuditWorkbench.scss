@@ -9,6 +9,10 @@
     margin-top: $spacing-05;
   }
 
+  &__c2pa-logo {
+    display: block;
+  }
+
   &__claims-list {
     margin-top: $spacing-05;
   }
@@ -16,4 +20,8 @@
   &__status-card {
     min-height: 100%;
   }
+}
+
+.ddr-theme--dark .audit-workbench__c2pa-logo {
+  filter: invert(1);
 }

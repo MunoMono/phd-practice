@@ -6,10 +6,11 @@
 .visual-analytics-workbench {
   --atlas-canvas-background: #ffffff;
   --atlas-muted-point: #8d8d8d;
+  --atlas-view-accent: #0f62fe;
   display: grid;
   grid-template-columns: 13.5rem minmax(0, 1fr) 16rem;
   grid-template-rows: auto minmax(0, 1fr);
-  height: calc(100vh - 8.125rem);
+  height: calc(100dvh - 2.5rem);
   min-height: 34rem;
   overflow: hidden;
   background: $background;
@@ -19,11 +20,15 @@
   &--inspector-collapsed { grid-template-columns: 13.5rem minmax(0, 1fr); }
   &--inspector-collapsed .visual-analytics-workbench__inspector { display: none; }
   &--controls-collapsed.visual-analytics-workbench--inspector-collapsed { grid-template-columns: minmax(0, 1fr); }
+  &--view-neighbourhoods { --atlas-view-accent: #009d9a; }
+  &--view-comparative { --atlas-view-accent: #9f1853; }
+  &--view-temporal { --atlas-view-accent: #198038; }
+  &--view-critical { --atlas-view-accent: #6929c4; }
 
   &__toolbar {
     grid-column: 1 / -1;
     display: grid;
-    grid-template-columns: max-content 14rem minmax(14rem, 24rem) minmax(10rem, 1fr) max-content max-content;
+    grid-template-columns: max-content 14rem minmax(14rem, 24rem) minmax(10rem, 1fr) max-content max-content max-content;
     gap: $spacing-04;
     align-items: end;
     padding: $spacing-04 $spacing-05;
@@ -33,6 +38,8 @@
 
   &__title { display: flex; gap: $spacing-03; align-items: center; @include type-style('heading-03'); }
   &__scope { @include type-style('label-01'); color: $text-secondary; padding-bottom: $spacing-03; }
+  &__panel-actions { display: flex; gap: $spacing-02; }
+  &__panel-actions .cds--btn { color: $link-primary; }
   &__notification { grid-column: 1 / -1; }
 
   &__controls, &__inspector {
@@ -45,11 +52,7 @@
   &__controls .cds--accordion__content { display: grid; gap: $spacing-04; }
   &__controls p, &__inspector p { @include type-style('body-compact-01'); color: $text-secondary; }
 
-  &__map-region { min-width: 0; min-height: 0; position: relative; padding: $spacing-04; display: flex; flex-direction: column; background: $layer; }
-  &__map-header { display: flex; justify-content: space-between; gap: $spacing-05; align-items: start; }
-  &__map-actions { display: flex; gap: $spacing-03; align-items: center; }
-  &__map-header h1 { @include type-style('heading-04'); margin-bottom: $spacing-02; }
-  &__map-header p { @include type-style('body-compact-01'); color: $text-secondary; max-width: 50rem; }
+  &__map-region { min-width: 0; min-height: 0; position: relative; padding: 0; display: flex; background: $layer; }
   &__canvas { display: block; flex: 1; width: 100%; min-height: 0; cursor: grab; border: 1px solid $border-subtle-01; touch-action: none; }
   &__canvas:active { cursor: grabbing; }
   &__empty-map { display: grid; place-items: center; flex: 1; min-height: 28rem; color: $text-secondary; border: 1px dashed $border-strong-01; }
@@ -57,6 +60,9 @@
   &__hover span { color: $text-secondary; }
 
   &__inspector .cds--tile { margin-top: $spacing-04; padding: $spacing-05; background: $layer-02; }
+  &__inspector .visual-analytics-workbench__view-context { display: grid; gap: $spacing-03; }
+  &__view-context p { margin: 0; }
+  &__view-context .cds--btn { justify-self: start; }
   &__inspector h2 { @include type-style('heading-03'); }
   &__inspector h3 { @include type-style('heading-01'); margin: $spacing-06 0 $spacing-02; }
   &__excerpt { border-left: 3px solid $border-interactive; padding-left: $spacing-03; }
@@ -72,14 +78,20 @@
   &__tray { display: none; }
   &__tray .cds--text-area__wrapper { min-width: 0; }
 
-  @include breakpoint-down(lg) { grid-template-columns: 12rem minmax(0, 1fr); &__inspector { display: none; } &__toolbar { grid-template-columns: max-content 13rem minmax(14rem, 1fr) max-content max-content; } &__scope { display: none; } &__tray { grid-template-columns: max-content minmax(12rem, 1fr) minmax(16rem, 1fr) max-content; } }
+  @include breakpoint-down(lg) { grid-template-columns: 12rem minmax(0, 1fr); &__inspector { display: none; } &__toolbar { grid-template-columns: max-content 13rem minmax(14rem, 1fr) max-content max-content max-content; } &__scope { display: none; } &__tray { grid-template-columns: max-content minmax(12rem, 1fr) minmax(16rem, 1fr) max-content; } }
   @include breakpoint-down(md) { height: auto; min-height: calc(100vh - 8.125rem); overflow: visible; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(28rem, 1fr) auto; &__controls { display: none; } &__toolbar { grid-template-columns: 1fr 1fr; } &__toolbar .cds--search { grid-column: 1 / -1; } &__tray { display: grid; grid-column: 1; grid-template-columns: 1fr; gap: $spacing-04; padding: $spacing-04; } }
 }
 
 .ddr-theme--dark .visual-analytics-workbench {
   --atlas-canvas-background: #161616;
   --atlas-muted-point: #525252;
+  --atlas-view-accent: #78a9ff;
 }
+
+.ddr-theme--dark .visual-analytics-workbench--view-neighbourhoods { --atlas-view-accent: #08bdba; }
+.ddr-theme--dark .visual-analytics-workbench--view-comparative { --atlas-view-accent: #ff7eb6; }
+.ddr-theme--dark .visual-analytics-workbench--view-temporal { --atlas-view-accent: #42be65; }
+.ddr-theme--dark .visual-analytics-workbench--view-critical { --atlas-view-accent: #be95ff; }
 
 .visual-analytics-page {
   &__status-tags {

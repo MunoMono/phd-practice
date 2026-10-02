@@ -62,11 +62,33 @@ class AuthorityRegistryTests(unittest.TestCase):
             with self.subTest(authority_type=authority_type):
                 self.assertIn(authority_type, self.registry.selected_types(question))
 
+    def test_documentary_what_does_question_is_not_employment_intent(self):
+        selected = self.registry.selected_types(
+            "What does the surviving Job 181 report say about internal representations?"
+        )
+
+        self.assertNotIn("agent_employment", selected)
+
     def test_period_uses_explicit_controlled_identifier_range(self):
         contexts = self.registry.resolve(self.database, "What period does 1970 belong to?", ["ref_ddr_period"])
         self.assertEqual(len(contexts), 1)
         self.assertEqual(contexts[0].authority_id, "1965-71")
         self.assertEqual(contexts[0].fields["epistemic_type"], "administrative_structural")
+
+    def test_period_collection_is_chronological_not_label_ordered(self):
+        rows = [
+            {"authority_id": "1978-85", "code": None, "label": "Third", "description": "", "metadata": {}},
+            {"authority_id": "1965-71", "code": None, "label": "Second", "description": "", "metadata": {}},
+            {"authority_id": "1972-77", "code": None, "label": "First", "description": "", "metadata": {}},
+        ]
+
+        class Database:
+            def execute(self, *_args, **_kwargs):
+                return Rows(rows)
+
+        contexts = self.registry.resolve(Database(), "List the controlled DDR periods.", ["ref_ddr_period"])
+
+        self.assertEqual([context.authority_id for context in contexts], ["1965-71", "1972-77", "1978-85"])
 
     def test_named_student_miss_does_not_become_historical_absence_or_full_list(self):
         contexts = self.registry.resolve(self.database, "Was Unknown Person a student?", ["ref_students"])
@@ -75,6 +97,44 @@ class AuthorityRegistryTests(unittest.TestCase):
     def test_interpretative_authority_is_labelled_as_database_classification(self):
         contexts = self.registry.resolve(self.database, "Which methodology classifications are available?", ["ref_methodology"])
         self.assertEqual(contexts[0].fields["authority_classification"], "database authority classification")
+
+    def test_multiple_explicit_job_numbers_are_exact_and_question_ordered(self):
+        rows = [
+            {"authority_id": "146", "code": "JOB_146", "label": "Job 146", "description": "", "metadata": {}},
+            {"authority_id": "170", "code": "JOB_170", "label": "Job 170", "description": "", "metadata": {}},
+            {"authority_id": "175", "code": "JOB_175", "label": "Job 175", "description": "", "metadata": {}},
+        ]
+
+        class Database:
+            def execute(self, *_args, **_kwargs):
+                return Rows(rows)
+
+        contexts = self.registry.resolve(Database(), "Compare Job 175 with Job 146.", ["ddr_projects"])
+
+        self.assertEqual([context.authority_id for context in contexts], ["175", "146"])
+
+    def test_explicit_methodology_codes_do_not_expand_to_registry_collection(self):
+        rows = [
+            {"authority_id": "1", "code": "SYSTEMATIC_DESIGN", "label": "Systematic design", "description": "", "metadata": {}},
+            {"authority_id": "2", "code": "SYSTEMS_ANALYSIS", "label": "Systems analysis", "description": "", "metadata": {}},
+            {"authority_id": "3", "code": "COMP_MODELLING", "label": "Computational modelling", "description": "", "metadata": {}},
+            {"authority_id": "4", "code": "ERGONOMIC_STUDY", "label": "Ergonomic study", "description": "", "metadata": {}},
+            {"authority_id": "5", "code": "UNRELATED", "label": "Unrelated", "description": "", "metadata": {}},
+        ]
+
+        class Database:
+            def execute(self, *_args, **_kwargs):
+                return Rows(rows)
+
+        contexts = self.registry.resolve(
+            Database(),
+            "How does the methodology registry distinguish SYSTEMATIC_DESIGN, SYSTEMS_ANALYSIS, COMP_MODELLING and ERGONOMIC_STUDY?",
+            ["ref_methodology"],
+        )
+
+        self.assertEqual([context.fields["code"] for context in contexts], [
+            "SYSTEMATIC_DESIGN", "SYSTEMS_ANALYSIS", "COMP_MODELLING", "ERGONOMIC_STUDY",
+        ])
 
 
 if __name__ == "__main__":

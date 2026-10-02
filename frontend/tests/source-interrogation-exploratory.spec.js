@@ -16,14 +16,37 @@ test('an exploratory interrogation renders Qwen answer, sources, and provenance 
         model: { name: 'qwen3:8b-q4_K_M', display_name: 'Qwen3 8B · Q4_K_M', runtime: 'ollama' },
         corpus_version: 'corpus_f40d78dbce52',
         provenance_validation: { valid: true, source_count: 1 },
-        retrieval: {}, retrieval_diagnostics: { result_count: 1, notes: [] },
+        retrieval: {}, retrieval_diagnostics: {
+          result_count: 1,
+          notes: [],
+          retrieval_coverage: {
+            coverage_status: 'partially_satisfied',
+            required_surfaces_found: ['documentary'],
+            required_surfaces_missing: ['oral_history'],
+            distinct_source_count: 1,
+            temporal_buckets_found: ['1970s'],
+            target_entity_evidence_found: true,
+            target_project_evidence_found: null
+          }
+        },
         retrieved_evidence: [{
           chunk_id: 'chunk-1', document_id: 'doc-1', title: 'Project report', text: 'A documentary passage.',
           pid: '546216480663', archive_record_pid: '637362423718', page_start: 4, rank: 1, score: 0.9,
           archive_resolution_status: 'resolved_current', provenance: { archive_record_pid: '637362423718', asset_pid: '123' }
           , asset_pid: '123', combined_score: 1.2, text_score: 0.9, metadata_score: 0.3, source_nomination_score: 1.2, passage_score: 1.4, source_nomination_channels: ['METADATA_MATCH', 'TEXT_MATCH'], passage_evidence_channel: 'DIRECT_TEXT_MATCH', retrieval_channels: ['TEXT_MATCH', 'METADATA_MATCH'], metadata_matches: [{ field: 'keywords', value: 'Example Person' }], evidence_classification: { subject_named: true, relationship_to_question: 'DIRECT_SUPPORT' }
         }]
+        , evidence_ledger: [
+          { evidence_id: 'ev:fixture', evidence_type: 'DIRECT_DOCUMENTARY', source_title: 'Project report', chunk_id_or_record_id: 'chunk-1', contemporary_or_retrospective: 'contemporary' },
+          { evidence_id: 'metadata:fixture', evidence_type: 'ARCHIVAL_METADATA', source_title: 'Project report', relation_type_if_any: 'PERSON_ASSOCIATED_WITH_SOURCE', relation_derivation_if_any: 'keyword_metadata', contemporary_or_retrospective: 'unknown' }
+        ]
         , documentary_evidence: [{ claim: 'A documentary passage.', pid: '546216480663', page: 4 }],
+        testimony_evidence: [{ claim: 'A later interview recollection.', pid: '546216480663', page: 4 }],
+        researcher_facing: {
+          authority_evidence: [],
+          documentary_evidence: [{ claim: 'A documentary passage.', pid: '546216480663', page: 4 }],
+          testimony_evidence: [{ claim: 'A later interview recollection.', pid: '546216480663', page: 4 }],
+          evidential_limits: [{ category: 'not_established', explanation: 'The source does not establish supervision.' }]
+        },
         inferences: [{ claim: 'This may be related across sources.' }],
         missingness: [{ category: 'not_established', explanation: 'The source does not establish supervision.' }]
       })
@@ -36,10 +59,18 @@ test('an exploratory interrogation renders Qwen answer, sources, and provenance 
   await expect(page.locator('p').filter({ hasText: 'Project report' }).first()).toBeVisible()
   await expect(page.getByText('Provenance enabled')).toBeVisible()
   await expect(page.getByText('Direct support').nth(1)).toBeVisible()
+  await expect(page.getByText('DIRECT_DOCUMENTARY').first()).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Typed evidence ledger' })).toBeVisible()
+  await expect(page.getByText(/PERSON_ASSOCIATED_WITH_SOURCE.*keyword_metadata/)).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Documentary evidence' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Retrospective testimony' })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Qwen interpretation' })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Evidential limits' })).toBeVisible()
   await expect(page.getByText('The source does not establish supervision.')).toBeVisible()
+  await expect(page.getByText('Retrieval coverage: partially satisfied.')).toBeVisible()
+  await expect(page.getByText('Required evidence missing: oral_history.')).toBeVisible()
+  await expect(page.getByText('Evidence periods: 1970s.')).toBeVisible()
+  await expect(page.getByText('Target entity evidence: found.')).toBeVisible()
   await page.getByText('Why this source?').click()
   await expect(page.getByText('Nomination channel')).toBeVisible()
   await expect(page.getByText('METADATA_MATCH + TEXT_MATCH')).toBeVisible()
@@ -53,10 +84,10 @@ test('an exploratory interrogation renders Qwen answer, sources, and provenance 
   await expect(page.getByText('DIRECT_TEXT_MATCH')).toBeVisible()
   await expect(page.getByText('Passage score')).toBeVisible()
   await expect(page.getByText('1.400')).toBeVisible()
-  expect(requestBody).toEqual({ query: 'Describe this harmless development source.', mode: 'exploratory', top_k: 5 })
+  expect(requestBody).toEqual({ query: 'Describe this harmless development source.', mode: 'exploratory', top_k: 8 })
 })
 
-test('an exact document title in a query targets that document automatically', async ({ page }) => {
+test('an exact document title is submitted for backend title resolution', async ({ page }) => {
   let requestBody
   const document = { document_id: 'five-year-programme', title: 'A five year programme for design in general education, 2nd draft', ml_policy_status: 'eligible_unrestricted' }
   await page.route('**/api/runtime/model-info', (route) => route.fulfill({ contentType: 'application/json', body: JSON.stringify({ status: 'ready', display_name: 'Qwen fixture' }) }))
@@ -74,7 +105,7 @@ test('an exact document title in a query targets that document automatically', a
   await page.getByRole('textbox', { name: 'Research query' }).fill(query)
   await page.getByRole('button', { name: 'Run interrogation' }).click()
 
-  await expect.poll(() => requestBody).toEqual({ query, mode: 'exploratory', top_k: 5, target_document_ids: ['five-year-programme'] })
+  await expect.poll(() => requestBody).toEqual({ query, mode: 'exploratory', top_k: 8 })
 })
 
 test('a document comparison retains document-specific evidence and insufficiency', async ({ page }) => {
@@ -112,13 +143,13 @@ test('a document comparison retains document-specific evidence and insufficiency
   await page.goto('/source-interrogation')
   await page.getByRole('textbox', { name: 'Research query' }).fill('Compare the selected documents.')
   await page.getByRole('combobox', { name: 'Mode / model selector' }).selectOption('comparison')
-  await page.getByRole('combobox', { name: 'Target document A' }).selectOption('document-a')
-  await page.getByRole('combobox', { name: 'Target document B (comparison)' }).selectOption('document-b')
+  await page.getByRole('combobox', { name: 'Document A' }).selectOption('document-a')
+  await page.getByRole('combobox', { name: 'Document B' }).selectOption('document-b')
   await page.getByRole('button', { name: 'Compare documents' }).click()
 
   await expect(page.getByRole('heading', { name: 'Document comparison evidence' })).toBeVisible()
   await expect(page.getByText('Document A:')).toBeVisible()
   await expect(page.getByText('Document B:')).toBeVisible()
   await expect(page.getByText('No relevant passage was retrieved from this selected document under the current query and corpus configuration.')).toBeVisible()
-  expect(requestBody).toEqual({ query: 'Compare the selected documents.', mode: 'comparison', top_k: 5, target_document_ids: ['document-a', 'document-b'] })
+  expect(requestBody).toEqual({ query: 'Compare the selected documents.', mode: 'comparison', top_k: 8, target_document_ids: ['document-a', 'document-b'] })
 })

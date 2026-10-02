@@ -23,7 +23,7 @@ def record_provenance_event(
         ProvenanceEvent.subject_id == subject_id,
     ).order_by(ProvenanceEvent.created_at.desc()).first()
     created_at = datetime.utcnow()
-    values = {
+    digest_values = {
         "event_id": f"prov-{uuid.uuid4().hex[:12]}",
         "event_type": event_type,
         "subject_type": subject_type,
@@ -34,9 +34,9 @@ def record_provenance_event(
         "created_at": created_at.isoformat(),
     }
     event = ProvenanceEvent(
-        **values,
-        event_sha256=provenance_event_digest(values),
+        **{key: value for key, value in digest_values.items() if key != "created_at"},
         created_at=created_at,
+        event_sha256=provenance_event_digest(digest_values),
     )
     db.add(event)
     return event

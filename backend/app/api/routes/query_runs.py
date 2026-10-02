@@ -3,13 +3,15 @@ import uuid
 from datetime import datetime
 from typing import Any, Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel
 
+from app.core.auth import get_optional_user
 from app.core.database import LocalSessionLocal
-from app.models.research_outputs import Claim, ClaimEvidence, MissingnessEvent, QueryRun, QueryRunChunk
+from app.models.research_outputs import Claim, ClaimEvidence, ContentCredentialAsset, MissingnessEvent, QueryRun, QueryRunChunk
 from app.services.claim_revision_service import record_claim_revision
+from app.services.content_credentials import ContentCredentialsUnavailable, sign_query_run_svg, signed_asset_record
 from app.services.provenance_event_service import record_provenance_event
 from app.services.provenance_integrity import claim_evidence_digest, query_run_chunk_digest, query_run_digest
 from app.services.provenance_service import ProvenanceService
@@ -453,6 +455,122 @@ async def export_query_run_markdown(query_id: str):
             payload,
             media_type="text/markdown",
             headers={"Content-Disposition": f'attachment; filename="{query_id}.md"'},
+        )
+    finally:
+        db.close()
+
+
+@router.get("/{query_id}/content-credentials.svg")
+async def export_query_run_content_credentials(query_id: str):
+    db = LocalSessionLocal()
+    try:
+        run = get_query_run_or_404(db, query_id)
+        try:
+            payload, validation = sign_query_run_svg(run)
+        except ContentCredentialsUnavailable as error:
+            raise HTTPException(status_code=503, detail=str(error)) from error
+        validation_state = validation.get("validation_state", "unknown")
+        return PlainTextResponse(
+            payload.decode("utf-8"),
+            media_type="image/svg+xml",
+            headers={
+                "Content-Disposition": f'attachment; filename="{query_id}-content-credentials.svg"',
+                "X-C2PA-Validation-State": str(validation_state),
+            },
+        )
+    finally:
+        db.close()
+
+
+def serialize_content_credential_asset(asset: ContentCredentialAsset) -> dict[str, Any]:
+    return {
+        "asset_id": asset.asset_id,
+        "query_id": asset.query_id,
+        "asset_format": asset.asset_format,
+        "asset_sha256": asset.asset_sha256,
+        "manifest_sha256": asset.manifest_sha256,
+        "validation_state": asset.validation_state,
+        "validation_status": asset.validation_status_json or [],
+        "signer_subject": asset.signer_subject,
+        "signer_trust": asset.signer_trust,
+        "created_by": asset.created_by,
+        "created_at": asset.created_at.isoformat() if asset.created_at else None,
+    }
+
+
+@router.post("/{query_id}/content-credentials", status_code=201)
+async def create_query_run_content_credentials(query_id: str, user: Optional[dict] = Depends(get_optional_user)):
+    db = LocalSessionLocal()
+    try:
+        run = get_query_run_or_404(db, query_id)
+        try:
+            payload, validation = sign_query_run_svg(run)
+        except ContentCredentialsUnavailable as error:
+            raise HTTPException(status_code=503, detail=str(error)) from error
+
+        record = signed_asset_record(payload, validation)
+        asset = ContentCredentialAsset(
+            asset_id=f"c2pa-{uuid.uuid4().hex[:12]}",
+            query_id=run.query_id,
+            asset_format="image/svg+xml",
+            asset_bytes=payload,
+            signer_trust="untrusted_research",
+            created_by=(user or {}).get("email") or (user or {}).get("user_id") or "system",
+            **record,
+        )
+        db.add(asset)
+        db.flush()
+        record_provenance_event(
+            db,
+            "content_credentials.created",
+            "content_credential_asset",
+            asset.asset_id,
+            {
+                "query_id": run.query_id,
+                "asset_sha256": asset.asset_sha256,
+                "manifest_sha256": asset.manifest_sha256,
+                "validation_state": asset.validation_state,
+                "signer_trust": asset.signer_trust,
+            },
+            actor=asset.created_by,
+        )
+        db.commit()
+        db.refresh(asset)
+        return serialize_content_credential_asset(asset)
+    finally:
+        db.close()
+
+
+@router.get("/{query_id}/content-credentials")
+async def list_query_run_content_credentials(query_id: str):
+    db = LocalSessionLocal()
+    try:
+        get_query_run_or_404(db, query_id)
+        assets = db.query(ContentCredentialAsset).filter(
+            ContentCredentialAsset.query_id == query_id
+        ).order_by(ContentCredentialAsset.created_at.desc()).all()
+        return {"assets": [serialize_content_credential_asset(asset) for asset in assets]}
+    finally:
+        db.close()
+
+
+@router.get("/{query_id}/content-credentials/{asset_id}.svg")
+async def download_query_run_content_credentials(query_id: str, asset_id: str):
+    db = LocalSessionLocal()
+    try:
+        asset = db.query(ContentCredentialAsset).filter(
+            ContentCredentialAsset.query_id == query_id,
+            ContentCredentialAsset.asset_id == asset_id,
+        ).first()
+        if not asset:
+            raise HTTPException(status_code=404, detail="Content Credentials asset not found")
+        return PlainTextResponse(
+            asset.asset_bytes.decode("utf-8"),
+            media_type=asset.asset_format,
+            headers={
+                "Content-Disposition": f'attachment; filename="{asset.asset_id}.svg"',
+                "X-C2PA-Validation-State": asset.validation_state,
+            },
         )
     finally:
         db.close()

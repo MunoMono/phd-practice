@@ -35,7 +35,10 @@ AUTHORITY_SPECS = {
 }
 
 INTENT_HINTS = {
-    "agent_employment": re.compile(r"\b(?:role|involvement|work|tenure|staff|position|employment|held)\b", re.IGNORECASE),
+    "agent_employment": re.compile(
+        r"\b(?:role|involvement|work|tenure|staff|position|employment|held|when|did|activity|activities|at the ddr)\b",
+        re.IGNORECASE,
+    ),
     "ref_students": re.compile(r"\bstudent(?:s)?\b", re.IGNORECASE),
     "ref_fonds": re.compile(r"\bfonds?\b", re.IGNORECASE),
     "ref_publication_type": re.compile(r"\b(publication type|reports?|working papers?|prospectuses|interviews?)\b", re.IGNORECASE),
@@ -77,6 +80,7 @@ class AuthorityRegistry:
     def resolve(self, db: Any, question: str, authority_types: list[str] | None = None) -> list[AuthorityContext]:
         selected = authority_types if authority_types is not None else self.selected_types(question)
         contexts: list[AuthorityContext] = []
+        normalized_question = " ".join(re.findall(r"[a-z0-9]+", question.lower()))
         question_terms = {term.lower() for term in re.findall(r"[A-Za-z]{3,}", question)} - AUTHORITY_INTENT_TERMS - {
             "what", "which", "who", "when", "where", "work", "worked", "available", "first", "take", "took", "into", "with", "from", "that", "this", "about", "under", "were", "was", "are", "did", "does", "led", "lead",
         }
@@ -91,15 +95,26 @@ class AuthorityRegistry:
                 """),
                 {"authority_type": authority_type},
             ).mappings().all()
-            if authority_type == "ref_ddr_period":
+            exact_matches = self._exact_identifier_matches(question, rows)
+            if exact_matches:
+                matched = exact_matches
+            elif authority_type == "ref_ddr_period":
                 matched = self._period_matches(question, rows)
             elif authority_type == "ddr_projects":
                 matched = self._project_matches(question, question_terms, rows)
+            elif authority_type == "agent_employment":
+                exact_name_matches = [
+                    row
+                    for row in rows
+                    if " ".join(re.findall(r"[a-z0-9]+", str(row["label"]).lower()))
+                    in normalized_question
+                ]
+                matched = exact_name_matches or self._best_matches(question_terms, rows)
             elif not question_terms and not spec.direct_lookup:
                 matched = rows
             else:
                 matched = self._best_matches(question_terms, rows)
-            if authority_type != "ref_ddr_period" and self._is_collection_request(question, authority_type):
+            if not exact_matches and authority_type != "ref_ddr_period" and self._is_collection_request(question, authority_type):
                 matched = rows
             for row in matched:
                 contexts.append(
@@ -121,10 +136,27 @@ class AuthorityRegistry:
         return contexts
 
     @staticmethod
+    def _exact_identifier_matches(question: str, rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """Return explicitly named registry identifiers in their question order."""
+        occurrences: list[tuple[int, dict[str, Any]]] = []
+        for row in rows:
+            identifiers = (str(row.get("authority_id") or ""), str(row.get("code") or ""))
+            positions = [
+                match.start()
+                for identifier in identifiers
+                if identifier
+                for match in re.finditer(rf"(?<![A-Za-z0-9_]){re.escape(identifier)}(?![A-Za-z0-9_])", question, re.IGNORECASE)
+            ]
+            if positions:
+                occurrences.append((min(positions), row))
+        return [row for _position, row in sorted(occurrences, key=lambda item: item[0])]
+
+    @staticmethod
     def _project_matches(question: str, question_terms: set[str], rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
-        job_match = re.search(r"\bjob(?: number)?\s+(\d+)\b", question, re.IGNORECASE)
-        if job_match:
-            return [row for row in rows if str(row["authority_id"]) == job_match.group(1)]
+        job_ids = re.findall(r"\bjob(?: number)?\s+(\d+)\b", question, re.IGNORECASE)
+        if job_ids:
+            rows_by_id = {str(row["authority_id"]): row for row in rows}
+            return [rows_by_id[job_id] for job_id in job_ids if job_id in rows_by_id]
         scored_rows = []
         for row in rows:
             haystack = " ".join(str(value or "") for value in (row["authority_id"], row["code"], row["label"], row["description"], *dict(row["metadata"] or {}).values())).lower()
@@ -155,14 +187,21 @@ class AuthorityRegistry:
             "ref_students": r"\b(?:which|what|list|show)\s+(?:all\s+)?students?\b",
             "ref_fonds": r"\b(?:which|what|list|show)\s+(?:all\s+)?fonds?\b",
             "ref_publication_type": r"\b(?:which|what|list|show)\s+(?:all\s+)?(?:publication types?|reports?|working papers?|prospectuses|interviews?)\b",
+            "ref_methodology": r"\b(?:how does|what|which|list|show)\b.*\b(?:methodology|registry|distinguish)\b",
         }
         pattern = patterns.get(authority_type)
         return bool(pattern and re.search(pattern, question, re.IGNORECASE))
 
     @staticmethod
     def _period_matches(question: str, rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        def period_start(row: dict[str, Any]) -> int:
+            match = re.match(r"(\d{4})-", str(row["authority_id"]))
+            return int(match.group(1)) if match else 9999
+
         years = [int(year) for year in re.findall(r"\b(?:19|20)\d{2}\b", question)]
         if not years:
+            if re.search(r"\b(?:what|which|list|show)\b.*\b(?:controlled )?(?:ddr )?periods?\b", question, re.IGNORECASE):
+                return sorted(rows, key=period_start)
             if re.search(r"\b(?:formally )?constitut(?:ed|ion)\b", question, re.IGNORECASE):
                 return [row for row in rows if "formal constitution" in f"{row['label']} {row['description']}".lower()]
             question_lower = question.lower()
@@ -181,7 +220,7 @@ class AuthorityRegistry:
             end = int(end_token) if len(end_token) == 4 else (start // 100) * 100 + int(end_token)
             if any(start <= year <= end for year in years):
                 matched.append(row)
-        return matched
+        return sorted(matched, key=period_start)
 
     @staticmethod
     def _matches(question_terms: set[str], row: dict[str, Any]) -> bool:

@@ -14,6 +14,7 @@ import uuid
 import numpy as np
 
 from app.core.database import LocalSessionLocal
+from app.core.config import settings
 from app.core.ddr_temporal_scope import DDR_DOCUMENT_SQL_SCOPE
 from app.models.research_outputs import EmbeddingReadinessReview, MissingnessEvent
 from app.services.corpus_status_service import get_corpus_status
@@ -1811,7 +1812,7 @@ async def get_dashboard_stats():
 @router.get("/dashboard-analytical-surface")
 async def get_dashboard_analytical_surface():
     """Return current frozen-corpus measures for the landing-page analytical surface."""
-    corpus_version = "corpus_f40d78dbce52"
+    corpus_version = settings.TURIN_ARCHIVE_FIRST_CORPUS_VERSION
     db = LocalSessionLocal()
 
     try:

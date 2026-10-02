@@ -117,6 +117,7 @@ class DocumentChunk(LocalBase):
     
     # Chunk metadata
     chunk_metadata = Column(JSONB)
+    corpus_version = Column(String(255), index=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
 

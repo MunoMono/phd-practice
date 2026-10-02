@@ -65,6 +65,19 @@ export const getDocumentAnnotations = async (documentId) => {
   }
 }
 
+export const getDocumentChunks = async (documentId, params = {}) => {
+  const payload = await apiRequest(`/api/documents/${documentId}/chunks`, { params })
+
+  return {
+    documentId: payload?.document_id || documentId,
+    access: payload?.access || {},
+    count: payload?.count || 0,
+    offset: payload?.offset || 0,
+    limit: payload?.limit || 0,
+    chunks: payload?.chunks || []
+  }
+}
+
 export const syncDocumentMetadata = (documentId) => apiRequest(`/api/documents/${documentId}/sync-metadata`, {
   method: 'POST'
 })

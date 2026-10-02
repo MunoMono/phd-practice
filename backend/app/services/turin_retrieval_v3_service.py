@@ -7,6 +7,7 @@ from typing import Any
 
 from sqlalchemy import text
 
+from app.core.config import settings
 from app.services.exploratory_retrieval_service import ExploratoryRetrievalService
 from app.services.retrieval_validation_service import RetrievalValidationService
 from app.services.turin_retrieval_v3_coverage import TurinRetrievalV3Coverage
@@ -16,7 +17,7 @@ from app.services.turin_retrieval_v31_authority_graph import TurinRetrievalV31Au
 from app.services.turin_retrieval_v34_slots import TurinRetrievalV34Slots
 
 
-CORPUS_VERSION = "corpus_f40d78dbce52"
+CORPUS_VERSION = settings.TURIN_ARCHIVE_FIRST_CORPUS_VERSION
 METADATA_SNAPSHOT = "turin-archive-metadata-v1"
 LANE_LIMIT = 30
 SOURCE_LIMIT = 80

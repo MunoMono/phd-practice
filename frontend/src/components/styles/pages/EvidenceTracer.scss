@@ -53,12 +53,40 @@
     margin-bottom: $spacing-07;
   }
 
+  .tracer__answer-state {
+    display: grid;
+    gap: $spacing-03;
+    margin-bottom: $spacing-05;
+
+    details p {
+      margin: $spacing-03 0 0;
+    }
+  }
+
   .tracer__answer-body {
     @include type-style('heading-03');
+    font-size: 4.21875rem;
+    line-height: 5.625rem;
     max-width: 72rem;
     margin-bottom: $spacing-07;
     white-space: pre-wrap;
     color: $text-primary;
+
+    .tracer__answer-paragraph h4 {
+      margin: 0 0 2rem;
+      font-size: 1.875rem;
+      line-height: 2.25rem;
+    }
+
+    p {
+      margin: 0;
+      font-size: 1.5rem;
+      line-height: 2.25rem;
+    }
+
+    .tracer__answer-paragraph + .tracer__answer-paragraph {
+      margin-top: $spacing-05;
+    }
 
     .tracer__source-citation {
       display: inline-block;

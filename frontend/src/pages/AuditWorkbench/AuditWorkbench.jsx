@@ -1,4 +1,4 @@
-import { Button, InlineNotification, Select, SelectItem, Tag, Tile } from '@carbon/react'
+import { Button, InlineNotification, Pagination, Select, SelectItem, Tag, Tile } from '@carbon/react'
 import { Catalog, Download } from '@carbon/icons-react'
 import { useEffect, useMemo, useState } from 'react'
 import { getAuthoritySummary } from '../../api/authorities'
@@ -10,7 +10,7 @@ import { exportClaimsCsv, exportClaimsMarkdown, getClaims } from '../../api/clai
 import { exportCrossReadCsv, exportCrossReadMarkdown, getCrossReadMap } from '../../api/crossRead'
 import { getRuntimeLoadStatus } from '../../api/runtime'
 import { getMissingnessEvents, getMissingnessSummary } from '../../api/missingness'
-import { exportQueryRunJson, exportQueryRunMarkdown, getQueryRun, getQueryRuns } from '../../api/queryRuns'
+import { downloadContentCredentialAsset, exportQueryRunJson, exportQueryRunMarkdown, getContentCredentialAssets, getQueryRun, getQueryRuns } from '../../api/queryRuns'
 import { getResearchStateTag } from '../../utils/researchState'
 import { downloadFile } from '../../utils/workbenchExport'
 
@@ -20,6 +20,8 @@ const AuditWorkbench = () => {
   const [queryRuns, setQueryRuns] = useState([])
   const [selectedQueryId, setSelectedQueryId] = useState('')
   const [selectedQueryRun, setSelectedQueryRun] = useState(null)
+  const [selectedContentCredential, setSelectedContentCredential] = useState(null)
+  const [queryRunPage, setQueryRunPage] = useState(1)
   const [missingnessEvents, setMissingnessEvents] = useState([])
   const [missingnessSummary, setMissingnessSummary] = useState(null)
   const [crossReadMap, setCrossReadMap] = useState([])
@@ -52,11 +54,21 @@ const AuditWorkbench = () => {
         }
 
         const nextQueryRuns = queryRunPayload.query_runs || []
-        const nextSelectedQueryId = nextQueryRuns[0]?.query_id || ''
+        const credentialLists = await Promise.all(nextQueryRuns.map(async (run) => {
+          try {
+            const payload = await getContentCredentialAssets(run.query_id)
+            return { queryId: run.query_id, assets: payload.assets || [] }
+          } catch {
+            return { queryId: run.query_id, assets: [] }
+          }
+        }))
+        const credentialledRun = credentialLists.find(({ assets }) => assets.length > 0)
+        const nextSelectedQueryId = credentialledRun?.queryId || nextQueryRuns[0]?.query_id || ''
 
         setBackendHealth(healthPayload)
         setRuntimeStatus(runtimePayload)
         setQueryRuns(nextQueryRuns)
+        setQueryRunPage(1)
         setSelectedQueryId(nextSelectedQueryId)
         setMissingnessEvents(missingnessPayload.events || [])
         setMissingnessSummary(missingnessSummaryPayload)
@@ -84,6 +96,7 @@ const AuditWorkbench = () => {
   useEffect(() => {
     if (!selectedQueryId) {
       setSelectedQueryRun(null)
+      setSelectedContentCredential(null)
       return
     }
 
@@ -91,14 +104,19 @@ const AuditWorkbench = () => {
 
     const loadSelectedQueryRun = async () => {
       try {
-        const payload = await getQueryRun(selectedQueryId)
+        const [payload, credentialPayload] = await Promise.all([
+          getQueryRun(selectedQueryId),
+          getContentCredentialAssets(selectedQueryId),
+        ])
         if (!isCancelled) {
           setSelectedQueryRun(payload)
+          setSelectedContentCredential(credentialPayload.assets?.[0] || null)
         }
       } catch (loadError) {
         if (!isCancelled) {
           setError(loadError.message || 'Failed to load the selected query run.')
           setSelectedQueryRun(null)
+          setSelectedContentCredential(null)
         }
       }
     }
@@ -115,6 +133,23 @@ const AuditWorkbench = () => {
     const crossReadMappingCount = crossReadMap.reduce((total, passage) => total + (passage.mapping_count || passage.mappings?.length || 0), 0)
 
     return [
+      {
+        label: 'C2PA research credentials',
+        value: loading ? 'Loading...' : selectedContentCredential?.validation_state === 'Valid' ? 'Signed asset ready' : 'Ready to sign',
+        note: loading
+          ? 'Checking C2PA research asset'
+          : selectedContentCredential
+            ? `Valid C2PA manifest · ${selectedContentCredential.signer_trust === 'untrusted_research' ? 'research signer, untrusted' : 'signer trust unavailable'}`
+            : 'C2PA signing is available for selected source interrogations',
+        logo: true,
+      },
+      {
+        label: 'Authority register',
+        value: loading ? 'Loading...' : String(authoritySummary?.totalRecords || 0),
+        note: authoritySummary
+          ? `${authoritySummary.count} authority types · ${authoritySummary.coreRecords} core`
+          : 'Archive authority context',
+      },
       {
         label: 'Apparatus connection',
         value: loading ? 'Checking' : error ? 'Attention needed' : 'Online',
@@ -146,7 +181,9 @@ const AuditWorkbench = () => {
         note: 'Claims ready for evidence review',
       },
     ]
-  }, [claims, error, loading, queryRuns.length, runtimeStatus])
+  }, [authoritySummary, claims, error, loading, queryRuns.length, runtimeStatus, selectedContentCredential])
+
+  const visibleQueryRuns = useMemo(() => queryRuns.slice((queryRunPage - 1) * 12, queryRunPage * 12), [queryRunPage, queryRuns])
 
   const selectedQueryRunExportsEnabled = Boolean(selectedQueryId)
 
@@ -241,12 +278,6 @@ const AuditWorkbench = () => {
         />
       </Column>
 
-      <Column>
-        <Tile>
-          <PanelHeader title="Analytical output" description="Provenance consolidates live apparatus traces. It does not create findings; it gathers logs, exports, and evidence trails for review." />
-        </Tile>
-      </Column>
-
       {error && (
         <Column>
           <InlineNotification lowContrast kind="error" title="Live provenance unavailable" subtitle={error} />
@@ -256,10 +287,13 @@ const AuditWorkbench = () => {
       <Column>
         <Tile>
           <PanelHeader title="Operational overview" description="The live research apparatus at a glance." />
-          <div className="audit-workbench__status-grid">
+          <div className="app-card-grid app-card-grid--dense app-card-grid--responsive audit-workbench__authority-grid">
             {apparatusCards.map((card) => (
               <div key={card.label} className="app-stat-card audit-workbench__status-card">
-                <strong className="app-stat-card__title">{card.label}</strong>
+                <strong className="app-stat-card__title">
+                  {card.logo && <img className="audit-workbench__c2pa-logo" src="/c2pa_logo.svg" alt="C2PA Content Credentials" width="192" height="46" />}
+                  {!card.logo && card.label}
+                </strong>
                 <p className="app-stat-card__value">{card.value}</p>
                 <p className="app-stat-card__note">{card.note}</p>
               </div>
@@ -301,7 +335,7 @@ const AuditWorkbench = () => {
             <InlineNotification lowContrast kind="info" title="No query runs yet" subtitle="Run a source interrogation to surface persisted retrieval trails here." />
           ) : (
             <div className="app-card-grid app-card-grid--dense">
-              {queryRuns.map((run) => (
+              {visibleQueryRuns.map((run) => (
                 <div key={run.query_id} className="app-list-item">
                   <strong className="app-list-item__title">{run.prompt}</strong>
                   {getResearchStateTag(run) ? <Tag type={getResearchStateTag(run).type} size="sm">{getResearchStateTag(run).label}</Tag> : null}
@@ -320,6 +354,15 @@ const AuditWorkbench = () => {
                 </div>
               ))}
             </div>
+          )}
+          {!loading && queryRuns.length > 12 && (
+            <Pagination
+              page={queryRunPage}
+              pageSize={12}
+              pageSizes={[12]}
+              totalItems={queryRuns.length}
+              onChange={({ page }) => setQueryRunPage(page)}
+            />
           )}
         </Tile>
       </Column>
@@ -447,6 +490,22 @@ const AuditWorkbench = () => {
                 <p className="app-text-muted app-copy-tight">
                   A checksum detects changes to the retained record. It is not a digital signature, C2PA manifest, or assessment of a source's authenticity.
                 </p>
+                <InlineNotification
+                  lowContrast
+                  kind={selectedContentCredential?.validation_state === 'Valid' ? 'success' : 'info'}
+                  title={selectedContentCredential ? 'C2PA Content Credentials research asset' : 'No C2PA Content Credentials asset'}
+                  subtitle={selectedContentCredential
+                    ? `${selectedContentCredential.validation_state} manifest. ${selectedContentCredential.signer_trust === 'untrusted_research' ? 'The self-signed research signer is untrusted.' : 'Signer trust status is unavailable.'}`
+                    : 'No durable signed asset has been created for this source interrogation.'}
+                />
+                {selectedContentCredential && (
+                  <div className="app-actions-row">
+                    <Button kind="ghost" size="sm" renderIcon={Download} onClick={async () => {
+                      const content = await downloadContentCredentialAsset(selectedQueryId, selectedContentCredential.asset_id)
+                      downloadFile(`${selectedContentCredential.asset_id}.svg`, content, 'image/svg+xml;charset=utf-8')
+                    }}>Download signed C2PA asset</Button>
+                  </div>
+                )}
               </>
             )}
           </div>

@@ -14,3 +14,8 @@ export const getAuthoritySummary = async () => {
     criticalRecords: sumCounts(authorityTypes.filter((item) => item.category === 'critical')),
   }
 }
+
+export const getAuthorityRegister = async (params = {}) => {
+  const payload = await apiRequest('/api/authorities/register', { params })
+  return payload?.records || []
+}

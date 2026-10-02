@@ -13,6 +13,10 @@ export const exportQueryRunJson = (queryId) => apiRequest(`/api/query-runs/${que
 
 export const exportQueryRunMarkdown = (queryId) => apiRequest(`/api/query-runs/${queryId}/export.md`)
 
+export const getContentCredentialAssets = (queryId) => apiRequest(`/api/query-runs/${queryId}/content-credentials`)
+
+export const downloadContentCredentialAsset = (queryId, assetId) => apiRequest(`/api/query-runs/${queryId}/content-credentials/${assetId}.svg`)
+
 export const createClaimFromQueryRun = (queryId, body) => apiRequest(`/api/query-runs/${queryId}/create-claim`, {
   method: 'POST',
   body

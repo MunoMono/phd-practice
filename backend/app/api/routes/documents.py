@@ -3,11 +3,12 @@ Document upload and processing endpoints
 Handles PDF uploads with temporal metadata for testamentary traces analysis
 """
 import logging
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Query
 from typing import Optional
 import uuid
 from datetime import datetime
 import json
+from sqlalchemy import text
 
 from app.core.ddr_temporal_scope import DDR_END_DATE, DDR_START_DATE, is_within_ddr_scope, parse_publication_date
 from app.services.docling_processor import DoclingProcessor
@@ -15,6 +16,7 @@ from app.services.embedding_service import EmbeddingService
 from app.core.database import LocalSessionLocal
 from app.models.document import Document, DocumentChunk
 from app.services.document_source_service import build_document_annotations_payload, build_document_detail_payload, build_document_list_payload, select_source_documents
+from app.services.ml_policy import parse_ml_pages
 from app.services.source_metadata_sync import SourceMetadataSyncService
 
 logger = logging.getLogger(__name__)
@@ -170,7 +172,8 @@ async def sync_document_metadata(document_id: str):
 @router.get("/")
 async def list_documents(
     year: Optional[int] = None,
-    status: Optional[str] = None
+    status: Optional[str] = None,
+    authority_id: Optional[str] = None,
 ):
     """List all documents with optional filters"""
     db = LocalSessionLocal()
@@ -181,6 +184,8 @@ async def list_documents(
             query = query.filter(Document.publication_year == year)
         if status:
             query = query.filter(Document.processing_status == status)
+        if authority_id:
+            query = query.filter(Document.authority_id == authority_id)
         
         docs = [
             document
@@ -220,5 +225,92 @@ async def get_ml_annotations(document_id: str):
             raise HTTPException(status_code=404, detail="Document not found")
 
         return build_document_annotations_payload(doc)
+    finally:
+        db.close()
+
+
+@router.get("/{document_id}/chunks")
+async def get_document_chunks(
+    document_id: str,
+    offset: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
+):
+    """Return persisted passages that are permitted by this document's ML policy."""
+    db = LocalSessionLocal()
+    try:
+        document = db.query(Document).filter(Document.document_id == document_id).first()
+        if not document:
+            raise HTTPException(status_code=404, detail="Document not found")
+
+        is_eligible = document.ml_policy_status in {
+            "eligible_unrestricted",
+            "eligible_page_restricted",
+        }
+        policy = parse_ml_pages(document.ml_page_scope)
+        allowed_pages = set(policy["allowed_pages"] or [])
+        access = {
+            "ml_policy_status": document.ml_policy_status,
+            "ml_page_scope": document.ml_page_scope,
+            "is_text_available": is_eligible,
+            "reason": document.ml_exclusion_reason,
+        }
+
+        if not is_eligible:
+            return {
+                "document_id": document.document_id,
+                "access": access,
+                "count": 0,
+                "offset": offset,
+                "limit": limit,
+                "chunks": [],
+            }
+
+        clauses = ["document_id = :document_id"]
+        params = {"document_id": document.document_id, "offset": offset, "limit": limit}
+        if document.corpus_version:
+            clauses.append("corpus_version = :corpus_version")
+            params["corpus_version"] = document.corpus_version
+        if document.ml_policy_status == "eligible_page_restricted":
+            if policy["error"] or not allowed_pages:
+                access["is_text_available"] = False
+                access["reason"] = "The document page scope could not be interpreted safely."
+                return {
+                    "document_id": document.document_id,
+                    "access": access,
+                    "count": 0,
+                    "offset": offset,
+                    "limit": limit,
+                    "chunks": [],
+                }
+            clauses.append("source_page = ANY(:allowed_pages)")
+            params["allowed_pages"] = list(allowed_pages)
+
+        where_clause = " AND ".join(clauses)
+        total = db.execute(text(f"SELECT COUNT(*) FROM document_chunks WHERE {where_clause}"), params).scalar_one()
+        chunks = db.execute(text(f"""
+            SELECT chunk_id, chunk_index, chunk_type, chunk_text, source_page, source_section
+            FROM document_chunks
+            WHERE {where_clause}
+            ORDER BY source_page NULLS LAST, chunk_index, chunk_id
+            OFFSET :offset LIMIT :limit
+        """), params).mappings().all()
+        return {
+            "document_id": document.document_id,
+            "access": access,
+            "count": total,
+            "offset": offset,
+            "limit": limit,
+            "chunks": [
+                {
+                    "chunk_id": chunk["chunk_id"],
+                    "chunk_index": chunk["chunk_index"],
+                    "chunk_type": chunk["chunk_type"],
+                    "text": chunk["chunk_text"],
+                    "source_page": chunk["source_page"],
+                    "source_section": chunk["source_section"],
+                }
+                for chunk in chunks
+            ],
+        }
     finally:
         db.close()

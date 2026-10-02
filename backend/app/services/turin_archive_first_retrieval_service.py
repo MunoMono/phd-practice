@@ -3,21 +3,36 @@
 from __future__ import annotations
 
 import re
+from dataclasses import asdict
 from typing import Any, Mapping
 
 from sqlalchemy import bindparam, text
 
 from app.services.exploratory_retrieval_service import ExploratoryQueryPlanner, ExploratoryRetrievalService, _terms
 from app.services.ml_policy import parse_ml_pages
+from app.services.retrieval_contract_service import (
+    RetrievalContract,
+    candidate_project_anchor_matches,
+    derive_retrieval_contract,
+    diversify_candidates,
+)
 from app.services.retrieval_validation_service import RetrievalValidationService
 from app.services.turin_question_policy import matching_turin_question_policy
+from app.services.turin_question_route import classify_question_route, decompose_hybrid_question
 
 
 ARCHIVE_FIRST_RETRIEVAL_VERSION = "turin-archive-first-retrieval-v1"
 ARCHIVE_ASSET_SNAPSHOT_VERSION = "turin-archive-asset-snapshot-v1"
 MAX_ARCHIVE_CANDIDATES = 40
 PASSAGES_PER_SOURCE = 3
+NAMED_DOCUMENT_MAX_PASSAGES = 8
 MAX_DOCUMENTARY_QUOTED_CONCEPT_SOURCES = 3
+NAMED_DOCUMENT_OVERVIEW_TERMS = {
+    "analysis", "awareness", "creativity", "criteria", "design", "development",
+    "economic", "environmental", "ethics", "innovation", "measurement", "model",
+    "needs", "planned", "process", "project", "qualitative", "quantitative",
+    "research", "social", "strategy", "systems",
+}
 ENTITY_ANCHOR_SCORE = 10
 SOURCE_FAMILY_TOPIC_MATCH_SCORE = 10
 SOURCE_FAMILY_FIELDS = {"record_title", "box_title", "collection_title", "preset_groups"}
@@ -112,6 +127,179 @@ class TurinArchiveFirstRetrievalService:
         return not parsed["is_restricted"] or page is None or page in (parsed["allowed_pages"] or [])
 
     @staticmethod
+    def _substantive_named_document_passage(text_value: str) -> bool:
+        """Exclude cover/title fragments when a question explicitly names a document."""
+        text = " ".join(str(text_value or "").split())
+        valid, _ = ExploratoryRetrievalService._passage_quality(text)
+        return valid and len(text) >= 180 and len(_terms(text)) >= 30
+
+    @staticmethod
+    def _complete_sentence_count(text_value: str) -> int:
+        """Prefer prose-bearing passages when selecting broad thematic evidence."""
+        return sum(
+            bool(
+                len(sentence.strip()) >= 60
+                and re.match(r"[A-Z\"']", sentence.lstrip())
+                and "|" not in sentence
+                and "##" not in sentence
+            )
+            for sentence in re.split(r"(?<=[.!?])\s+", str(text_value or ""))
+        )
+
+    @staticmethod
+    def _is_named_document_overview_question(question: str) -> bool:
+        return bool(re.search(
+            r"\b(?:key take\s*aways?|main (?:arguments?|themes?)|central (?:arguments?|themes?)|overall argument|broadly)\b",
+            question,
+            re.IGNORECASE,
+        ))
+
+    @staticmethod
+    def _named_document_overview_score(text_value: str) -> int:
+        return len(set(_terms(text_value)).intersection(NAMED_DOCUMENT_OVERVIEW_TERMS))
+
+    @classmethod
+    def _is_archive_scope_overview_question(
+        cls, question: str, archive_record_pid: str | None
+    ) -> bool:
+        return bool(archive_record_pid) and cls._is_named_document_overview_question(question)
+
+    def retrieve_archive_scope_overview(
+        self,
+        db: Any,
+        question: str,
+        corpus_version: str,
+        archive_record_pid: str,
+        selected_top_k: int,
+        thematic_terms: tuple[str, ...] = (),
+        preset_id: str | None = None,
+        contract: RetrievalContract | None = None,
+    ) -> dict[str, Any]:
+        """Select a broad, inspectable passage set from one controlled archive scope."""
+        contract = contract or derive_retrieval_contract(
+            question,
+            preset_id=preset_id,
+            single_document_mode=self._is_named_document_overview_question(question),
+        )
+        allow_cross_scope = contract.allow_cross_preset_backfill and bool(
+            len(contract.required_evidence_types) > 1
+            or contract.entity_anchors
+            or contract.project_anchors
+        )
+        evidence_terms = set(NAMED_DOCUMENT_OVERVIEW_TERMS)
+        if thematic_terms:
+            evidence_terms = set().union(*(_terms(term) for term in thematic_terms))
+        overview_query = " | ".join(sorted(evidence_terms))
+        rows = db.execute(text("""
+            SELECT dc.chunk_id, dc.document_id, dc.chunk_text, dc.chunk_index, dc.chunk_type,
+                   dc.source_page, dc.source_section, dc.chunk_metadata,
+                   d.pid, d.title, d.filename, d.authority_id, d.authority_data, d.archive_record_id,
+                   d.archive_record_pid, d.asset_id, d.asset_pid, d.asset_id_or_asset_pid, d.source_uri,
+                   d.archive_metadata_source, d.metadata_sync_status, d.corpus_version, d.ml_page_scope,
+                   ts_rank(dc.search_tsv, to_tsquery('english', :overview_query)) AS score
+            FROM document_chunks dc JOIN documents d USING(document_id)
+            WHERE d.corpus_version = :corpus_version
+              AND d.ml_policy_status IN ('eligible_unrestricted', 'eligible_page_restricted')
+              AND dc.search_tsv @@ to_tsquery('english', :overview_query)
+              AND (:allow_cross_scope OR EXISTS (
+                    SELECT 1
+                    FROM turin_archive_asset_snapshots snapshot
+                    WHERE snapshot.source_snapshot_version = :snapshot_version
+                      AND snapshot.record_pid = :archive_record_pid
+                      AND (
+                        snapshot.asset_pid = d.asset_pid
+                        OR snapshot.asset_id = d.asset_id
+                        OR d.asset_id_or_asset_pid IN (snapshot.asset_pid, snapshot.asset_id)
+                      )
+                            ))
+            ORDER BY score DESC, dc.chunk_index, dc.chunk_id
+            LIMIT 600
+        """), {
+            "overview_query": overview_query,
+            "corpus_version": corpus_version,
+            "snapshot_version": ARCHIVE_ASSET_SNAPSHOT_VERSION,
+            "archive_record_pid": archive_record_pid,
+            "allow_cross_scope": allow_cross_scope,
+        }).mappings().all()
+        assets = self._asset_rows(db, None if allow_cross_scope else archive_record_pid)
+        assets_by_identity = {
+            self._asset_identity(asset): asset
+            for asset in assets
+        }
+        candidates = [
+            {
+                **dict(row),
+                **{
+                    field: asset.get(field)
+                    for field in (
+                        "source_type", "record_title", "collection_title", "preset_groups",
+                        "display_date", "normalized_date", "exact_job_id", "people",
+                    )
+                },
+                "preferred_scope": str(row.get("archive_record_pid") or "") == archive_record_pid,
+            }
+            for row in rows
+            for asset in [assets_by_identity.get(self._asset_identity(row), {})]
+            if self._page_permitted(row.get("source_page"), row.get("ml_page_scope"))
+            and self._substantive_named_document_passage(str(row.get("chunk_text") or ""))
+        ]
+        candidates.sort(key=lambda row: (
+            0 if row.get("preferred_scope") else 1,
+            -self._complete_sentence_count(str(row.get("chunk_text") or "")),
+            -len(set(_terms(str(row.get("chunk_text") or ""))).intersection(evidence_terms)),
+            -float(row.get("score") or 0.0),
+            row.get("chunk_index") or 0,
+            row["chunk_id"],
+        ))
+        limit = max(selected_top_k, NAMED_DOCUMENT_MAX_PASSAGES)
+        selected, coverage = diversify_candidates(candidates, contract, limit)
+        results = []
+        for rank, row in enumerate(selected, start=1):
+            mapped = self.mapper._result_from_row(row, rank)
+            ExploratoryRetrievalService._apply_snapshot_identity(mapped, row)
+            chunk_terms = set(_terms(str(row.get("chunk_text") or "")))
+            matched_terms = sorted(chunk_terms.intersection(evidence_terms))
+            evidence_anchor = {
+                "document_id": row["document_id"],
+                "chunk_id": row["chunk_id"],
+                "page": row.get("source_page"),
+                "retrieval_reason": "preset_thematic_documentary_term_match" if thematic_terms else "archive_scope_overview_term_match",
+                "retrieval_channel": "ARCHIVE_SCOPE_OVERVIEW_FTS",
+                "score": float(row.get("score") or 0.0),
+                "matched_terms": matched_terms,
+                "preset_id": preset_id,
+            }
+            results.append({
+                **mapped,
+                "retrieval_match_type": "ARCHIVE_SCOPE_OVERVIEW_PASSAGE",
+                "retrieval_channels": ["ARCHIVE_SCOPE_OVERVIEW_FTS"],
+                "evidence_anchor": evidence_anchor,
+                "required_facets": list(row.get("required_facets") or []),
+                "supported_facets": list(row.get("supported_facets") or []),
+            })
+        return {
+            "results": results,
+            "transparency": {
+                "strategy": "archive_scope_overview_v1",
+                "archive_record_pid": archive_record_pid,
+                "source_nomination_unit": "controlled_archive_scope",
+                "archive_question_preset": preset_id,
+                "retrieval_contract": asdict(contract),
+            },
+            "diagnostics": {
+                "archive_candidate_count": len(assets),
+                "materialised_candidate_count": len({row["document_id"] for row in candidates}),
+                "retrieved_documentary_source_count": len(results),
+                "overview_document_count": len({row["document_id"] for row in selected}),
+                "retrieval_coverage": coverage.as_dict(),
+            },
+            "archival_discovery": [],
+            "document_availability": [],
+            "archival_context_only": [],
+            "corpus_representation_gaps": [],
+        }
+
+    @staticmethod
     def _is_oral_history_asset(asset: Mapping[str, Any]) -> bool:
         source_description = " ".join(str(asset.get(field) or "") for field in (
             "source_type", "record_title", "attached_media_title", "label", "preset_groups",
@@ -198,7 +386,7 @@ class TurinArchiveFirstRetrievalService:
             "excluded_for_relevance": len(eligible_asset_ids - nominated_asset_ids),
         }
 
-    def _asset_rows(self, db: Any) -> list[dict[str, Any]]:
+    def _asset_rows(self, db: Any, archive_record_pid: str | None = None) -> list[dict[str, Any]]:
         rows = db.execute(text("""
             SELECT record_pid, attached_media_pid, asset_pid, asset_id, label,
                    display_date, normalized_date, use_for_ml, ml_pages, source_type,
@@ -207,8 +395,12 @@ class TurinArchiveFirstRetrievalService:
                    controlled_aliases, preset_groups, source_snapshot_version
             FROM turin_archive_asset_snapshots
             WHERE source_snapshot_version = :snapshot_version
+              AND (:archive_record_pid IS NULL OR record_pid = :archive_record_pid)
             ORDER BY asset_pid, asset_id
-        """), {"snapshot_version": ARCHIVE_ASSET_SNAPSHOT_VERSION}).mappings().all()
+        """), {
+            "snapshot_version": ARCHIVE_ASSET_SNAPSHOT_VERSION,
+            "archive_record_pid": archive_record_pid,
+        }).mappings().all()
         return [dict(row) for row in rows]
 
     @staticmethod
@@ -220,6 +412,87 @@ class TurinArchiveFirstRetrievalService:
             if match
             if len(_terms(match)) >= 2
         ]
+
+    @classmethod
+    def _explicit_source_title_matches(cls, question: str, titles: list[str]) -> list[str]:
+        """Resolve a distinctive source title before thematic retrieval."""
+        quoted_titles = [
+            _normalise(concept)
+            for concept in cls._quoted_concepts(question)
+            if len(_terms(concept)) >= 3
+        ]
+        question_words = " ".join(re.findall(r"[a-z0-9]+", question.lower()))
+        project_ids = set(re.findall(r"\b(?:job|project)\s+(\d{1,3})\b", question, re.IGNORECASE))
+        matches = []
+        for title in titles:
+            normalised_title = _normalise(title)
+            title_words = re.findall(r"[a-z0-9]+", title.lower())
+            distinctive_short_title = (
+                len(title_words) == 2
+                and any(len(word) >= 10 for word in title_words)
+                and " ".join(title_words) in question_words
+            )
+            unquoted_title_phrases = [
+                " ".join(title_words[index:index + length])
+                for length in range(4, min(6, len(title_words)) + 1)
+                for index in range(len(title_words) - length + 1)
+                if any(len(word) >= 8 for word in title_words[index:index + length])
+            ]
+            if (
+                any(quoted_title in normalised_title or normalised_title in quoted_title for quoted_title in quoted_titles)
+                or distinctive_short_title
+                or any(phrase in question_words for phrase in unquoted_title_phrases)
+                or any(re.search(rf"\bjob\s+{re.escape(project_id)}\b", normalised_title) for project_id in project_ids)
+            ):
+                matches.append(title)
+        return matches
+
+    @staticmethod
+    def _explicit_title_route_is_sufficient(question: str, matched_document_count: int) -> bool:
+        if matched_document_count != 1:
+            return False
+        contract = derive_retrieval_contract(question, single_document_mode=True)
+        comparison_surfaces = set(contract.required_evidence_types) - {"documentary", "project_report"}
+        return contract.temporal_requirement == "none" and not comparison_surfaces
+
+    def _explicit_title_document_ids(
+        self, db: Any, question: str, corpus_version: str, archive_record_pid: str | None = None,
+    ) -> list[str]:
+        rows = db.execute(text("""
+            SELECT document_id, title
+                        FROM documents d
+                        WHERE d.corpus_version = :corpus_version
+              AND ml_policy_status IN ('eligible_unrestricted', 'eligible_page_restricted')
+                            AND (
+                                    :archive_record_pid IS NULL
+                                    OR EXISTS (
+                                            SELECT 1
+                                            FROM turin_archive_asset_snapshots snapshot
+                                            WHERE snapshot.source_snapshot_version = :snapshot_version
+                                                AND snapshot.record_pid = :archive_record_pid
+                                                AND (
+                                                        snapshot.asset_pid = d.asset_pid
+                                                        OR snapshot.asset_id = d.asset_id
+                                                        OR d.asset_id_or_asset_pid IN (snapshot.asset_pid, snapshot.asset_id)
+                                                )
+                                    )
+                            )
+                        ORDER BY d.document_id
+        """), {
+            "corpus_version": corpus_version,
+            "archive_record_pid": archive_record_pid,
+                        "snapshot_version": ARCHIVE_ASSET_SNAPSHOT_VERSION,
+        }).mappings().all()
+        titles = [str(row["title"] or "") for row in rows]
+        matched_titles = set(self._explicit_source_title_matches(question, titles))
+        return [str(row["document_id"]) for row in rows if str(row["title"] or "") in matched_titles]
+
+    @classmethod
+    def _question_without_explicit_titles(cls, question: str) -> str:
+        stripped = question
+        for title in cls._quoted_concepts(question):
+            stripped = re.sub(re.escape(title), " ", stripped, flags=re.IGNORECASE)
+        return " ".join(stripped.split()) or question
 
     def _documentary_quoted_concept_results(
         self,
@@ -351,31 +624,98 @@ class TurinArchiveFirstRetrievalService:
             return {"classification": "DOCLING_TEXT_MISSING", "document_id": document["document_id"], "docling_text_available": False}
         return {"classification": "DOCLING_TEXT_AVAILABLE", "document_id": document["document_id"], "docling_text_available": True}
 
-    def retrieve(self, db: Any, question: str, selected_top_k: int, corpus_version: str) -> dict[str, Any]:
-        plan = self.planner.build_plan(db, question)
+    def retrieve(self, db: Any, question: str, selected_top_k: int, corpus_version: str, archive_record_pid: str | None = None) -> dict[str, Any]:
         policy = matching_turin_question_policy(question)
+        if policy and policy.reservation_type == "SCOPED_MISSINGNESS":
+            results = self._configured_document_page_results(db, question, corpus_version)
+            if not results:
+                results = self._configured_reservation_results(db, question)
+            if results:
+                return {
+                    "results": results,
+                    "transparency": {
+                        "strategy": "configured_question_policy_reservation_v1",
+                        "policy_id": policy.policy_id,
+                    },
+                    "diagnostics": {
+                        "archive_candidate_count": 0,
+                        "retrieved_documentary_source_count": len(results),
+                        "configured_reservation_exclusive": True,
+                    },
+                    "archival_discovery": [], "document_availability": [],
+                    "archival_context_only": [], "corpus_representation_gaps": [],
+                }
+        explicit_title_document_ids = self._explicit_title_document_ids(
+            db, question, corpus_version, archive_record_pid,
+        )
+        if self._explicit_title_route_is_sufficient(question, len(explicit_title_document_ids)):
+            contract = derive_retrieval_contract(question, single_document_mode=True)
+            retrieval = self.retrieve_explicit_title_documents(
+                db, question, explicit_title_document_ids, corpus_version, selected_top_k
+            )
+            retrieval["results"], coverage = diversify_candidates(
+                retrieval["results"], contract, max(selected_top_k, NAMED_DOCUMENT_MAX_PASSAGES)
+            )
+            retrieval["transparency"] = {
+                **retrieval["transparency"],
+                "strategy": "explicit_source_title_v2",
+                "matched_document_ids": explicit_title_document_ids,
+                "retrieval_contract": asdict(contract),
+            }
+            retrieval["diagnostics"] = {
+                **retrieval["diagnostics"],
+                "retrieval_coverage": coverage.as_dict(),
+            }
+            return retrieval
+        if self._is_archive_scope_overview_question(question, archive_record_pid):
+            return self.retrieve_archive_scope_overview(
+                db, question, corpus_version, str(archive_record_pid), selected_top_k
+            )
         results = self._configured_document_page_results(db, question, corpus_version)
         if not results:
             results = self._configured_reservation_results(db, question)
-        if results and policy and policy.reservation_type == "SCOPED_MISSINGNESS":
+        route_decision = classify_question_route(question)
+        hybrid_decomposition = decompose_hybrid_question(question)
+        if route_decision.family == "HYBRID_AUTHORITY_DOCUMENTARY" and hybrid_decomposition is None:
             return {
-                "results": results,
+                "results": [],
                 "transparency": {
-                    "strategy": "configured_question_policy_reservation_v1",
-                    "policy_id": policy.policy_id,
+                    "strategy": "hybrid_documentary_clause_unavailable_v1",
+                    "route_family": route_decision.family,
+                    "route_decision": route_decision.as_dict(),
                 },
                 "diagnostics": {
                     "archive_candidate_count": 0,
-                    "retrieved_documentary_source_count": len(results),
-                    "configured_reservation_exclusive": True,
+                    "retrieved_documentary_source_count": 0,
+                    "diagnostic_state": "DOCUMENTARY_CLAUSE_UNAVAILABLE",
                 },
                 "archival_discovery": [], "document_availability": [],
                 "archival_context_only": [], "corpus_representation_gaps": [],
             }
-        plan = self.planner.build_plan(db, question)
+        if hybrid_decomposition:
+            authority_plan = self.planner.build_plan(db, question)
+            plan = self.planner.build_plan(
+                db,
+                hybrid_decomposition.documentary_query,
+                entity_anchors=authority_plan["resolved_entities"],
+                documentary_anchors=hybrid_decomposition.documentary_anchors,
+            )
+        else:
+            plan = self.planner.build_plan(db, question)
+        resolved_entity_labels = tuple(
+            str(entity.get("label"))
+            for entity in plan.get("resolved_entities", [])
+            if entity.get("label")
+        )
+        contract = derive_retrieval_contract(question, entity_anchors=resolved_entity_labels)
         source_selection = policy.source_selection or {} if policy else {}
         required_source_families = set(source_selection.get("required_source_families", []))
-        assets = self._asset_rows(db)
+        assets = self._asset_rows(db, archive_record_pid)
+        if contract.project_anchors:
+            assets = [
+                asset for asset in assets
+                if candidate_project_anchor_matches(asset, contract.project_anchors)
+            ]
         nominations = []
         for asset in assets:
             matches = self._candidate_matches(asset, plan)
@@ -385,14 +725,23 @@ class TurinArchiveFirstRetrievalService:
                     "asset_pid": asset.get("asset_pid"), "asset_id": asset.get("asset_id"), "label": asset.get("label"),
                     "display_date": asset.get("display_date"), "normalized_date": asset.get("normalized_date"),
                     "use_for_ml": asset.get("use_for_ml"), "ml_pages": asset.get("ml_pages"), **matches,
+                    "source_type": asset.get("source_type"), "record_title": asset.get("record_title"),
+                    "collection_title": asset.get("collection_title"), "preset_groups": asset.get("preset_groups"),
+                    "exact_job_id": asset.get("exact_job_id"), "people": asset.get("people"),
                     "availability": self._availability(db, asset, corpus_version),
                 })
         nominations.sort(key=lambda item: (-item["score"], str(item.get("asset_pid") or item.get("asset_id"))))
         nominations = nominations[:MAX_ARCHIVE_CANDIDATES]
-        query_terms = set(_terms(question))
+        query_terms = set(_terms(str(plan["normalised_query"])))
+        query_terms.update(
+            term
+            for entity in plan["resolved_entities"]
+            for term in _terms(str(entity["label"]))
+        )
+        documentary_query = str(plan["normalised_query"])
         if not results:
             results = self._documentary_quoted_concept_results(
-                db, question, corpus_version, min(MAX_DOCUMENTARY_QUOTED_CONCEPT_SOURCES, selected_top_k)
+                db, documentary_query, corpus_version, min(MAX_DOCUMENTARY_QUOTED_CONCEPT_SOURCES, selected_top_k)
             )
         selected_document_ids = {result["document_id"] for result in results}
         selected_asset_ids = {self._asset_identity(result) for result in results}
@@ -421,7 +770,7 @@ class TurinArchiveFirstRetrievalService:
                 FROM document_chunks dc JOIN documents d USING(document_id)
                 WHERE dc.document_id = :document_id AND dc.corpus_version = :corpus_version
                 ORDER BY score DESC, dc.chunk_id ASC
-            """), {"document_id": availability["document_id"], "corpus_version": corpus_version, "question": question}).mappings().all()
+            """), {"document_id": availability["document_id"], "corpus_version": corpus_version, "question": documentary_query}).mappings().all()
             permitted = [dict(row) for row in chunk_rows if self._page_permitted(row.get("source_page"), nomination["ml_pages"])]
             passage = ExploratoryRetrievalService._select_best_passage(permitted, query_terms)
             if passage is None:
@@ -431,11 +780,26 @@ class TurinArchiveFirstRetrievalService:
                 continue
             mapped = self.mapper._result_from_row({**passage, "score": passage["passage_score"]}, len(results) + 1)
             ExploratoryRetrievalService._apply_snapshot_identity(mapped, passage)
-            results.append({**mapped, "archive_nomination": nomination, "retrieval_match_type": "ARCHIVE_FIRST_WITHIN_SOURCE_PASSAGE", "metadata_is_documentary_evidence": False})
+            results.append({
+                **mapped,
+                "source_type": nomination.get("source_type"),
+                "record_title": nomination.get("record_title"),
+                "collection_title": nomination.get("collection_title"),
+                "preset_groups": nomination.get("preset_groups"),
+                "display_date": mapped.get("display_date") or nomination.get("display_date"),
+                "exact_job_id": nomination.get("exact_job_id"),
+                "people": nomination.get("people"),
+                "archive_nomination": nomination,
+                "retrieval_match_type": "ARCHIVE_FIRST_WITHIN_SOURCE_PASSAGE",
+                "metadata_is_documentary_evidence": False,
+            })
             selected_document_ids.add(passage["document_id"])
             selected_families.add(self._source_family(nomination))
-            if len(results) == selected_top_k:
+            if len(results) == max(selected_top_k * 3, selected_top_k):
                 break
+        results, coverage = diversify_candidates(results, contract, selected_top_k)
+        for rank, result in enumerate(results, start=1):
+            result["rank"] = rank
         archival_context_only = [item for item in nominations if item["availability"]["classification"] == "ARCHIVAL_CONTEXT_ONLY"]
         gaps = [item for item in nominations if item["availability"]["classification"] == "CORPUS_REPRESENTATION_GAP"]
         oral_history_coverage = self._oral_history_coverage(
@@ -449,12 +813,91 @@ class TurinArchiveFirstRetrievalService:
         )
         return {
             "results": results,
-            "transparency": {**plan, "strategy": ARCHIVE_FIRST_RETRIEVAL_VERSION, "asset_snapshot_version": ARCHIVE_ASSET_SNAPSHOT_VERSION, "source_nomination_unit": "canonical_digital_asset", "global_corpus_competition_before_nomination": False},
-            "diagnostics": {"archive_candidate_count": len(nominations), "ml_eligible_candidate_count": sum(item["use_for_ml"] is True for item in nominations), "materialised_candidate_count": sum(item["availability"]["docling_text_available"] for item in nominations), "retrieved_documentary_source_count": len(results), "corpus_representation_gaps": len(gaps), "oral_history_coverage": oral_history_coverage, "source_family_diversity": source_family_diagnostics, "authority_asset_coverage": authority_asset_coverage},
+            "transparency": {**plan, "strategy": ARCHIVE_FIRST_RETRIEVAL_VERSION, "archive_record_pid": archive_record_pid, "asset_snapshot_version": ARCHIVE_ASSET_SNAPSHOT_VERSION, "source_nomination_unit": "canonical_digital_asset", "global_corpus_competition_before_nomination": False, "retrieval_contract": asdict(contract), **({"hybrid_decomposition": hybrid_decomposition.as_dict()} if hybrid_decomposition else {})},
+            "diagnostics": {"archive_candidate_count": len(nominations), "ml_eligible_candidate_count": sum(item["use_for_ml"] is True for item in nominations), "materialised_candidate_count": sum(item["availability"]["docling_text_available"] for item in nominations), "retrieved_documentary_source_count": len(results), "corpus_representation_gaps": len(gaps), "oral_history_coverage": oral_history_coverage, "source_family_diversity": source_family_diagnostics, "authority_asset_coverage": authority_asset_coverage, "retrieval_coverage": coverage.as_dict()},
             "archival_discovery": nominations,
             "document_availability": [{"asset_pid": item["asset_pid"], "asset_id": item["asset_id"], "label": item["label"], **item["availability"]} for item in nominations],
             "archival_context_only": archival_context_only,
             "corpus_representation_gaps": gaps,
+        }
+
+    def retrieve_person_evidence(
+        self,
+        db: Any,
+        person_name: str,
+        question: str,
+        corpus_version: str,
+        selected_top_k: int,
+        archive_record_pid: str | None = None,
+    ) -> dict[str, Any]:
+        """Retrieve substantive passages that explicitly name a resolved staff authority."""
+        rows = db.execute(text("""
+            SELECT dc.chunk_id, dc.document_id, dc.chunk_text, dc.chunk_index, dc.chunk_type,
+                   dc.source_page, dc.source_section, dc.chunk_metadata,
+                   d.pid, d.title, d.filename, d.authority_id, d.authority_data, d.archive_record_id,
+                   d.archive_record_pid, d.asset_id, d.asset_pid, d.asset_id_or_asset_pid, d.source_uri,
+                   d.archive_metadata_source, d.metadata_sync_status, d.corpus_version, d.ml_page_scope,
+                   ts_rank(dc.search_tsv, websearch_to_tsquery('english', :person_name)) AS score
+            FROM document_chunks dc JOIN documents d USING(document_id)
+            WHERE dc.search_tsv @@ websearch_to_tsquery('english', :person_name)
+              AND d.use_for_ml = 1
+              AND d.ml_policy_status IN ('eligible_unrestricted', 'eligible_page_restricted')
+              AND dc.corpus_version = :corpus_version
+              AND (:archive_record_pid IS NULL OR d.archive_record_pid = :archive_record_pid)
+            ORDER BY score DESC, dc.chunk_index, dc.chunk_id
+        """), {
+            "person_name": person_name,
+            "corpus_version": corpus_version,
+            "archive_record_pid": archive_record_pid,
+        }).mappings().all()
+        name_terms = set(_terms(person_name))
+        activity_terms = {
+            "appointed", "contribution", "curriculum", "design", "education", "joined",
+            "lectured", "lecture", "philosophy", "professor", "research", "teaching",
+            "tutor", "work", "wrote",
+        }
+        candidates = []
+        for row in rows:
+            row = dict(row)
+            if not self._page_permitted(row.get("source_page"), row["ml_page_scope"]):
+                continue
+            passage = " ".join(str(row.get("chunk_text") or "").split())
+            valid, _ = ExploratoryRetrievalService._passage_quality(passage)
+            terms = set(_terms(passage))
+            if not valid or not name_terms.issubset(terms):
+                continue
+            if len(passage) < 180 or "|" in passage or passage.upper().startswith("CURRICULUM VITAE"):
+                continue
+            activity_matches = len(terms & activity_terms)
+            if not activity_matches:
+                continue
+            candidates.append((activity_matches, float(row.get("score") or 0.0), row))
+        candidates.sort(key=lambda item: (-item[0], -item[1], item[2]["chunk_index"], item[2]["chunk_id"]))
+        results = []
+        seen_documents = set()
+        for _, score, row in candidates:
+            if row["document_id"] in seen_documents:
+                continue
+            mapped = self.mapper._result_from_row({**row, "score": score}, len(results) + 1)
+            ExploratoryRetrievalService._apply_snapshot_identity(mapped, row)
+            results.append({**mapped, "retrieval_match_type": "EXPLICIT_PERSON_AUTHORITY_PASSAGE"})
+            seen_documents.add(row["document_id"])
+            if len(results) == selected_top_k:
+                break
+        return {
+            "results": results,
+            "transparency": {
+                "strategy": "explicit_person_authority_v1",
+                "person_name": person_name,
+                "archive_record_pid": archive_record_pid,
+            },
+            "diagnostics": {
+                "person_name": person_name,
+                "person_named_candidate_count": len(candidates),
+                "retrieved_documentary_source_count": len(results),
+            },
+            "archival_discovery": [], "document_availability": [],
+            "archival_context_only": [], "corpus_representation_gaps": [],
         }
 
     def retrieve_selected_documents(
@@ -509,4 +952,127 @@ class TurinArchiveFirstRetrievalService:
             "diagnostics": {"selected_document_count": len(document_ids), "retrieved_documentary_source_count": len(results)},
             "archival_discovery": [], "document_availability": availability,
             "archival_context_only": [], "corpus_representation_gaps": [],
+        }
+
+    def retrieve_explicit_title_documents(
+        self, db: Any, question: str, document_ids: list[str], corpus_version: str, selected_top_k: int,
+    ) -> dict[str, Any]:
+        """Retrieve several strong passages from a document explicitly named by title."""
+        documents = db.execute(text("""
+            SELECT document_id, title, ml_policy_status, ml_page_scope
+            FROM documents
+            WHERE document_id IN :document_ids AND corpus_version = :corpus_version
+            ORDER BY document_id
+        """).bindparams(bindparam("document_ids", expanding=True)), {
+            "document_ids": document_ids, "corpus_version": corpus_version,
+        }).mappings().all()
+        found_ids = {row["document_id"] for row in documents}
+        missing_ids = sorted(set(document_ids) - found_ids)
+        if missing_ids:
+            raise ValueError(f"Explicitly named documents are unavailable in the active corpus: {', '.join(missing_ids)}")
+
+        passage_question = self._question_without_explicit_titles(question)
+        results, availability = [], []
+        for document in documents:
+            if document["ml_policy_status"] not in {"eligible_unrestricted", "eligible_page_restricted"}:
+                continue
+            document_question = re.sub(
+                re.escape(str(document["title"] or "")), " ", passage_question, flags=re.IGNORECASE,
+            )
+            chunk_rows = db.execute(text("""
+                SELECT dc.chunk_id, dc.document_id, dc.chunk_text, dc.chunk_index, dc.chunk_type,
+                       dc.source_page, dc.source_section, dc.chunk_metadata,
+                       d.pid, d.title, d.filename, d.authority_id, d.authority_data, d.archive_record_id,
+                       d.archive_record_pid, d.asset_id, d.asset_pid, d.asset_id_or_asset_pid, d.source_uri,
+                       d.archive_metadata_source, d.metadata_sync_status, d.corpus_version,
+                       ts_rank(dc.search_tsv, websearch_to_tsquery('english', :question)) AS score
+                FROM document_chunks dc JOIN documents d USING(document_id)
+                WHERE dc.document_id = :document_id AND dc.corpus_version = :corpus_version
+                ORDER BY score DESC, dc.chunk_index, dc.chunk_id
+            """), {"document_id": document["document_id"], "corpus_version": corpus_version, "question": document_question}).mappings().all()
+            permitted = [dict(row) for row in chunk_rows if self._page_permitted(row.get("source_page"), document["ml_page_scope"])]
+            overview_question = self._is_named_document_overview_question(document_question)
+            ranked_passages = [] if overview_question else [
+                row for row in permitted
+                if self._substantive_named_document_passage(str(row.get("chunk_text") or ""))
+                and float(row.get("score") or 0.0) > 0
+            ]
+            selected_chunk_ids = {row["chunk_id"] for row in ranked_passages}
+            question_terms = set(_terms(document_question))
+            supplemental_passages = []
+            for row in permitted:
+                if row["chunk_id"] in selected_chunk_ids:
+                    continue
+                if not self._substantive_named_document_passage(str(row.get("chunk_text") or "")):
+                    continue
+                passage_text = str(row.get("chunk_text") or "")
+                overlap = len(question_terms.intersection(_terms(passage_text)))
+                overview_score = self._named_document_overview_score(passage_text) if overview_question else 0
+                supplemental_passages.append((overview_score, overlap, float(row.get("score") or 0.0), row))
+            supplemental_passages.sort(key=lambda item: (-item[0], -item[1], -item[2], item[3]["chunk_index"], item[3]["chunk_id"]))
+            passage_limit = max(selected_top_k, NAMED_DOCUMENT_MAX_PASSAGES)
+            ranked_passages.extend(
+                row for _, _, _, row in supplemental_passages[:max(0, passage_limit - len(ranked_passages))]
+            )
+            for passage in ranked_passages:
+                if len(results) == passage_limit:
+                    break
+                mapped = self.mapper._result_from_row(passage, len(results) + 1)
+                ExploratoryRetrievalService._apply_snapshot_identity(mapped, passage)
+                results.append({**mapped, "retrieval_match_type": "EXPLICIT_QUOTED_TITLE_PASSAGE"})
+            availability.append({
+                "document_id": document["document_id"], "title": document["title"],
+                "classification": "DOCLING_TEXT_AVAILABLE" if ranked_passages else "DOCUMENTARY_EVIDENCE_INSUFFICIENT",
+            })
+            if len(results) == passage_limit:
+                break
+        return {
+            "results": results,
+            "transparency": {"strategy": "explicit_quoted_source_title_v1", "selected_document_ids": document_ids},
+            "diagnostics": {"selected_document_count": len(documents), "retrieved_documentary_source_count": len(results)},
+            "archival_discovery": [], "document_availability": availability,
+            "archival_context_only": [], "corpus_representation_gaps": [],
+        }
+
+    def retrieve_selected_chunks(
+        self, db: Any, chunk_ids: list[str], corpus_version: str
+    ) -> dict[str, Any]:
+        """Return explicitly selected passages after enforcing corpus and page policy."""
+        rows = db.execute(text("""
+            SELECT dc.chunk_id, dc.document_id, dc.chunk_text, dc.chunk_index, dc.chunk_type,
+                   dc.source_page, dc.source_section, dc.chunk_metadata,
+                   d.pid, d.title, d.filename, d.authority_id, d.authority_data, d.archive_record_id,
+                   d.archive_record_pid, d.asset_id, d.asset_pid, d.asset_id_or_asset_pid, d.source_uri,
+                   d.archive_metadata_source, d.metadata_sync_status, d.corpus_version, d.ml_policy_status,
+                   d.ml_page_scope
+            FROM document_chunks dc JOIN documents d USING(document_id)
+            WHERE dc.chunk_id IN :chunk_ids AND dc.corpus_version = :corpus_version
+            ORDER BY dc.chunk_index, dc.chunk_id
+        """).bindparams(bindparam("chunk_ids", expanding=True)), {
+            "chunk_ids": chunk_ids,
+            "corpus_version": corpus_version,
+        }).mappings().all()
+        found_ids = {row["chunk_id"] for row in rows}
+        missing_ids = sorted(set(chunk_ids) - found_ids)
+        if missing_ids:
+            raise ValueError(f"Selected chunks are unavailable in the active corpus: {', '.join(missing_ids)}")
+
+        results = []
+        for rank, row in enumerate(rows, start=1):
+            if row["ml_policy_status"] not in {"eligible_unrestricted", "eligible_page_restricted"}:
+                raise ValueError(f"Selected chunk is not eligible for model interrogation: {row['chunk_id']}")
+            if not self._page_permitted(row["source_page"], row["ml_page_scope"]):
+                raise ValueError(f"Selected chunk is outside its permitted page scope: {row['chunk_id']}")
+            mapped = self.mapper._result_from_row({**dict(row), "score": 1.0}, rank)
+            ExploratoryRetrievalService._apply_snapshot_identity(mapped, row)
+            results.append({**mapped, "retrieval_match_type": "EXPLICIT_CHUNK_SELECTION"})
+
+        return {
+            "results": results,
+            "transparency": {"strategy": "explicit_chunk_selection_v1", "selected_chunk_ids": chunk_ids},
+            "diagnostics": {"selected_chunk_count": len(chunk_ids), "retrieved_documentary_source_count": len(results)},
+            "archival_discovery": [],
+            "document_availability": [],
+            "archival_context_only": [],
+            "corpus_representation_gaps": [],
         }

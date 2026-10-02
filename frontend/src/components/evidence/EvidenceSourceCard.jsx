@@ -91,6 +91,7 @@ const EvidenceSourceCard = ({
             <div><dt>Archive ID</dt><dd>{source.pid || 'Unavailable'}</dd></div>
             <div><dt>Answer use</dt><dd>{source.evidenceState || 'Retrieved candidate'}</dd></div>
             <div><dt>Relation</dt><dd>{classificationLabel || 'Not classified'}</dd></div>
+            <div><dt>Evidence type</dt><dd>{source.evidenceType || 'Not typed'}</dd></div>
             <div><dt>Status</dt><dd>{source.provenanceStatus || 'Unavailable'}</dd></div>
           </dl>
         </div>

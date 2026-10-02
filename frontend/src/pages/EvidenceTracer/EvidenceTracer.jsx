@@ -131,6 +131,7 @@ const AnswerStateNotice = ({ trace }) => {
         <details>
           <summary>Run diagnostics</summary>
           <p>Retrieved sources: {trace.sources.length}. Cited sources: {citedCount}. Answer origin: {trace.answerOrigin || 'unavailable'}.</p>
+          {trace.synthesisFailure && <p>Failure: {trace.synthesisFailure.code}. {trace.synthesisFailure.message}</p>}
           {failedStage && <p>Stage: {failedStage[0]}. Reason: {failedStage[1].failure_message || failedStage[1].failure_code || 'unavailable'}.</p>}
         </details>
       )}
@@ -282,6 +283,7 @@ const mapPersistedRunToTrace = (run) => {
     response: response.answer || '',
     answerOrigin: run.answer_origin || 'qwen_generated_synthesis',
     answerState: run.answer_state || null,
+    synthesisFailure: response.synthesis_failure || null,
     model: run.model?.name || 'Granite experiment',
     retrievedChunkIds: sources.map((source) => source.chunkId).filter(Boolean),
     citations: sources.map((source) => source.citation).filter(Boolean),
@@ -293,9 +295,16 @@ const mapPersistedRunToTrace = (run) => {
     sources,
     inferenceProvenance: run.provenance_validation || null,
     claimProvenanceResult: run.provenance_validation || null,
-    authorityEvidence: mapAuthorityEvidence(run.authority_context),
+    claimValidation: response.claim_validation || null,
+    authorityEvidence: mapAuthorityEvidence(response.authority_evidence || run.authority_context),
+    authorityProvenance: response.authority_provenance || [],
+    authorityBoundaries: response.authority_boundaries || [],
+    roleReconciliation: response.researcher_facing?.role_reconciliation || [],
     archivalAssociations: response.archival_associations || [],
+    evidenceLedger: response.evidence_ledger || [],
+    sourceGroups: response.source_groups || [],
     documentaryEvidence: response.evidence || [],
+    testimonyEvidence: response.testimony_evidence || [],
     inferences: response.inferences || [],
     contradictions: response.contradictions || [],
     missingness: response.missingness || [],
@@ -444,7 +453,7 @@ const AnswerWithSourceLinks = ({ trace }) => {
             {claim.text}
             {sourceNumbers.length > 0 && <sup className="tracer__source-citation">
               {sourceNumbers.map((sourceNumber, citationIndex) => (
-                <span key={sourceNumber}>{citationIndex > 0 ? ', ' : ''}<a href={`#source-${sourceNumber}`} aria-label={`Jump to source ${sourceNumber}`}>{sourceNumber}</a></span>
+                <span key={sourceNumber}>{citationIndex > 0 ? ', ' : ''}<a href={`#grouped-source-${sourceNumber}`} aria-label={`Jump to source ${sourceNumber}`}>{sourceNumber}</a></span>
               ))}
             </sup>}
             {authorityNumbers.length > 0 && <sup className="tracer__source-citation">
@@ -499,6 +508,30 @@ const getRetrievalDiagnosticItems = (diagnostics) => {
   }
   if (Number.isInteger(diagnostics.corpus_representation_gaps)) {
     items.push(`Corpus representation gaps: ${diagnostics.corpus_representation_gaps}.`)
+  }
+  const coverage = diagnostics.retrieval_coverage
+  if (coverage && typeof coverage === 'object') {
+    if (coverage.coverage_status) {
+      items.push(`Retrieval coverage: ${coverage.coverage_status.replaceAll('_', ' ')}.`)
+    }
+    if (coverage.required_surfaces_found?.length > 0) {
+      items.push(`Required evidence found: ${coverage.required_surfaces_found.join(', ')}.`)
+    }
+    if (coverage.required_surfaces_missing?.length > 0) {
+      items.push(`Required evidence missing: ${coverage.required_surfaces_missing.join(', ')}.`)
+    }
+    if (Number.isInteger(coverage.distinct_source_count)) {
+      items.push(`Distinct sources: ${coverage.distinct_source_count}.`)
+    }
+    if (coverage.temporal_buckets_found?.length > 0) {
+      items.push(`Evidence periods: ${coverage.temporal_buckets_found.join(', ')}.`)
+    }
+    if (typeof coverage.target_entity_evidence_found === 'boolean') {
+      items.push(`Target entity evidence: ${coverage.target_entity_evidence_found ? 'found' : 'not found'}.`)
+    }
+    if (typeof coverage.target_project_evidence_found === 'boolean') {
+      items.push(`Target project evidence: ${coverage.target_project_evidence_found ? 'found' : 'not found'}.`)
+    }
   }
   if (Number.isFinite(diagnostics.max_score) && Number.isFinite(diagnostics.min_score)) {
     items.push(`Lexical score range: ${formatScore(diagnostics.min_score)} to ${formatScore(diagnostics.max_score)}.`)
@@ -732,8 +765,10 @@ const EvidenceTracer = () => {
       const sourceUsage = analysis.source_usage || {}
       const retainedSourceIds = new Set(sourceUsage.retained_evidence_source_ids || [])
       const citedSourceNumbers = new Set(sourceUsage.cited_source_numbers || [])
+      const evidenceLedger = analysis.evidence_ledger || []
       const enrichedSources = mapRetrievedSources(analysis.retrieved_evidence || analysis.final_five).map((source, index) => ({
         ...source,
+        evidenceType: evidenceLedger.find((item) => item.chunk_id_or_record_id === source.chunkId)?.evidence_type || null,
         evidenceState: citedSourceNumbers.has(index + 1)
           ? 'Cited support'
           : retainedSourceIds.has(`${source.documentId}:${source.chunkId}`)
@@ -757,6 +792,7 @@ const EvidenceTracer = () => {
         response: analysis.answer || '',
         answerOrigin: analysis.answer_origin || (mode === 'retrieval-v3' ? 'retrieval_only' : 'qwen_generated_synthesis'),
         answerState: analysis.answer_state || null,
+        synthesisFailure: analysis.synthesis_failure || null,
         sourceUsage,
         model: analysis.model?.display_name || analysis.model?.name || (mode === 'retrieval-v3' ? 'Retrieval v3 (model-neutral)' : 'Active local runtime'),
         retrievedChunkIds: enrichedSources.map((source) => source.chunkId).filter(Boolean),
@@ -781,11 +817,19 @@ const EvidenceTracer = () => {
         claimProvenanceResult: analysis.provenance_validation?.claim_provenance
           ? { valid: analysis.provenance_validation.valid, claim_count: analysis.provenance_validation.claim_count }
           : null,
-        authorityEvidence: mapAuthorityEvidence(analysis.researcher_facing?.authority_evidence || []),
+        claimValidation: analysis.claim_validation || null,
+        missingnessDecision: analysis.missingness_decision || null,
+        authorityEvidence: mapAuthorityEvidence(analysis.researcher_facing?.authority_evidence || analysis.authority_evidence || []),
+        authorityProvenance: analysis.authority_provenance || [],
+        authorityBoundaries: analysis.authority_boundaries || [],
+        roleReconciliation: analysis.researcher_facing?.role_reconciliation || [],
         diagnosticAuthorityEvidence: mapAuthorityEvidence(analysis.authority_evidence),
           archivalAssociations: analysis.archival_associations || [],
+        evidenceLedger,
+        sourceGroups: analysis.source_groups || [],
         authorityRoles: analysis.authority_roles || null,
         documentaryEvidence: analysis.researcher_facing?.documentary_evidence || [],
+        testimonyEvidence: analysis.researcher_facing?.testimony_evidence || analysis.testimony_evidence || [],
         diagnosticDocumentaryEvidence: analysis.documentary_evidence || [],
         contextualEvidence: analysis.contextual_evidence || [],
         inferences: analysis.inferences || [],
@@ -1241,6 +1285,9 @@ const EvidenceTracer = () => {
                           : `${item.assertion} | Staff code: ${item.authority_id || 'unavailable'} | ${item.role || 'Role unavailable'} | ${item.tenure?.start_date || 'start unavailable'} to ${item.tenure?.end_date || 'end unavailable'}`}
                     </p>
                   ))}
+                {traceData.authorityProvenance?.length > 0 && <p>Authority provenance: {traceData.authorityProvenance.map((item) => `${item.authority_type} | ${item.authority_id}`).join('; ')}.</p>}
+                {traceData.authorityBoundaries?.map((boundary) => <p key={boundary}><strong>Boundary:</strong> {boundary}</p>)}
+                {traceData.roleReconciliation?.map((item) => <p key={item.status}><strong>Reconciliation:</strong> {item.boundary}</p>)}
                 {traceData.authorityRoles && <>
                   <p>Planner entity resolution: {traceData.authorityRoles.planner_entity_resolution?.length > 0 ? traceData.authorityRoles.planner_entity_resolution.map((item) => `${item.label} (${item.authority_type})`).join('; ') : 'None'}.</p>
                   <p>Controlled lexical expansion: {traceData.authorityRoles.controlled_lexical_expansion?.used ? 'Yes' : 'No'}.</p>
@@ -1252,6 +1299,47 @@ const EvidenceTracer = () => {
               {traceData.documentaryEvidence?.length > 0 && <section aria-label="Documentary evidence">
                 <h4>Documentary evidence</h4>
                 {traceData.documentaryEvidence.map((item, index) => <p key={item.claim_id || item.chunk_id || index}>{item.text || item.claim_text || item.claim}</p>)}
+              </section>}
+              {traceData.testimonyEvidence?.length > 0 && <section aria-label="Retrospective testimony">
+                <h4>Retrospective testimony</h4>
+                {traceData.testimonyEvidence.map((item, index) => <p key={item.claim_id || item.chunk_id || index}>{item.text || item.claim_text || item.claim}</p>)}
+              </section>}
+              {traceData.evidenceLedger?.length > 0 && <section aria-label="Typed evidence ledger">
+                <h4>Typed evidence ledger</h4>
+                {traceData.evidenceLedger.map((item) => (
+                  <p key={item.evidence_id}>
+                    {item.evidence_type} | {item.source_title || item.source_pid_or_authority_key || item.evidence_id}
+                    {item.relation_type_if_any ? ` | Relation: ${item.relation_type_if_any}` : ''}
+                    {item.relation_derivation_if_any ? ` | Derived from: ${item.relation_derivation_if_any}` : ''}
+                    {item.contemporary_or_retrospective ? ` | Temporal class: ${item.contemporary_or_retrospective}` : ''}
+                  </p>
+                ))}
+              </section>}
+              {traceData.sourceGroups?.length > 0 && <section aria-label="Source assets">
+                <h4>Source assets</h4>
+                {traceData.sourceGroups.map((group) => (
+                  <details key={group.asset_key} open>
+                    <summary>
+                      {group.title || 'Untitled source'}
+                      {group.date ? ` | ${group.date}` : ''}
+                      {group.pid ? ` | PID ${group.pid}` : ''}
+                      {` | ${group.chunks?.length || 0} retrieved passage${group.chunks?.length === 1 ? '' : 's'}`}
+                    </summary>
+                    <p>
+                      Evidence type: {group.evidence_types?.map((type) => (
+                        <Tag key={type} type="blue" size="sm">{type}</Tag>
+                      ))}
+                    </p>
+                    {group.collection && <p>Collection: {group.collection}</p>}
+                    {group.presets?.length > 0 && <p>Collection preset: {group.presets.join(', ')}</p>}
+                    {group.chunks?.map((chunk) => (
+                      <details key={chunk.source_id} id={`grouped-source-${chunk.source_number}`} open>
+                        <summary>Page {chunk.page_start || 'unavailable'}{chunk.page_end && chunk.page_end !== chunk.page_start ? `-${chunk.page_end}` : ''} | Chunk {chunk.chunk_id || 'unavailable'}</summary>
+                        <p>{chunk.text || 'Passage text unavailable.'}</p>
+                      </details>
+                    ))}
+                  </details>
+                ))}
               </section>}
               <section aria-label="Archival metadata associations">
                 <h4>Archival metadata associations</h4>
@@ -1317,6 +1405,11 @@ const EvidenceTracer = () => {
               <section aria-label="Model claim provenance">
                 <h4>Model-claim provenance</h4>
                 <p>{traceData.claimProvenanceResult?.valid ? 'PASS' : 'PARTIAL / requires researcher review.'} Generated substantive claims must cite valid supplied documentary sources.</p>
+                {traceData.claimValidation?.rendered_claims?.map((claim, index) => (
+                  <p key={`claim-validation-${index}`}>
+                    Claim {claim.claim_ids?.join(', ') || index + 1} | Status: <strong>{claim.status}</strong> | Evidence IDs: {claim.supporting_evidence_ids?.join(', ') || 'None'}
+                  </p>
+                ))}
                 {traceData.claimProvenance?.length > 0 && (
                   <div className="tracer__claim-provenance">
                     {traceData.claimProvenance.map((claim) => (
@@ -1331,6 +1424,13 @@ const EvidenceTracer = () => {
                 {traceData.formatViolations?.length > 0 && <InlineNotification lowContrast kind="warning" title="Model output contained unexpected structural/prompt-echo text." subtitle="The raw capture is preserved exactly; this text is recorded as FORMAT_VIOLATION, not as an evidential claim." />}
                 {traceData.capture && <details className="tracer__raw-capture"><summary>Raw one-shot output (immutable audit record)</summary><pre>{traceData.rawModelResponse}</pre></details>}
               </section>
+              {traceData.missingnessDecision && (
+                <section aria-label="Scoped missingness decision">
+                  <h4>Scoped missingness decision</h4>
+                  <p>Status: {traceData.missingnessDecision.missingness_state}. Coverage: {traceData.missingnessDecision.coverage_status}.</p>
+                  <p>Tested proposition: {traceData.missingnessDecision.claim_predicate}</p>
+                </section>
+              )}
             </div>
           )}
 

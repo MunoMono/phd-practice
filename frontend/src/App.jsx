@@ -66,11 +66,12 @@ function App() {
                   <Route path="/source-interrogation" element={<EvidenceTracer />} />
                   <Route path="/absences" element={<MissingnessWorkbench />} />
                   <Route path="/cross-readings" element={<CrossReadWorkbench />} />
-                  <Route path="/semantic-atlas" element={<VisualAnalytics />} />
-                  <Route path="/semantic-neighbourhoods" element={<Navigate to="/semantic-atlas?view=neighbourhoods" replace />} />
-                  <Route path="/comparative-views" element={<Navigate to="/semantic-atlas?view=comparative" replace />} />
-                  <Route path="/temporal-documentary-change" element={<Navigate to="/semantic-atlas?view=temporal" replace />} />
-                  <Route path="/critical-inquiry" element={<Navigate to="/semantic-atlas?view=critical" replace />} />
+                  <Route path="/visual-analytics" element={<VisualAnalytics />} />
+                  <Route path="/semantic-atlas" element={<Navigate to="/visual-analytics" replace />} />
+                  <Route path="/semantic-neighbourhoods" element={<Navigate to="/visual-analytics?view=neighbourhoods" replace />} />
+                  <Route path="/comparative-views" element={<Navigate to="/visual-analytics?view=comparative" replace />} />
+                  <Route path="/temporal-documentary-change" element={<Navigate to="/visual-analytics?view=temporal" replace />} />
+                  <Route path="/critical-inquiry" element={<Navigate to="/visual-analytics?view=critical" replace />} />
                   <Route path="/challenge-map" element={<ChallengeMap />} />
                   <Route path="/claims-evidence" element={<ClaimsWorkbench />} />
                   <Route path="/provenance" element={<AuditWorkbench />} />

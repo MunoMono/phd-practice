@@ -41,6 +41,7 @@ services:
       POSTGRES_PORT: 5432
       POSTGRES_DB: ${POSTGRES_DB:-testamentary-traces}
       TURIN_RUNTIME_VERSION: ${TURIN_RUNTIME_VERSION:-turin-runtime-v2}
+      TURIN_ARCHIVE_FIRST_CORPUS_VERSION: ${TURIN_ARCHIVE_FIRST_CORPUS_VERSION:-corpus_turin_archive_first_cc11e8678168}
       TURIN_INFERENCE_PROVIDER: ${TURIN_INFERENCE_PROVIDER:-disabled}
       OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:15435}
       TURIN_MODEL: ${TURIN_MODEL:-qwen3:8b-q4_K_M}
@@ -56,13 +57,21 @@ services:
       # Auth0 Configuration
       AUTH0_DOMAIN: ${VITE_AUTH0_DOMAIN:-dev-i4m880asz7y6j5sk.us.auth0.com}
       AUTH0_AUDIENCE: ${VITE_AUTH0_AUDIENCE:-https://api.ddrarchive.org}
+      C2PA_SIGNING_ENABLED: ${C2PA_SIGNING_ENABLED:-false}
+      C2PA_SIGNING_MODE: ${C2PA_SIGNING_MODE:-external}
+      C2PA_SIGNER_URL: ${C2PA_SIGNER_URL:-}
+      C2PA_SIGNER_CLIENT_CERT_PATH: /run/c2pa/signer-client.pem
+      C2PA_SIGNING_CERTIFICATE_PATH: /run/c2pa/certificate.pem
+      C2PA_SIGNING_KEY_PATH: /run/c2pa/private-key.pem
+      C2PA_SIGNING_KEY_PASSPHRASE: ${C2PA_SIGNING_KEY_PASSPHRASE:-}
+      C2PA_TRUST_LIST_URL: ${C2PA_TRUST_LIST_URL:-https://raw.githubusercontent.com/c2pa-org/conformance-public/main/trust-list/trust-list.json}
     # SECURITY: Backend only accessible via nginx proxy, not directly from internet
     # ports:
     #   - "8000:8000"
     volumes:
-      - ./backend:/app
       - backend_logs:/app/logs
       - model_cache:/root/.cache/huggingface
+      - ./secrets/c2pa:/run/c2pa:ro
     healthcheck:
       test:
         ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5)"]
@@ -100,7 +109,6 @@ services:
       OPENBLAS_NUM_THREADS: "1"
       HF_HOME: /root/.cache/huggingface
     volumes:
-      - ./backend:/app
       - backend_logs:/app/logs
       - model_cache:/root/.cache/huggingface
       - docling_cache:/root/.cache/docling

@@ -12,8 +12,8 @@ export const PRIMARY_SECTIONS = [
   { key: 'workbench', label: 'Workbench', path: '/workbench', icon: Chip },
   { key: 'sources', label: 'Sources', path: '/sources', icon: Search },
   { key: 'analysis', label: 'Analysis', path: '/source-interrogation', icon: DataVis_4 },
-  { key: 'visual-analytics', label: 'Visual analytics', path: '/semantic-atlas', icon: DataVis_4 },
-  { key: 'evidence', label: 'Evidence', path: '/claims-evidence', icon: CheckmarkOutline },
+  { key: 'visual-analytics', label: 'Visual analytics', path: '/visual-analytics', icon: DataVis_4 },
+  { key: 'evidence', label: 'Evidence', path: '/provenance', icon: CheckmarkOutline },
   { key: 'documentation', label: 'Documentation', path: '/documentation', icon: Catalog },
 ]
 
@@ -30,7 +30,7 @@ export const SECONDARY_SECTIONS = {
     { key: 'cross-readings', label: 'Cross-readings', path: '/cross-readings', icon: ArrowsHorizontal, matches: ['/cross-readings', '/cross-read'] },
   ],
   'visual-analytics': [
-    { key: 'semantic-atlas', label: 'Semantic atlas', path: '/semantic-atlas', icon: DataVis_4, matches: ['/semantic-atlas', '/clusters', '/visual-analytics'] },
+    { key: 'semantic-atlas', label: 'Semantic atlas', path: '/visual-analytics', icon: DataVis_4, matches: ['/semantic-atlas', '/clusters', '/visual-analytics'] },
     { key: 'semantic-neighbourhoods', label: 'Semantic neighbourhoods', path: '/semantic-neighbourhoods', icon: Search, matches: ['/semantic-neighbourhoods'] },
     { key: 'comparative-views', label: 'Comparative views', path: '/comparative-views', icon: ArrowsHorizontal, matches: ['/comparative-views'] },
     { key: 'temporal-documentary-change', label: 'Temporal change', path: '/temporal-documentary-change', icon: DataVis_4, matches: ['/temporal-documentary-change'] },
@@ -38,9 +38,9 @@ export const SECONDARY_SECTIONS = {
     { key: 'challenge-map', label: 'Challenge this map', path: '/challenge-map', icon: DataVis_4, matches: ['/challenge-map'] },
   ],
   evidence: [
+    { key: 'provenance', label: 'Provenance', path: '/provenance', icon: Catalog, matches: ['/provenance', '/audit', '/sessions', '/ml-dashboard'] },
     { key: 'claims-evidence', label: 'Claims and evidence', path: '/claims-evidence', icon: CheckmarkOutline, matches: ['/claims-evidence', '/claims'] },
     { key: 'research-runs', label: 'Research runs', path: '/research-runs', icon: Catalog, matches: ['/research-runs', '/experiments'] },
-    { key: 'provenance', label: 'Provenance', path: '/provenance', icon: Catalog, matches: ['/provenance', '/audit', '/sessions', '/experiments', '/ml-dashboard'] },
   ],
   documentation: [
     { key: 'expanded-abstract', label: 'Expanded abstract', path: '/documentation/expanded-abstract', icon: Catalog, matches: ['/documentation/expanded-abstract'] },

@@ -83,7 +83,7 @@ const CorpusComposition = ({ composition }) => {
   )
 }
 
-const EvidenceDensity = ({ density, currentChunks }) => {
+const EvidenceDensity = ({ density, currentChunks, controlledIngestibleSources }) => {
   const tooltipRef = useAnalyticalTooltip('dashboard-density-tooltip')
 
   if (!Array.isArray(density) || density.length === 0) {
@@ -98,7 +98,7 @@ const EvidenceDensity = ({ density, currentChunks }) => {
 
   return (
     <ChartPanel title="Evidence density" subtitle="Highest current searchable chunk counts by source document.">
-      <div className="dashboard__density-total"><strong>{numberFormat.format(currentChunks)}</strong><span>current chunks across 95 controlled-ingestible sources</span></div>
+      <div className="dashboard__density-total"><strong>{numberFormat.format(currentChunks)}</strong><span>current chunks across {numberFormat.format(controlledIngestibleSources)} controlled-ingestible sources</span></div>
       <div className="dashboard__density-list">
         {density.slice(0, 10).map((document) => (
           <div
@@ -215,7 +215,11 @@ const DashboardAnalyticalSurface = ({ data, claims, claimsAvailable, status }) =
   return (
     <div className="dashboard__analytical-grid">
       <CorpusComposition composition={composition} />
-      <EvidenceDensity density={data.density} currentChunks={composition?.current_chunks ?? 0} />
+      <EvidenceDensity
+        density={data.density}
+        currentChunks={composition?.current_chunks ?? 0}
+        controlledIngestibleSources={composition?.controlled_ingestible_sources ?? 0}
+      />
       <CorpusAcrossTime temporal={data.temporal} />
       <ResearchEvidenceState runs={data.runs} claims={claims || []} claimsAvailable={claimsAvailable} />
     </div>

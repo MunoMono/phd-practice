@@ -28,15 +28,26 @@ SNAPSHOT_VERSION = "turin-archive-asset-snapshot-v1"
 FROZEN_CORPUS_VERSION = "corpus_f40d78dbce52"
 INGESTION_VERSION = "turin-archive-first-successor-v1"
 Q02_ASSET_PIDS = ("062054716175", "852120727979", "723660822664")
+TARGETED_ASSET_PIDS = (
+    "098776258047",
+    "482546702591",
+    "492782087857",
+    "665092576421",
+    "723660822664",
+)
 
 
-def successor_corpus_version(rows: list[dict[str, Any]]) -> str:
+def successor_corpus_version(
+    rows: list[dict[str, Any]],
+    parent_corpus_version: str = FROZEN_CORPUS_VERSION,
+    clone_document_id_prefix: str = "successor_doc_",
+) -> str:
     identities = sorted(
         (row["asset_pid"], row["asset_id"], row["record_pid"], row["attached_media_pid"])
         for row in rows
     )
-    digest = hashlib.sha256(json.dumps(identities, separators=(",", ":")).encode()).hexdigest()[:12]
-    return f"corpus_turin_archive_first_{digest}"
+    digest = hashlib.sha256(json.dumps({"parent": parent_corpus_version, "assets": identities, "clone_document_id_prefix": clone_document_id_prefix}, separators=(",", ":")).encode()).hexdigest()[:12]
+    return f"corpus_turin_targeted_{digest}"
 
 
 def _year(row: dict[str, Any]) -> int:
@@ -82,22 +93,22 @@ def _existing_document_ids(db, rows: list[dict[str, Any]]) -> set[str]:
     return existing
 
 
-def _chunked_document_ids(db, document_ids: set[str]) -> set[str]:
+def _chunked_document_ids(db, document_ids: set[str], parent_corpus_version: str) -> set[str]:
     if not document_ids:
         return set()
     return set(db.execute(text("""
         SELECT DISTINCT document_id FROM document_chunks
         WHERE corpus_version = :corpus_version AND document_id = ANY(:document_ids)
-    """), {"corpus_version": FROZEN_CORPUS_VERSION, "document_ids": list(document_ids)}).scalars())
+    """), {"corpus_version": parent_corpus_version, "document_ids": list(document_ids)}).scalars())
 
 
-def _frozen_document_ids(db, document_ids: set[str]) -> set[str]:
+def _parent_document_ids(db, document_ids: set[str], parent_corpus_version: str) -> set[str]:
     if not document_ids:
         return set()
     return set(db.execute(text("""
         SELECT document_id FROM documents
         WHERE corpus_version = :corpus_version AND document_id = ANY(:document_ids)
-    """), {"corpus_version": FROZEN_CORPUS_VERSION, "document_ids": list(document_ids)}).scalars())
+    """), {"corpus_version": parent_corpus_version, "document_ids": list(document_ids)}).scalars())
 
 
 def _metadata(row: dict[str, Any], source_uri: str, checksum: str) -> dict[str, Any]:
@@ -204,14 +215,62 @@ async def _materialize_new_asset(db, row: dict[str, Any], corpus_version: str, a
     return {"asset_pid": row["asset_pid"], "document_id": document_id, "pages": len(page_text), "chunks": chunks, "checksum_sha256": checksum}
 
 
-def _copy_frozen_chunks(db, corpus_version: str) -> int:
+def _copy_parent_documents(
+    db,
+    corpus_version: str,
+    parent_corpus_version: str,
+    clone_document_id_prefix: str,
+) -> int:
+    return db.execute(text("""
+        INSERT INTO documents (
+            document_id, pid, authority_id, authority_data, archive_record_id,
+            archive_record_pid, asset_id, asset_pid, asset_id_or_asset_pid,
+            title, publication_year, publication_date, filename, file_type,
+            s3_key, source_uri, source_path, file_size_bytes, checksum_sha256,
+            page_count, ocr_status, extracted_text, has_diagrams, diagram_s3_keys,
+            processing_status, processing_error, processed_at, ingestion_version,
+            corpus_version, metadata_source, use_for_ml, ml_page_scope,
+            ml_policy_status, ml_exclusion_reason, archive_metadata_fetched_at,
+            archive_metadata_source, archive_metadata_snapshot_hash,
+            metadata_sync_status, metadata_sync_error, source_asset_checksum,
+            source_asset_identity_hash, source_asset_changed, reingestion_required,
+            doc_metadata, created_at, updated_at
+        )
+        SELECT
+            :clone_document_id_prefix || substr(md5(:corpus_version || '|' || document_id), 1, 24),
+            pid, authority_id, authority_data, archive_record_id,
+            archive_record_pid, asset_id, asset_pid, asset_id_or_asset_pid,
+            title, publication_year, publication_date, filename, file_type,
+            s3_key, source_uri || '#corpus-release=' || :corpus_version, source_path, file_size_bytes, checksum_sha256,
+            page_count, ocr_status, extracted_text, has_diagrams, diagram_s3_keys,
+            processing_status, processing_error, processed_at, ingestion_version,
+            :corpus_version, metadata_source, use_for_ml, ml_page_scope,
+            ml_policy_status, ml_exclusion_reason, archive_metadata_fetched_at,
+            archive_metadata_source, archive_metadata_snapshot_hash,
+            metadata_sync_status, metadata_sync_error, source_asset_checksum,
+            source_asset_identity_hash, source_asset_changed, reingestion_required,
+            doc_metadata || jsonb_build_object('reused_from_corpus_version', corpus_version), NOW(), NOW()
+        FROM documents
+        WHERE corpus_version = :frozen_corpus
+        ON CONFLICT (document_id) DO NOTHING
+        """), {"corpus_version": corpus_version, "frozen_corpus": parent_corpus_version,
+            "clone_document_id_prefix": clone_document_id_prefix}).rowcount
+
+
+def _copy_parent_chunks(
+    db,
+    corpus_version: str,
+    parent_corpus_version: str,
+    clone_document_id_prefix: str,
+) -> int:
     return db.execute(text("""
         INSERT INTO document_chunks (chunk_id, document_id, chunk_text, chunk_index, chunk_type,
             publication_year, embedding_vector, embedding_model, key_concepts, drift_score,
             chunk_metadata, created_at, search_tsv, source_page, source_section, pid,
             source_filename, content, page_end, corpus_version, ingestion_version, chunking_version)
         SELECT 'successor_' || substr(md5(:corpus_version || '|' || chunk_id), 1, 24),
-            document_id, chunk_text, chunk_index, chunk_type, publication_year, embedding_vector,
+            :clone_document_id_prefix || substr(md5(:corpus_version || '|' || document_id), 1, 24),
+            chunk_text, chunk_index, chunk_type, publication_year, embedding_vector,
             embedding_model, key_concepts, drift_score,
             chunk_metadata || jsonb_build_object('reused_from_corpus_version', corpus_version), NOW(),
             search_tsv, source_page, source_section, pid, source_filename, content, page_end,
@@ -219,32 +278,59 @@ def _copy_frozen_chunks(db, corpus_version: str) -> int:
         FROM document_chunks
         WHERE corpus_version = :frozen_corpus
         ON CONFLICT (chunk_id) DO NOTHING
-    """), {"corpus_version": corpus_version, "ingestion_version": INGESTION_VERSION, "frozen_corpus": FROZEN_CORPUS_VERSION}).rowcount
+        """), {"corpus_version": corpus_version, "ingestion_version": INGESTION_VERSION,
+            "frozen_corpus": parent_corpus_version, "clone_document_id_prefix": clone_document_id_prefix}).rowcount
 
 
 async def main(arguments) -> None:
     db = LocalSessionLocal()
     try:
+        parent_corpus_version = arguments.parent_corpus
+        clone_document_id_prefix = arguments.clone_document_id_prefix
         rows = _snapshot_rows(db, Path(arguments.snapshot_export))
-        corpus_version = successor_corpus_version(rows)
+        requested_asset_pids = set(
+            arguments.asset_pids or ()
+            if arguments.allow_empty
+            else (arguments.asset_pids or (TARGETED_ASSET_PIDS if not arguments.all_new else ()))
+        )
+        if requested_asset_pids and arguments.all_new:
+            raise ValueError("--asset-pids and --all-new cannot be combined")
         exact_existing = _existing_document_ids(db, rows)
-        chunked_existing = _chunked_document_ids(db, exact_existing)
-        frozen_existing = _frozen_document_ids(db, exact_existing)
+        chunked_existing = _chunked_document_ids(db, exact_existing, parent_corpus_version)
+        parent_existing = _parent_document_ids(db, exact_existing, parent_corpus_version)
         new_rows = [row for row in rows if row["asset_pid"] not in {
-            value for value, in db.execute(text("SELECT asset_pid FROM documents WHERE asset_pid IS NOT NULL")).all()
+            value for value, in db.execute(text("""
+                SELECT asset_pid FROM documents
+                WHERE corpus_version = :parent_corpus_version AND asset_pid IS NOT NULL
+            """), {"parent_corpus_version": parent_corpus_version}).all()
         }]
-        selected = [row for row in new_rows if arguments.all_new or row["asset_pid"] in Q02_ASSET_PIDS]
+        selected = [row for row in new_rows if arguments.all_new or row["asset_pid"] in requested_asset_pids]
+        selected_pids = {row["asset_pid"] for row in selected}
+        missing_requested = requested_asset_pids - selected_pids
+        if missing_requested:
+            raise ValueError(f"requested assets are absent or already materialised: {sorted(missing_requested)}")
+        corpus_version = successor_corpus_version(
+            selected,
+            parent_corpus_version,
+            clone_document_id_prefix,
+        )
         if not arguments.execute:
-            print(json.dumps({"successor_corpus_version": corpus_version, "eligible_assets": len(rows), "reused_governed_documents": len(chunked_existing), "known_representation_mismatches": len(frozen_existing - chunked_existing), "new_assets": len(new_rows), "selected_assets": [row["asset_pid"] for row in selected]}, indent=2))
+            print(json.dumps({"successor_corpus_version": corpus_version, "parent_corpus_version": parent_corpus_version, "eligible_assets": len(rows), "reused_governed_documents": len(chunked_existing), "known_representation_mismatches": len(parent_existing - chunked_existing), "new_assets": len(new_rows), "selected_assets": sorted(selected_pids)}, indent=2))
             return
         artifacts_dir = Path(arguments.artifacts_dir) / corpus_version
-        _copy_frozen_chunks(db, corpus_version)
+        copied_documents = _copy_parent_documents(
+            db, corpus_version, parent_corpus_version, clone_document_id_prefix
+        )
+        copied_chunks = _copy_parent_chunks(
+            db, corpus_version, parent_corpus_version, clone_document_id_prefix
+        )
+        db.commit()
         outcomes = []
         for row in selected:
             outcomes.append(await _materialize_new_asset(db, row, corpus_version, artifacts_dir))
             db.commit()
         counts = dict(db.execute(text("SELECT count(DISTINCT document_id) AS documents, count(*) AS chunks FROM document_chunks WHERE corpus_version=:corpus_version"), {"corpus_version": corpus_version}).mappings().one())
-        report = {"successor_corpus_version": corpus_version, "snapshot_version": SNAPSHOT_VERSION, "eligible_assets": len(rows), "reused_governed_documents": len(chunked_existing), "known_representation_mismatches": len(frozen_existing - chunked_existing), "newly_materialized": outcomes, "counts": counts, "created_at_utc": datetime.now(timezone.utc).isoformat()}
+        report = {"successor_corpus_version": corpus_version, "parent_corpus_version": parent_corpus_version, "snapshot_version": SNAPSHOT_VERSION, "eligible_assets": len(rows), "reused_governed_documents": len(chunked_existing), "copied_documents": copied_documents, "copied_chunks": copied_chunks, "known_representation_mismatches": len(parent_existing - chunked_existing), "newly_materialized": outcomes, "counts": counts, "created_at_utc": datetime.now(timezone.utc).isoformat()}
         artifacts_dir.mkdir(parents=True, exist_ok=True)
         (artifacts_dir / "successor-corpus-report.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
         print(json.dumps(report, indent=2))
@@ -259,6 +345,10 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--execute", action="store_true")
     parser.add_argument("--all-new", action="store_true")
+    parser.add_argument("--asset-pids", nargs="*", default=None)
+    parser.add_argument("--parent-corpus", default=FROZEN_CORPUS_VERSION)
+    parser.add_argument("--allow-empty", action="store_true")
+    parser.add_argument("--clone-document-id-prefix", default="successor_doc_")
     parser.add_argument("--artifacts-dir", default="/app/artifacts/turin-archive-first-successor-v1")
     parser.add_argument("--snapshot-export", default="/app/artifacts/turin-archive-asset-snapshot-v1-complete.json")
     asyncio.run(main(parser.parse_args()))

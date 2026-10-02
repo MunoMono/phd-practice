@@ -148,6 +148,7 @@ def build_document_list_payload(document: Any) -> Dict[str, Any]:
         'archive_resolution_status': archive_resolution_status(document),
         'pid': document.pid,
         'attached_media_pid': document.pid,
+        'authority_id': document.authority_id,
         'archive_record_pid': document.archive_record_pid or roles['retrieval_provenance'].get('archive_record_pid'),
         'asset_id': document.asset_id or roles['retrieval_provenance'].get('asset_id'),
         'asset_pid': document.asset_pid or roles['retrieval_provenance'].get('asset_pid'),
