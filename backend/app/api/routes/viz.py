@@ -4,7 +4,7 @@ Carbon Design System compatible data structures
 """
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
-from sqlalchemy import text
+from sqlalchemy import func, text
 from typing import Any, List, Dict, Literal, Mapping, Optional
 from datetime import datetime
 import json
