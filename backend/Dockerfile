@@ -23,6 +23,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY . .
 
+RUN python -m pip check && python scripts/verify_runtime_dependencies.py
+
 # Create logs directory
 RUN mkdir -p logs/sessions
 
