@@ -34,8 +34,7 @@ const Providers = ({ children }) => {
       domain={domain}
       clientId={clientId}
       authorizationParams={{
-        redirect_uri: window.location.origin,
-        audience: `https://${domain}/api/v2/`
+        redirect_uri: window.location.origin
       }}
       cacheLocation="localstorage"
     >
