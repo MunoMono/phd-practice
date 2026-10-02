@@ -44,6 +44,32 @@ export const getUmapProjection = async (params = {}) => {
   return normalizeUmapProjection(payload)
 }
 
+export const createVisualInquiry = (payload) => apiRequest('/api/viz/inquiries', {
+  method: 'POST',
+  body: payload
+})
+
+export const getVisualInquiry = (inquiryId) => apiRequest(`/api/viz/inquiries/${encodeURIComponent(inquiryId)}`)
+
+export const createVisualCohort = (payload) => apiRequest('/api/viz/cohorts', {
+  method: 'POST',
+  body: payload
+})
+
+export const getVisualCohort = (cohortId) => apiRequest(`/api/viz/cohorts/${encodeURIComponent(cohortId)}`)
+
+export const createVisualAnnotation = (payload) => apiRequest('/api/viz/annotations', {
+  method: 'POST',
+  body: payload
+})
+
+export const reviseVisualAnnotation = (annotationId, payload) => apiRequest(`/api/viz/annotations/${encodeURIComponent(annotationId)}`, {
+  method: 'PUT',
+  body: payload
+})
+
+export const getVisualAnnotationRevisions = (annotationId) => apiRequest(`/api/viz/annotations/${encodeURIComponent(annotationId)}/revisions`)
+
 export const getEmbeddingReadiness = () => apiRequest('/api/viz/embedding-readiness')
 
 export const createEmbeddingReadinessReview = (payload) => apiRequest('/api/viz/embedding-readiness', {
@@ -61,10 +87,31 @@ export const getSemanticNeighbourhood = (payload) => apiRequest('/api/viz/semant
   body: payload
 })
 
+export const getProjectionFidelity = (payload) => apiRequest('/api/viz/projection-fidelity', {
+  method: 'POST',
+  body: payload
+})
+
 export const runCriticalProbe = (payload) => apiRequest('/api/viz/critical-probe', {
   method: 'POST',
   body: payload
 })
+
+export const createVisualCriticalProbe = (payload) => apiRequest('/api/viz/critical-probe-records', {
+  method: 'POST',
+  body: payload
+})
+
+export const getVisualCriticalProbe = (probeId) => apiRequest(`/api/viz/critical-probe-records/${encodeURIComponent(probeId)}`)
+
+export const createVisualTemporalPeriod = (payload) => apiRequest('/api/viz/temporal-periods', {
+  method: 'POST',
+  body: payload
+})
+
+export const getVisualTemporalPeriods = () => apiRequest('/api/viz/temporal-periods')
+
+export const getAlignedUmapStaticComparison = (alignedRunId) => apiRequest(`/api/viz/aligned-runs/${encodeURIComponent(alignedRunId)}/static-comparison`)
 
 export const challengeUmapProjection = (payload) => apiRequest('/api/viz/umap/challenge', {
   method: 'POST',

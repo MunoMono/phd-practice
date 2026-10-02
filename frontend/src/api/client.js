@@ -1,5 +1,11 @@
 import getApiBaseUrl from '../utils/apiBaseUrl'
 
+let accessTokenProvider = null
+
+export const configureAccessTokenProvider = (provider) => {
+  accessTokenProvider = provider
+}
+
 const buildQueryString = (params = {}) => {
   const searchParams = new URLSearchParams()
 
@@ -35,10 +41,17 @@ export const apiRequest = async (path, options = {}) => {
 
   const baseUrl = getApiBaseUrl()
   const normalizedPath = path.startsWith('/') ? path : `/${path}`
+  let accessToken = null
+  try {
+    accessToken = accessTokenProvider ? await accessTokenProvider() : null
+  } catch {
+    accessToken = null
+  }
   const response = await fetch(`${baseUrl}${normalizedPath}${buildQueryString(params)}`, {
     method,
     headers: {
       ...(body ? { 'Content-Type': 'application/json' } : {}),
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
       ...headers
     },
     body: body ? JSON.stringify(body) : undefined,

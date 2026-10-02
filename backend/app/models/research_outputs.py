@@ -51,6 +51,192 @@ class EmbeddingReadinessReview(LocalBase):
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
+class VisualInquiry(LocalBase):
+    __tablename__ = "visual_inquiries"
+
+    id = Column(Integer, primary_key=True, index=True)
+    inquiry_id = Column(String(255), unique=True, nullable=False, index=True)
+    researcher = Column(String(255))
+    view = Column(String(64), nullable=False, index=True)
+    question = Column(Text)
+    note = Column(Text)
+    corpus_release = Column(String(255))
+    source_scope = Column(Text)
+    projection_id = Column(String(255), index=True)
+    embedding_set_id = Column(String(255))
+    workspace_json = Column(JSONB, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class VisualCohort(LocalBase):
+    __tablename__ = "visual_cohorts"
+
+    id = Column(Integer, primary_key=True, index=True)
+    cohort_id = Column(String(255), unique=True, nullable=False, index=True)
+    inquiry_id = Column(String(255), ForeignKey("visual_inquiries.inquiry_id", ondelete="SET NULL"), index=True)
+    name = Column(String(255), nullable=False)
+    researcher = Column(String(255))
+    definition_json = Column(JSONB, nullable=False)
+    point_ids_json = Column(JSONB, nullable=False)
+    projection_id = Column(String(255), index=True)
+    embedding_set_id = Column(String(255))
+    version = Column(Integer, nullable=False, default=1)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class VisualAnnotation(LocalBase):
+    __tablename__ = "visual_annotations"
+
+    id = Column(Integer, primary_key=True, index=True)
+    annotation_id = Column(String(255), unique=True, nullable=False, index=True)
+    inquiry_id = Column(String(255), ForeignKey("visual_inquiries.inquiry_id", ondelete="SET NULL"), index=True)
+    document_id = Column(String(255), index=True)
+    chunk_id = Column(String(255), index=True)
+    annotation_type = Column(String(64), nullable=False, index=True)
+    value_json = Column(JSONB, nullable=False)
+    evidence_source = Column(String(255))
+    reviewer = Column(String(255))
+    owner_id = Column(String(255), index=True)
+    status = Column(String(32), nullable=False, default="draft", index=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class VisualAnnotationRevision(LocalBase):
+    __tablename__ = "visual_annotation_revisions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    annotation_id = Column(String(255), ForeignKey("visual_annotations.annotation_id", ondelete="CASCADE"), nullable=False, index=True)
+    revision = Column(Integer, nullable=False)
+    snapshot_json = Column(JSONB, nullable=False)
+    reviewer = Column(String(255))
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class VisualCriticalProbe(LocalBase):
+    __tablename__ = "visual_critical_probes"
+
+    id = Column(Integer, primary_key=True, index=True)
+    probe_id = Column(String(255), unique=True, nullable=False, index=True)
+    inquiry_id = Column(String(255), ForeignKey("visual_inquiries.inquiry_id", ondelete="SET NULL"), index=True)
+    projection_id = Column(String(255), index=True)
+    embedding_set_id = Column(String(255))
+    label = Column(String(255), nullable=False)
+    probe_text = Column(Text, nullable=False)
+    polarity = Column(String(16), nullable=False, index=True)
+    retrieval_method = Column(String(128), nullable=False)
+    result_json = Column(JSONB, nullable=False)
+    researcher = Column(String(255))
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class VisualTemporalPeriod(LocalBase):
+    __tablename__ = "visual_temporal_periods"
+
+    id = Column(Integer, primary_key=True, index=True)
+    period_id = Column(String(255), unique=True, nullable=False, index=True)
+    label = Column(String(255), nullable=False)
+    start_year = Column(Integer)
+    end_year = Column(Integer)
+    authority_source = Column(Text, nullable=False)
+    certainty = Column(String(32), nullable=False, default="asserted")
+    notes = Column(Text)
+    created_by = Column(String(255))
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class AlignedUmapRun(LocalBase):
+    __tablename__ = "aligned_umap_runs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    aligned_run_id = Column(String(255), unique=True, nullable=False, index=True)
+    baseline_projection_id = Column(String(255), nullable=False, index=True)
+    baseline_embedding_set_id = Column(String(255), nullable=False)
+    corpus_snapshot_id = Column(String(255), nullable=False, index=True)
+    dimensions = Column(Integer, nullable=False)
+    parameters_json = Column(JSONB, nullable=False)
+    method_version = Column(String(255), nullable=False)
+    status = Column(String(32), nullable=False, default="draft", index=True)
+    created_by = Column(String(255))
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class AlignedUmapSlice(LocalBase):
+    __tablename__ = "aligned_umap_slices"
+
+    id = Column(Integer, primary_key=True, index=True)
+    slice_id = Column(String(255), unique=True, nullable=False, index=True)
+    aligned_run_id = Column(String(255), ForeignKey("aligned_umap_runs.aligned_run_id", ondelete="CASCADE"), nullable=False, index=True)
+    slice_order = Column(Integer, nullable=False)
+    period_provenance_json = Column(JSONB, nullable=False)
+    membership_query_json = Column(JSONB, nullable=False)
+    membership_point_ids_json = Column(JSONB, nullable=False, default=list)
+    point_count = Column(Integer, nullable=False)
+    exclusions_json = Column(JSONB, nullable=False, default=list)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class AlignedUmapRelation(LocalBase):
+    __tablename__ = "aligned_umap_relations"
+
+    id = Column(Integer, primary_key=True, index=True)
+    relation_id = Column(String(255), unique=True, nullable=False, index=True)
+    aligned_run_id = Column(String(255), ForeignKey("aligned_umap_runs.aligned_run_id", ondelete="CASCADE"), nullable=False, index=True)
+    from_slice_id = Column(String(255), ForeignKey("aligned_umap_slices.slice_id", ondelete="CASCADE"), nullable=False, index=True)
+    to_slice_id = Column(String(255), ForeignKey("aligned_umap_slices.slice_id", ondelete="CASCADE"), nullable=False, index=True)
+    source_point_id = Column(String(255), nullable=False, index=True)
+    target_point_id = Column(String(255), nullable=False, index=True)
+    relation_type = Column(String(128), nullable=False)
+    authority_provenance_json = Column(JSONB, nullable=False)
+    validator_status = Column(String(32), nullable=False, default="pending", index=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class AlignedUmapValidationReport(LocalBase):
+    __tablename__ = "aligned_umap_validation_reports"
+
+    id = Column(Integer, primary_key=True, index=True)
+    report_id = Column(String(255), unique=True, nullable=False, index=True)
+    aligned_run_id = Column(String(255), ForeignKey("aligned_umap_runs.aligned_run_id", ondelete="CASCADE"), nullable=False, index=True)
+    relation_coverage_json = Column(JSONB, nullable=False)
+    exclusions_json = Column(JSONB, nullable=False)
+    diagnostics_json = Column(JSONB, nullable=False)
+    reviewer = Column(String(255), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class ReducerCheckpoint(LocalBase):
+    __tablename__ = "reducer_checkpoints"
+
+    id = Column(Integer, primary_key=True, index=True)
+    reducer_id = Column(String(255), unique=True, nullable=False, index=True)
+    embedding_set_id = Column(String(255), nullable=False, index=True)
+    projection_id = Column(String(255), nullable=False, index=True)
+    dimensions = Column(Integer, nullable=False)
+    serialization_format = Column(String(64), nullable=False)
+    checksum = Column(String(128), nullable=False)
+    corpus_snapshot_id = Column(String(255), nullable=False, index=True)
+    compatibility_status = Column(String(32), nullable=False, default="unreviewed", index=True)
+    retained_location = Column(Text, nullable=False)
+    created_by = Column(String(255))
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class ReducerCompatibilityReview(LocalBase):
+    __tablename__ = "reducer_compatibility_reviews"
+
+    id = Column(Integer, primary_key=True, index=True)
+    review_id = Column(String(255), unique=True, nullable=False, index=True)
+    reducer_id = Column(String(255), ForeignKey("reducer_checkpoints.reducer_id", ondelete="CASCADE"), nullable=False, index=True)
+    validation_method = Column(String(255), nullable=False)
+    result = Column(String(32), nullable=False, index=True)
+    reviewer = Column(String(255), nullable=False)
+    notes = Column(Text)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
 class Claim(LocalBase):
     __tablename__ = "claims"
 

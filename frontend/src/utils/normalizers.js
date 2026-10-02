@@ -331,6 +331,15 @@ export const normalizeUmapProjection = (raw = {}) => ({
       z: toNumber(firstDefined(point.z, point.umap_z), null),
     year: firstDefined(point.year, point.publication_year, null),
     sourceType: firstDefined(point.sourceType, point.source_type, 'unknown'),
+    documentaryForm: {
+      fileType: firstDefined(point.documentaryForm?.fileType, point.documentary_form?.file_type, 'not_exposed'),
+      chunkType: firstDefined(point.documentaryForm?.chunkType, point.documentary_form?.chunk_type, 'not_exposed'),
+      extractionState: firstDefined(point.documentaryForm?.extractionState, point.documentary_form?.extraction_state, 'not_exposed'),
+      rightsAccessState: firstDefined(point.documentaryForm?.rightsAccessState, point.documentary_form?.rights_access_state, 'not_exposed'),
+      metadataCompleteness: firstDefined(point.documentaryForm?.metadataCompleteness, point.documentary_form?.metadata_completeness, 'not_evaluated'),
+      documentTextLength: toNumber(firstDefined(point.documentaryForm?.documentTextLength, point.documentary_form?.document_text_length), null),
+      documentChunkCount: toNumber(firstDefined(point.documentaryForm?.documentChunkCount, point.documentary_form?.document_chunk_count), null)
+    },
     themes: toArray(firstDefined(point.themes, point.ml_themes, [])),
     entities: toArray(firstDefined(point.entities, point.ml_entities, [])),
     clusterId: firstDefined(point.clusterId, point.cluster_id, null),
@@ -347,6 +356,7 @@ export const normalizeUmapProjection = (raw = {}) => ({
       hasAuthorityContext: Boolean(firstDefined(point.evidenceSurface?.hasAuthorityContext, point.evidence_surface?.has_authority_context, false)),
       requiresDoclingOrOcr: Boolean(firstDefined(point.evidenceSurface?.requiresDoclingOrOcr, point.evidence_surface?.requires_docling_or_ocr, false)),
       visibilityLabel: firstDefined(point.evidenceSurface?.visibilityLabel, point.evidence_surface?.visibility_label, 'unknown_until_docling'),
+      representationState: firstDefined(point.evidenceSurface?.representationState, point.evidence_surface?.representation_state, 'unknown'),
       interpretationLimit: firstDefined(point.evidenceSurface?.interpretationLimit, point.evidence_surface?.interpretation_limit, null)
     },
     missingness: {
@@ -355,7 +365,11 @@ export const normalizeUmapProjection = (raw = {}) => ({
       graphqlExposureMissingness: firstDefined(point.missingness?.graphqlExposureMissingness, point.missingness?.graphql_exposure_missingness, {}),
       llmEvidenceMissingness: firstDefined(point.missingness?.llmEvidenceMissingness, point.missingness?.llm_evidence_missingness, {}),
       interpretationLimits: toArray(firstDefined(point.missingness?.interpretationLimits, point.missingness?.interpretation_limits, []))
-    }
+    },
+    archiveAuthorityContext: firstDefined(point.archiveAuthorityContext, point.archive_authority_context, { availability: 'not_exposed' }),
+    databaseAuthorityContext: toArray(firstDefined(point.databaseAuthorityContext, point.database_authority_context, [])),
+    annotationSummary: firstDefined(point.annotationSummary, point.annotation_summary, { status: 'not_available' }),
+    provenance: firstDefined(point.provenance, {})
   })),
   clusters: toArray(raw.clusters).map((cluster, index) => ({
     id: firstDefined(cluster.id, cluster.clusterId, cluster.cluster_id, `cluster-${index}`),
@@ -398,6 +412,9 @@ export const normalizeUmapProjection = (raw = {}) => ({
       documentsWithEmbeddings: toNumber(firstDefined(raw.metadata?.evidenceSurfaceScope?.documentsWithEmbeddings, raw.metadata?.evidence_surface_scope?.documents_with_embeddings), 0),
       embeddedChunks: toNumber(firstDefined(raw.metadata?.evidenceSurfaceScope?.embeddedChunks, raw.metadata?.evidence_surface_scope?.embedded_chunks), 0),
       documentsRepresentedByChunks: toNumber(firstDefined(raw.metadata?.evidenceSurfaceScope?.documentsRepresentedByChunks, raw.metadata?.evidence_surface_scope?.documents_represented_by_chunks), 0),
+      activeCorpusVersion: firstDefined(raw.metadata?.evidenceSurfaceScope?.activeCorpusVersion, raw.metadata?.evidence_surface_scope?.active_corpus_version, null),
+      activeFtsChunks: toNumber(firstDefined(raw.metadata?.evidenceSurfaceScope?.activeFtsChunks, raw.metadata?.evidence_surface_scope?.active_fts_chunks), 0),
+      activeFtsDocuments: toNumber(firstDefined(raw.metadata?.evidenceSurfaceScope?.activeFtsDocuments, raw.metadata?.evidence_surface_scope?.active_fts_documents), 0),
       distinctPidsRepresented: toNumber(firstDefined(raw.metadata?.evidenceSurfaceScope?.distinctPidsRepresented, raw.metadata?.evidence_surface_scope?.distinct_pids_represented), 0),
       totalCandidates: toNumber(firstDefined(raw.metadata?.evidenceSurfaceScope?.totalCandidates, raw.metadata?.evidence_surface_scope?.total_candidates), 0),
       returnedPoints: toNumber(firstDefined(raw.metadata?.evidenceSurfaceScope?.returnedPoints, raw.metadata?.evidence_surface_scope?.returned_points), 0),

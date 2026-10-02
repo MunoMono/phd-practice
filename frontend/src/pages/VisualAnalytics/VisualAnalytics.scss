@@ -6,15 +6,15 @@
 .visual-analytics-workbench {
   --atlas-canvas-background: #ffffff;
   display: grid;
-  grid-template-columns: 13.5rem minmax(0, 1fr) 16rem;
+  grid-template-columns: 17rem minmax(0, 1fr) 18rem;
   grid-template-rows: auto minmax(0, 1fr) auto;
   height: calc(100vh - 8.125rem);
   min-height: 34rem;
   overflow: hidden;
   background: $background;
 
-  &--controls-collapsed { grid-template-columns: minmax(0, 1fr) 16rem; }
-  &--inspector-collapsed { grid-template-columns: 13.5rem minmax(0, 1fr); }
+  &--controls-collapsed { grid-template-columns: minmax(0, 1fr) 18rem; }
+  &--inspector-collapsed { grid-template-columns: 17rem minmax(0, 1fr); }
   &--controls-collapsed.visual-analytics-workbench--inspector-collapsed { grid-template-columns: minmax(0, 1fr); }
 
   &__toolbar {
@@ -30,6 +30,8 @@
 
   &__title { display: flex; gap: $spacing-03; align-items: center; @include type-style('heading-03'); }
   &__scope { @include type-style('label-01'); color: $text-secondary; padding-bottom: $spacing-03; }
+  &__method-strip { display: flex; flex-wrap: wrap; gap: $spacing-03; align-items: center; color: $text-secondary; @include type-style('label-01'); }
+  &__method-strip span { white-space: nowrap; }
   &__notification { grid-column: 1 / -1; }
 
   &__controls, &__inspector {
@@ -40,6 +42,14 @@
   &__controls { border-right: 1px solid $border-subtle-01; }
   &__inspector { border-left: 1px solid $border-subtle-01; }
   &__controls .cds--accordion__content { display: grid; gap: $spacing-04; }
+  &__controls .cds--form-item,
+  &__controls .cds--select,
+  &__controls .cds--select-input,
+  &__controls .cds--text-input-wrapper,
+  &__controls .cds--text-input,
+  &__controls .cds--text-area,
+  &__controls .cds--text-area__wrapper { inline-size: 100%; max-inline-size: none; }
+  &__controls .cds--select { flex: 1 1 100%; }
   &__controls p, &__inspector p { @include type-style('body-compact-01'); color: $text-secondary; }
 
   &__map-region { min-width: 0; min-height: 0; position: relative; padding: $spacing-04; display: flex; flex-direction: column; background: $layer; }
@@ -61,6 +71,7 @@
   &__inspector dl { display: grid; grid-template-columns: 6rem minmax(0, 1fr); gap: $spacing-03; @include type-style('body-compact-01'); }
   &__inspector dt { color: $text-secondary; }
   &__inspector dd { margin: 0; overflow-wrap: anywhere; }
+  &__legend-values { display: flex; flex-wrap: wrap; gap: $spacing-02; }
   &__actions { display: flex; flex-wrap: wrap; gap: $spacing-02; margin-top: $spacing-05; }
   &__neighbour-list { display: grid; gap: 1px; max-height: 14rem; overflow-y: auto; background: $border-subtle-01; }
   &__neighbour-list button { display: grid; gap: $spacing-02; width: 100%; padding: $spacing-03; border: 0; background: $layer-01; color: $text-primary; text-align: left; cursor: pointer; }
@@ -70,8 +81,8 @@
   &__tray { grid-column: 1 / -1; display: grid; grid-template-columns: max-content max-content minmax(12rem, 1fr) minmax(18rem, 32rem) max-content; gap: $spacing-04; align-items: center; padding: $spacing-04 $spacing-05; border-top: 1px solid $border-subtle-01; background: $layer-01; @include type-style('body-compact-01'); }
   &__tray .cds--text-area__wrapper { min-width: 0; }
 
-  @include breakpoint-down(lg) { grid-template-columns: 12rem minmax(0, 1fr); &__inspector { display: none; } &__toolbar { grid-template-columns: max-content 13rem minmax(14rem, 1fr) max-content max-content; } &__scope { display: none; } &__tray { grid-template-columns: max-content minmax(12rem, 1fr) minmax(16rem, 1fr) max-content; } }
-  @include breakpoint-down(md) { height: auto; min-height: calc(100vh - 8.125rem); overflow: visible; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(28rem, 1fr) auto; &__controls { display: none; } &__toolbar { grid-template-columns: 1fr 1fr; } &__toolbar .cds--search { grid-column: 1 / -1; } &__tray { grid-template-columns: 1fr; } }
+  @include breakpoint-down(lg) { grid-template-columns: 15rem minmax(0, 1fr); &__inspector { display: none; } &__toolbar { grid-template-columns: max-content 13rem minmax(14rem, 1fr) max-content max-content; } &__scope, &__method-strip { display: none; } &__tray { grid-template-columns: max-content minmax(12rem, 1fr) minmax(16rem, 1fr) max-content; } }
+  @include breakpoint-down(md) { height: auto; min-height: calc(100vh - 8.125rem); overflow: visible; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(28rem, 1fr) auto auto; &__map-region { grid-column: 1; grid-row: 2; } &__controls { display: block; grid-column: 1; grid-row: 3; border-right: 0; border-top: 1px solid $border-subtle-01; } &__toolbar { grid-template-columns: 1fr 1fr; } &__toolbar .cds--search { grid-column: 1 / -1; } &__tray { grid-column: 1; grid-row: 4; grid-template-columns: 1fr; } }
 }
 
 .ddr-theme--dark .visual-analytics-workbench {

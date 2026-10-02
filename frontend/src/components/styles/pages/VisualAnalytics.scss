@@ -8,7 +8,7 @@
   --atlas-muted-point: #8d8d8d;
   --atlas-view-accent: #0f62fe;
   display: grid;
-  grid-template-columns: 13.5rem minmax(0, 1fr) 16rem;
+  grid-template-columns: 17rem minmax(0, 1fr) 16rem;
   grid-template-rows: auto minmax(0, 1fr);
   height: calc(100dvh - 2.5rem);
   min-height: 34rem;
@@ -17,7 +17,7 @@
 
   &--controls-collapsed { grid-template-columns: minmax(0, 1fr) 16rem; }
   &--controls-collapsed .visual-analytics-workbench__controls { display: none; }
-  &--inspector-collapsed { grid-template-columns: 13.5rem minmax(0, 1fr); }
+  &--inspector-collapsed { grid-template-columns: 17rem minmax(0, 1fr); }
   &--inspector-collapsed .visual-analytics-workbench__inspector { display: none; }
   &--controls-collapsed.visual-analytics-workbench--inspector-collapsed { grid-template-columns: minmax(0, 1fr); }
   &--view-neighbourhoods { --atlas-view-accent: #009d9a; }
@@ -50,6 +50,14 @@
   &__controls { border-right: 1px solid $border-subtle-01; }
   &__inspector { border-left: 1px solid $border-subtle-01; }
   &__controls .cds--accordion__content { display: grid; gap: $spacing-04; }
+  &__controls .cds--form-item,
+  &__controls .cds--select,
+  &__controls .cds--select-input,
+  &__controls .cds--text-input-wrapper,
+  &__controls .cds--text-input,
+  &__controls .cds--text-area,
+  &__controls .cds--text-area__wrapper { inline-size: 100%; max-inline-size: none; }
+  &__controls .cds--select { flex: 1 1 100%; }
   &__controls p, &__inspector p { @include type-style('body-compact-01'); color: $text-secondary; }
 
   &__map-region { min-width: 0; min-height: 0; position: relative; padding: 0; display: flex; background: $layer; }
@@ -78,8 +86,8 @@
   &__tray { display: none; }
   &__tray .cds--text-area__wrapper { min-width: 0; }
 
-  @include breakpoint-down(lg) { grid-template-columns: 12rem minmax(0, 1fr); &__inspector { display: none; } &__toolbar { grid-template-columns: max-content 13rem minmax(14rem, 1fr) max-content max-content max-content; } &__scope { display: none; } &__tray { grid-template-columns: max-content minmax(12rem, 1fr) minmax(16rem, 1fr) max-content; } }
-  @include breakpoint-down(md) { height: auto; min-height: calc(100vh - 8.125rem); overflow: visible; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(28rem, 1fr) auto; &__controls { display: none; } &__toolbar { grid-template-columns: 1fr 1fr; } &__toolbar .cds--search { grid-column: 1 / -1; } &__tray { display: grid; grid-column: 1; grid-template-columns: 1fr; gap: $spacing-04; padding: $spacing-04; } }
+  @include breakpoint-down(lg) { grid-template-columns: 15rem minmax(0, 1fr); &__inspector { display: none; } &__toolbar { grid-template-columns: max-content 13rem minmax(14rem, 1fr) max-content max-content max-content; } &__scope { display: none; } &__tray { grid-template-columns: max-content minmax(12rem, 1fr) minmax(16rem, 1fr) max-content; } }
+  @include breakpoint-down(md) { height: auto; min-height: calc(100vh - 8.125rem); overflow: visible; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(28rem, 1fr) auto auto; &__map-region { grid-column: 1; grid-row: 2; } &__controls { display: block; grid-column: 1; grid-row: 3; border-right: 0; border-top: 1px solid $border-subtle-01; } &__toolbar { grid-template-columns: 1fr 1fr; } &__toolbar .cds--search { grid-column: 1 / -1; } &__tray { display: grid; grid-column: 1; grid-row: 4; grid-template-columns: 1fr; gap: $spacing-04; padding: $spacing-04; } }
 }
 
 .ddr-theme--dark .visual-analytics-workbench {

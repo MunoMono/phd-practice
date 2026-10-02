@@ -2,10 +2,10 @@
 Visualization API - Data endpoints for D3.js visualizations
 Carbon Design System compatible data structures
 """
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from sqlalchemy import text
-from typing import List, Dict, Literal, Optional
+from typing import Any, List, Dict, Literal, Mapping, Optional
 from datetime import datetime
 import json
 import logging
@@ -15,8 +15,9 @@ import numpy as np
 
 from app.core.database import LocalSessionLocal
 from app.core.config import settings
+from app.core.auth import get_optional_user
 from app.core.ddr_temporal_scope import DDR_DOCUMENT_SQL_SCOPE
-from app.models.research_outputs import EmbeddingReadinessReview, MissingnessEvent
+from app.models.research_outputs import AlignedUmapRelation, AlignedUmapRun, AlignedUmapSlice, AlignedUmapValidationReport, EmbeddingReadinessReview, MissingnessEvent, ReducerCheckpoint, ReducerCompatibilityReview, VisualAnnotation, VisualAnnotationRevision, VisualCohort, VisualCriticalProbe, VisualInquiry, VisualTemporalPeriod
 from app.services.corpus_status_service import get_corpus_status
 
 router = APIRouter()
@@ -95,12 +96,181 @@ class AtlasCoverageMissingnessRequest(BaseModel):
 
 class SemanticNeighbourhoodRequest(BaseModel):
     focal_chunk_id: str = Field(min_length=1, max_length=255)
-    size: int = Field(default=25, ge=1, le=50)
+    size: int = Field(default=10, ge=5, le=50)
+
+    @field_validator("size")
+    @classmethod
+    def display_k_must_use_configured_step(cls, value: int) -> int:
+        if value % 5:
+            raise ValueError("Neighbourhood display k must increase in steps of 5.")
+        return value
 
 
 class CriticalProbeRequest(BaseModel):
     concept: str = Field(min_length=2, max_length=500)
     size: int = Field(default=25, ge=1, le=50)
+
+
+class VisualCriticalProbeRequest(BaseModel):
+    inquiry_id: Optional[str] = Field(default=None, max_length=255)
+    researcher: Optional[str] = Field(default=None, max_length=255)
+    label: str = Field(min_length=1, max_length=255)
+    probe_text: str = Field(min_length=2, max_length=500)
+    polarity: Literal["positive", "negative"]
+    projection_id: Optional[str] = Field(default=None, max_length=255)
+    embedding_set_id: Optional[str] = Field(default=None, max_length=255)
+    retrieval_method: str = Field(min_length=1, max_length=128)
+    results: Dict
+
+
+class VisualTemporalPeriodRequest(BaseModel):
+    label: str = Field(min_length=1, max_length=255)
+    start_year: Optional[int] = None
+    end_year: Optional[int] = None
+    authority_source: str = Field(min_length=1)
+    certainty: Literal["asserted", "approximate", "contested"] = "asserted"
+    notes: Optional[str] = None
+
+    @model_validator(mode="after")
+    def validates_bounds(self):
+        if self.start_year is not None and self.end_year is not None and self.start_year > self.end_year:
+            raise ValueError("start_year must not be later than end_year")
+        return self
+
+
+class AlignedUmapSliceRequest(BaseModel):
+    slice_id: str = Field(min_length=1, max_length=255)
+    slice_order: int = Field(ge=0)
+    period_provenance: Dict
+    membership_query: Dict
+    membership_point_ids: List[str] = Field(min_length=1, max_length=10000)
+    exclusions: List[Dict] = Field(default_factory=list)
+
+    @field_validator("membership_point_ids")
+    @classmethod
+    def membership_ids_must_be_unique_and_nonblank(cls, value: List[str]) -> List[str]:
+        normalized = [point_id.strip() for point_id in value]
+        if any(not point_id for point_id in normalized) or len(set(normalized)) != len(normalized):
+            raise ValueError("membership_point_ids must be unique nonblank identifiers")
+        return normalized
+
+
+class AlignedUmapRelationRequest(BaseModel):
+    from_slice_id: str = Field(min_length=1, max_length=255)
+    to_slice_id: str = Field(min_length=1, max_length=255)
+    source_point_id: str = Field(min_length=1, max_length=255)
+    target_point_id: str = Field(min_length=1, max_length=255)
+    relation_type: str = Field(min_length=1, max_length=128)
+    authority_provenance: Dict
+
+
+class AlignedUmapRunRequest(BaseModel):
+    baseline_projection_id: str = Field(min_length=1, max_length=255)
+    baseline_embedding_set_id: str = Field(min_length=1, max_length=255)
+    corpus_snapshot_id: str = Field(min_length=1, max_length=255)
+    dimensions: int = Field(ge=2, le=3)
+    parameters: Dict
+    method_version: str = Field(min_length=1, max_length=255)
+    slices: List[AlignedUmapSliceRequest] = Field(min_length=2, max_length=100)
+    relations: List[AlignedUmapRelationRequest] = Field(min_length=1, max_length=100000)
+    created_by: Optional[str] = Field(default=None, max_length=255)
+
+    @model_validator(mode="after")
+    def requires_complete_consecutive_relation_scope(self):
+        slice_ids = [item.slice_id for item in self.slices]
+        slice_orders = [item.slice_order for item in self.slices]
+        if len(set(slice_ids)) != len(slice_ids) or len(set(slice_orders)) != len(slice_orders):
+            raise ValueError("aligned slices require unique IDs and orders")
+        slices_by_id = {item.slice_id: item for item in self.slices}
+        relation_pairs = set()
+        for relation in self.relations:
+            source_slice = slices_by_id.get(relation.from_slice_id)
+            target_slice = slices_by_id.get(relation.to_slice_id)
+            if not source_slice or not target_slice:
+                raise ValueError("aligned relations must reference declared slices")
+            if target_slice.slice_order != source_slice.slice_order + 1:
+                raise ValueError("aligned relations must join consecutive slices")
+            if relation.source_point_id not in source_slice.membership_point_ids or relation.target_point_id not in target_slice.membership_point_ids:
+                raise ValueError("aligned relation points must belong to their declared slices")
+            relation_pairs.add((relation.from_slice_id, relation.to_slice_id))
+        ordered_slices = sorted(self.slices, key=lambda item: item.slice_order)
+        for source_slice, target_slice in zip(ordered_slices, ordered_slices[1:]):
+            if (source_slice.slice_id, target_slice.slice_id) not in relation_pairs:
+                raise ValueError("every consecutive slice pair requires at least one explicit relation")
+        return self
+
+
+class AlignedUmapValidationRequest(BaseModel):
+    reviewer: str = Field(min_length=1, max_length=255)
+
+
+class ReducerCheckpointRequest(BaseModel):
+    embedding_set_id: str = Field(min_length=1, max_length=255)
+    projection_id: str = Field(min_length=1, max_length=255)
+    dimensions: int = Field(ge=2, le=3)
+    serialization_format: str = Field(min_length=1, max_length=64)
+    checksum: str = Field(min_length=16, max_length=128)
+    corpus_snapshot_id: str = Field(min_length=1, max_length=255)
+    retained_location: str = Field(min_length=1)
+    created_by: Optional[str] = Field(default=None, max_length=255)
+
+
+class ReducerCompatibilityReviewRequest(BaseModel):
+    validation_method: str = Field(min_length=1, max_length=255)
+    result: Literal["passed", "failed"]
+    reviewer: str = Field(min_length=1, max_length=255)
+    notes: Optional[str] = None
+
+
+class ReducerAvailabilityRequest(BaseModel):
+    embedding_set_id: str = Field(min_length=1, max_length=255)
+    projection_id: str = Field(min_length=1, max_length=255)
+    dimensions: int = Field(ge=2, le=3)
+    corpus_snapshot_id: str = Field(min_length=1, max_length=255)
+
+
+class ProjectionFidelityRequest(BaseModel):
+    focal_chunk_ids: List[str] = Field(min_length=1, max_length=100)
+    neighbourhood_size: int = Field(default=10, ge=2, le=50)
+
+
+class VisualInquiryRequest(BaseModel):
+    researcher: Optional[str] = Field(default=None, max_length=255)
+    view: str = Field(min_length=1, max_length=64)
+    question: Optional[str] = None
+    note: Optional[str] = None
+    corpus_release: Optional[str] = Field(default=None, max_length=255)
+    source_scope: Optional[str] = None
+    projection_id: Optional[str] = Field(default=None, max_length=255)
+    embedding_set_id: Optional[str] = Field(default=None, max_length=255)
+    workspace: Dict
+
+
+class VisualCohortRequest(BaseModel):
+    inquiry_id: Optional[str] = Field(default=None, max_length=255)
+    researcher: Optional[str] = Field(default=None, max_length=255)
+    name: str = Field(min_length=1, max_length=255)
+    definition: Dict
+    point_ids: List[str] = Field(default_factory=list, max_length=10000)
+    projection_id: Optional[str] = Field(default=None, max_length=255)
+    embedding_set_id: Optional[str] = Field(default=None, max_length=255)
+
+
+class VisualAnnotationRequest(BaseModel):
+    inquiry_id: Optional[str] = Field(default=None, max_length=255)
+    document_id: Optional[str] = Field(default=None, max_length=255)
+    chunk_id: Optional[str] = Field(default=None, max_length=255)
+    annotation_type: str = Field(min_length=1, max_length=64)
+    value: Dict
+    evidence_source: Optional[str] = Field(default=None, max_length=255)
+    reviewer: Optional[str] = Field(default=None, max_length=255)
+    status: Literal["draft", "reviewed", "contested"] = "draft"
+
+    @model_validator(mode="after")
+    def requires_source_identifier(self):
+        if not self.document_id and not self.chunk_id:
+            raise ValueError("A document_id or chunk_id is required for a visual annotation.")
+        return self
 
 
 class UmapChallengeRequest(BaseModel):
@@ -112,6 +282,10 @@ class UmapChallengeRequest(BaseModel):
 
 def _semantic_point_payload(row) -> dict:
     concepts = _extract_key_concepts(row.key_concepts)
+    authority_data = _mapping_value(getattr(row, "authority_data", None))
+    archive_record_pid = authority_data.get("archive_record_pid") or getattr(row, "archive_record_id", None)
+    record_public_uri = authority_data.get("record_public_uri") or authority_data.get("public_uri")
+    archive_context_available = bool(archive_record_pid or record_public_uri)
     return {
         "id": row.chunk_id,
         "document_id": row.document_id,
@@ -120,6 +294,13 @@ def _semantic_point_payload(row) -> dict:
         "title": row.title or "Untitled trace",
         "year": int(row.year) if row.year is not None else None,
         "source_type": _infer_source_type(row.file_type, row.chunk_type, row.citation),
+        "documentary_form": {
+            "file_type": row.file_type or "not_exposed",
+            "chunk_type": row.chunk_type or "not_exposed",
+            "extraction_state": "represented_extracted_text" if row.chunk_text else "represented_without_extracted_text",
+            "rights_access_state": "not_exposed",
+            "metadata_completeness": "not_evaluated",
+        },
         "themes": concepts,
         "excerpt": _clean_excerpt(row.chunk_text),
         "source_page": row.source_page,
@@ -127,7 +308,49 @@ def _semantic_point_payload(row) -> dict:
         "similarity": round(float(row.similarity), 5),
         "x": float(row.x) if row.x is not None else None,
         "y": float(row.y) if row.y is not None else None,
+        "evidence_surface": {
+            "is_ingested": True,
+            "has_embedding": True,
+            "has_extracted_text": bool(row.chunk_text),
+            "has_pdf": None,
+            "has_image_assets": None,
+            "has_authority_context": archive_context_available,
+            "requires_docling_or_ocr": False,
+            "visibility_label": "represented_embedded",
+            "representation_state": "represented_in_completed_embedding_set",
+            "interpretation_limit": "Representation in this computational surface is not evidence of archival completeness or historical significance.",
+        },
+        "missingness": {
+            "status": "not_recorded",
+            "interpretation_limits": ["No missingness event is currently attached to this represented point."],
+        },
+        "archive_authority_context": {
+            "availability": "available" if archive_context_available else "not_exposed",
+            "archive_record_pid": archive_record_pid,
+            "record_public_uri": record_public_uri,
+            "classification": "archive linkage metadata, not documentary evidence",
+        },
+        "database_authority_context": [],
+        "annotation_summary": {"status": "not_available"},
+        "provenance": {
+            "embedding_status": "embedded",
+            "embedding_set_membership": "completed",
+            "source_excerpt_policy": "bounded_excerpt",
+            "database_authority_context_status": "not_exposed",
+        },
     }
+
+
+def _mapping_value(value: Any) -> Dict:
+    if isinstance(value, Mapping):
+        return dict(value)
+    if isinstance(value, str):
+        try:
+            decoded = json.loads(value)
+            return dict(decoded) if isinstance(decoded, Mapping) else {}
+        except json.JSONDecodeError:
+            return {}
+    return {}
 
 
 def _semantic_neighbour_query(where_clause: str, citation_select: str) -> str:
@@ -135,7 +358,7 @@ def _semantic_neighbour_query(where_clause: str, citation_select: str) -> str:
         SELECT
             dc.document_id, dc.chunk_id, d.pid, d.title,
             COALESCE(dc.publication_year, d.publication_year) AS year,
-            d.file_type, dc.chunk_type, {citation_select}, dc.key_concepts,
+            d.file_type, d.authority_data, d.archive_record_id, dc.chunk_type, {citation_select}, dc.key_concepts,
             dc.chunk_text, dc.source_page, dc.source_section,
             pp.x, pp.y, {where_clause} AS similarity
         FROM semantic_chunk_embeddings sce
@@ -719,6 +942,18 @@ def _get_database_scope_counts(db) -> Dict:
                 """
             )
         ).fetchone()
+    active_corpus_counts = db.execute(
+        text(
+            """
+            SELECT
+                COUNT(*) FILTER (WHERE search_tsv IS NOT NULL) AS fts_chunks,
+                COUNT(DISTINCT document_id) FILTER (WHERE search_tsv IS NOT NULL) AS fts_documents
+            FROM document_chunks
+            WHERE corpus_version = :corpus_version
+            """
+        ),
+        {"corpus_version": settings.TURIN_ARCHIVE_FIRST_CORPUS_VERSION},
+    ).fetchone()
 
     return {
         "total_documents": int(counts.total_documents or 0),
@@ -729,6 +964,9 @@ def _get_database_scope_counts(db) -> Dict:
         "image_like_documents": int(counts.image_like_documents or 0),
         "embedded_chunks": int(chunk_counts.embedded_chunks or 0) if chunk_counts else 0,
         "documents_represented_by_chunks": int(chunk_counts.documents_represented_by_chunks or 0) if chunk_counts else 0,
+        "active_corpus_version": settings.TURIN_ARCHIVE_FIRST_CORPUS_VERSION,
+        "active_fts_chunks": int(active_corpus_counts.fts_chunks or 0),
+        "active_fts_documents": int(active_corpus_counts.fts_documents or 0),
     }
 
 
@@ -741,9 +979,17 @@ def _build_evidence_surface_scope(point_type: str, total_candidates: int, return
         "documents_with_embeddings": db_counts["documents_with_embeddings"],
         "embedded_chunks": db_counts["embedded_chunks"],
         "documents_represented_by_chunks": db_counts["documents_represented_by_chunks"],
+        "active_corpus_version": db_counts["active_corpus_version"],
+        "active_fts_chunks": db_counts["active_fts_chunks"],
+        "active_fts_documents": db_counts["active_fts_documents"],
         "distinct_pids_represented": distinct_pids,
         "total_candidates": total_candidates,
         "returned_points": returned_points,
+        "eligible_count": total_candidates,
+        "represented_count": total_candidates,
+        "rendered_count": returned_points,
+        "visible_count": returned_points,
+        "rendering_policy": "The API returns the requested bounded point set. Client-side filters may reduce visible_count; no rendered subset represents the complete evidence surface.",
         "point_type": point_type,
         "scope_note": "This projection represents the current ML-ingested evidence surface, not the total DDR archive.",
     }
@@ -789,8 +1035,196 @@ def _get_completed_semantic_atlas_projection(db):
             LIMIT 1
         """)).mappings().first()
     except Exception:
+        db.rollback()
         logger.info("Completed Semantic Atlas projection is not available; using legacy projection path")
         return None
+
+
+def _serialize_visual_inquiry(inquiry: VisualInquiry) -> Dict:
+    return {
+        "inquiry_id": inquiry.inquiry_id,
+        "researcher": inquiry.researcher,
+        "view": inquiry.view,
+        "question": inquiry.question,
+        "note": inquiry.note,
+        "corpus_release": inquiry.corpus_release,
+        "source_scope": inquiry.source_scope,
+        "projection_id": inquiry.projection_id,
+        "embedding_set_id": inquiry.embedding_set_id,
+        "workspace": inquiry.workspace_json,
+        "created_at": inquiry.created_at.isoformat() if inquiry.created_at else None,
+        "updated_at": inquiry.updated_at.isoformat() if inquiry.updated_at else None,
+    }
+
+
+def _serialize_visual_cohort(cohort: VisualCohort) -> Dict:
+    return {
+        "cohort_id": cohort.cohort_id,
+        "inquiry_id": cohort.inquiry_id,
+        "researcher": cohort.researcher,
+        "name": cohort.name,
+        "definition": cohort.definition_json,
+        "point_ids": cohort.point_ids_json,
+        "projection_id": cohort.projection_id,
+        "embedding_set_id": cohort.embedding_set_id,
+        "version": cohort.version,
+        "created_at": cohort.created_at.isoformat() if cohort.created_at else None,
+    }
+
+
+def _serialize_visual_annotation(annotation: VisualAnnotation) -> Dict:
+    return {
+        "annotation_id": annotation.annotation_id, "inquiry_id": annotation.inquiry_id,
+        "document_id": annotation.document_id, "chunk_id": annotation.chunk_id,
+        "annotation_type": annotation.annotation_type, "value": annotation.value_json,
+        "evidence_source": annotation.evidence_source, "reviewer": annotation.reviewer,
+        "owner_id": annotation.owner_id,
+        "status": annotation.status, "created_at": annotation.created_at.isoformat() if annotation.created_at else None,
+    }
+
+
+def _can_revise_visual_annotation(annotation: VisualAnnotation, user: Optional[Dict]) -> bool:
+    if not annotation.owner_id:
+        return True
+    if not user or not user.get("user_id"):
+        return False
+    if user["user_id"] == annotation.owner_id:
+        return True
+    return bool({"annotations:review", "visual:review"}.intersection(user.get("permissions", [])))
+
+
+@router.post("/annotations", status_code=201)
+async def create_visual_annotation(request: VisualAnnotationRequest, user: Optional[Dict] = Depends(get_optional_user)):
+    db = LocalSessionLocal()
+    try:
+        annotation_id = f"visual-annotation-{uuid.uuid4().hex[:12]}"
+        owner_id = user.get("user_id") if user else request.reviewer
+        reviewer = user.get("email") or user.get("user_id") if user else request.reviewer
+        annotation = VisualAnnotation(annotation_id=annotation_id, inquiry_id=request.inquiry_id, document_id=request.document_id, chunk_id=request.chunk_id, annotation_type=request.annotation_type, value_json=request.value, evidence_source=request.evidence_source, reviewer=reviewer, owner_id=owner_id, status=request.status)
+        db.add(annotation)
+        db.add(VisualAnnotationRevision(annotation_id=annotation_id, revision=1, snapshot_json=request.model_dump(), reviewer=reviewer))
+        db.commit()
+        db.refresh(annotation)
+        return _serialize_visual_annotation(annotation)
+    finally:
+        db.close()
+
+
+@router.get("/annotations/{annotation_id}")
+async def get_visual_annotation(annotation_id: str):
+    db = LocalSessionLocal()
+    try:
+        annotation = db.query(VisualAnnotation).filter(VisualAnnotation.annotation_id == annotation_id).first()
+        if not annotation:
+            raise HTTPException(status_code=404, detail="Visual annotation not found.")
+        return _serialize_visual_annotation(annotation)
+    finally:
+        db.close()
+
+
+@router.put("/annotations/{annotation_id}")
+async def revise_visual_annotation(annotation_id: str, request: VisualAnnotationRequest, user: Optional[Dict] = Depends(get_optional_user)):
+    db = LocalSessionLocal()
+    try:
+        annotation = db.query(VisualAnnotation).filter(VisualAnnotation.annotation_id == annotation_id).first()
+        if not annotation:
+            raise HTTPException(status_code=404, detail="Visual annotation not found.")
+        if not _can_revise_visual_annotation(annotation, user):
+            raise HTTPException(status_code=403, detail="Only the annotation owner or an authorized reviewer can revise this annotation.")
+        revision = (db.query(func.max(VisualAnnotationRevision.revision)).filter(VisualAnnotationRevision.annotation_id == annotation_id).scalar() or 0) + 1
+        annotation.inquiry_id = request.inquiry_id
+        annotation.document_id = request.document_id
+        annotation.chunk_id = request.chunk_id
+        annotation.annotation_type = request.annotation_type
+        annotation.value_json = request.value
+        annotation.evidence_source = request.evidence_source
+        annotation.reviewer = user.get("email") or user.get("user_id") if user else request.reviewer
+        annotation.owner_id = annotation.owner_id or user.get("user_id") if user else annotation.owner_id
+        annotation.status = request.status
+        db.add(VisualAnnotationRevision(annotation_id=annotation_id, revision=revision, snapshot_json=request.model_dump(), reviewer=annotation.reviewer))
+        db.commit()
+        db.refresh(annotation)
+        return {**_serialize_visual_annotation(annotation), "revision": revision}
+    finally:
+        db.close()
+
+
+@router.get("/annotations/{annotation_id}/revisions")
+async def get_visual_annotation_revisions(annotation_id: str):
+    db = LocalSessionLocal()
+    try:
+        revisions = db.query(VisualAnnotationRevision).filter(VisualAnnotationRevision.annotation_id == annotation_id).order_by(VisualAnnotationRevision.revision).all()
+        if not revisions and not db.query(VisualAnnotation.id).filter(VisualAnnotation.annotation_id == annotation_id).first():
+            raise HTTPException(status_code=404, detail="Visual annotation not found.")
+        return {"annotation_id": annotation_id, "revisions": [{"revision": item.revision, "snapshot": item.snapshot_json, "reviewer": item.reviewer, "created_at": item.created_at.isoformat() if item.created_at else None} for item in revisions]}
+    finally:
+        db.close()
+
+
+@router.post("/cohorts", status_code=201)
+async def create_visual_cohort(request: VisualCohortRequest):
+    db = LocalSessionLocal()
+    try:
+        cohort = VisualCohort(
+            cohort_id=f"visual-cohort-{uuid.uuid4().hex[:12]}", inquiry_id=request.inquiry_id,
+            researcher=request.researcher.strip() if request.researcher else None, name=request.name.strip(),
+            definition_json=request.definition, point_ids_json=request.point_ids,
+            projection_id=request.projection_id, embedding_set_id=request.embedding_set_id,
+        )
+        db.add(cohort)
+        db.commit()
+        db.refresh(cohort)
+        return _serialize_visual_cohort(cohort)
+    finally:
+        db.close()
+
+
+@router.get("/cohorts/{cohort_id}")
+async def get_visual_cohort(cohort_id: str):
+    db = LocalSessionLocal()
+    try:
+        cohort = db.query(VisualCohort).filter(VisualCohort.cohort_id == cohort_id).first()
+        if not cohort:
+            raise HTTPException(status_code=404, detail="Visual cohort not found.")
+        return _serialize_visual_cohort(cohort)
+    finally:
+        db.close()
+
+
+@router.post("/inquiries", status_code=201)
+async def create_visual_inquiry(request: VisualInquiryRequest):
+    db = LocalSessionLocal()
+    try:
+        inquiry = VisualInquiry(
+            inquiry_id=f"visual-inquiry-{uuid.uuid4().hex[:12]}",
+            researcher=request.researcher.strip() if request.researcher else None,
+            view=request.view,
+            question=request.question,
+            note=request.note,
+            corpus_release=request.corpus_release,
+            source_scope=request.source_scope,
+            projection_id=request.projection_id,
+            embedding_set_id=request.embedding_set_id,
+            workspace_json=request.workspace,
+        )
+        db.add(inquiry)
+        db.commit()
+        db.refresh(inquiry)
+        return _serialize_visual_inquiry(inquiry)
+    finally:
+        db.close()
+
+
+@router.get("/inquiries/{inquiry_id}")
+async def get_visual_inquiry(inquiry_id: str):
+    db = LocalSessionLocal()
+    try:
+        inquiry = db.query(VisualInquiry).filter(VisualInquiry.inquiry_id == inquiry_id).first()
+        if not inquiry:
+            raise HTTPException(status_code=404, detail="Visual inquiry not found.")
+        return _serialize_visual_inquiry(inquiry)
+    finally:
+        db.close()
 
 
 @router.post("/semantic-neighbourhood")
@@ -818,15 +1252,95 @@ async def get_semantic_neighbourhood(request: SemanticNeighbourhoodRequest):
             "query_vector": focal["embedding"],
             "size": request.size + 1,
         }).fetchall()
-        points = [_semantic_point_payload(row) for row in rows if row.chunk_id != request.focal_chunk_id][:request.size]
+        focal_point = next(
+            (_semantic_point_payload(row) for row in rows if row.chunk_id == request.focal_chunk_id),
+            None,
+        )
+        points = [
+            {**_semantic_point_payload(row), "rank": rank}
+            for rank, row in enumerate(
+                (row for row in rows if row.chunk_id != request.focal_chunk_id),
+                start=1,
+            )
+        ][:request.size]
         return {
             "focal_chunk_id": request.focal_chunk_id,
+            "focal": focal_point,
             "neighbours": points,
             "metadata": {
                 "embedding_set_id": projection["embedding_set_id"],
                 "projection_id": projection["projection_id"],
-                "method": "cosine similarity in the completed embedding space",
+                "metric": "cosine similarity",
+                "requested_k": request.size,
+                "returned_k": len(points),
+                "k_bounds": {"min": 5, "max": 50, "step": 5},
+                "method": "Original-space cosine similarity in the completed embedding space. Display k changes the bounded neighbour set only; it does not recompute the stored UMAP projection.",
                 "interpretation_limit": "Computational proximity identifies passages for archival investigation; it does not establish a historical relationship.",
+            },
+        }
+    finally:
+        db.close()
+
+
+@router.post("/projection-fidelity")
+async def get_projection_fidelity(request: ProjectionFidelityRequest):
+    """Compare original-space and projected local neighbourhoods without altering stored coordinates."""
+    db = LocalSessionLocal()
+    try:
+        projection = _get_completed_semantic_atlas_projection(db)
+        if not projection:
+            raise HTTPException(status_code=404, detail="No completed Semantic Atlas projection is available.")
+        results = []
+        excluded_chunk_ids = []
+        for chunk_id in request.focal_chunk_ids:
+            focal = db.execute(text("""
+                SELECT embedding::text AS embedding
+                FROM semantic_chunk_embeddings
+                WHERE embedding_set_id = :embedding_set_id AND chunk_id = :chunk_id AND status = 'embedded'
+            """), {"embedding_set_id": projection["embedding_set_id"], "chunk_id": chunk_id}).mappings().first()
+            coordinates = db.execute(text("""
+                SELECT x, y
+                FROM semantic_atlas_projection_points
+                WHERE projection_id = :projection_id AND chunk_id = :chunk_id AND x IS NOT NULL AND y IS NOT NULL
+            """), {"projection_id": projection["projection_id"], "chunk_id": chunk_id}).mappings().first()
+            if not focal or not coordinates:
+                excluded_chunk_ids.append(chunk_id)
+                continue
+            original_rows = db.execute(text("""
+                SELECT chunk_id
+                FROM semantic_chunk_embeddings
+                WHERE embedding_set_id = :embedding_set_id AND status = 'embedded' AND chunk_id != :chunk_id
+                ORDER BY embedding <=> CAST(:query_vector AS vector)
+                LIMIT :size
+            """), {"embedding_set_id": projection["embedding_set_id"], "chunk_id": chunk_id, "query_vector": focal["embedding"], "size": request.neighbourhood_size}).mappings().all()
+            projected_rows = db.execute(text("""
+                SELECT chunk_id
+                FROM semantic_atlas_projection_points
+                WHERE projection_id = :projection_id AND chunk_id != :chunk_id AND x IS NOT NULL AND y IS NOT NULL
+                ORDER BY POWER(x - :x, 2) + POWER(y - :y, 2)
+                LIMIT :size
+            """), {"projection_id": projection["projection_id"], "chunk_id": chunk_id, "x": coordinates["x"], "y": coordinates["y"], "size": request.neighbourhood_size}).mappings().all()
+            original_ids = {row["chunk_id"] for row in original_rows}
+            projected_ids = {row["chunk_id"] for row in projected_rows}
+            union = original_ids | projected_ids
+            results.append({
+                "chunk_id": chunk_id,
+                "jaccard_overlap": round(len(original_ids & projected_ids) / len(union), 5) if union else None,
+                "original_neighbour_count": len(original_ids),
+                "projected_neighbour_count": len(projected_ids),
+            })
+        return {
+            "results": results,
+            "excluded_chunk_ids": excluded_chunk_ids,
+            "metadata": {
+                "projection_id": projection["projection_id"],
+                "embedding_set_id": projection["embedding_set_id"],
+                "method": "local Jaccard overlap between original cosine and projected Euclidean neighbourhood membership",
+                "original_space_metric": "cosine distance",
+                "projected_space_metric": "Euclidean distance in stored 2D coordinates",
+                "neighbourhood_size": request.neighbourhood_size,
+                "calculation_version": "projection-fidelity-jaccard-v1",
+                "interpretation_limit": "Neighbourhood preservation is a projection diagnostic, not historical confidence or evidential strength.",
             },
         }
     finally:
@@ -870,6 +1384,224 @@ async def run_critical_probe(request: CriticalProbeRequest):
                 "interpretation_limit": "Critical lens supplied by researcher. Computational proximity indicates material for investigation, not confirmation of the proposition.",
             },
         }
+    finally:
+        db.close()
+
+
+@router.post("/critical-probe-records", status_code=201)
+async def create_visual_critical_probe(request: VisualCriticalProbeRequest):
+    db = LocalSessionLocal()
+    try:
+        probe = VisualCriticalProbe(
+            probe_id=f"visual-probe-{uuid.uuid4().hex[:12]}", inquiry_id=request.inquiry_id,
+            researcher=request.researcher, label=request.label, probe_text=request.probe_text,
+            polarity=request.polarity, projection_id=request.projection_id,
+            embedding_set_id=request.embedding_set_id, retrieval_method=request.retrieval_method,
+            result_json=request.results,
+        )
+        db.add(probe)
+        db.commit()
+        db.refresh(probe)
+        return {"probe_id": probe.probe_id, "inquiry_id": probe.inquiry_id, "label": probe.label, "probe_text": probe.probe_text, "polarity": probe.polarity, "projection_id": probe.projection_id, "embedding_set_id": probe.embedding_set_id, "retrieval_method": probe.retrieval_method, "results": probe.result_json, "created_at": probe.created_at.isoformat() if probe.created_at else None}
+    finally:
+        db.close()
+
+
+@router.get("/critical-probe-records/{probe_id}")
+async def get_visual_critical_probe(probe_id: str):
+    db = LocalSessionLocal()
+    try:
+        probe = db.query(VisualCriticalProbe).filter(VisualCriticalProbe.probe_id == probe_id).first()
+        if not probe:
+            raise HTTPException(status_code=404, detail="Critical probe record not found.")
+        return {"probe_id": probe.probe_id, "inquiry_id": probe.inquiry_id, "label": probe.label, "probe_text": probe.probe_text, "polarity": probe.polarity, "projection_id": probe.projection_id, "embedding_set_id": probe.embedding_set_id, "retrieval_method": probe.retrieval_method, "results": probe.result_json, "created_at": probe.created_at.isoformat() if probe.created_at else None}
+    finally:
+        db.close()
+
+
+@router.post("/temporal-periods", status_code=201)
+async def create_visual_temporal_period(request: VisualTemporalPeriodRequest):
+    db = LocalSessionLocal()
+    try:
+        period = VisualTemporalPeriod(period_id=f"visual-period-{uuid.uuid4().hex[:12]}", label=request.label.strip(), start_year=request.start_year, end_year=request.end_year, authority_source=request.authority_source.strip(), certainty=request.certainty, notes=request.notes)
+        db.add(period)
+        db.commit()
+        db.refresh(period)
+        return {"period_id": period.period_id, "label": period.label, "start_year": period.start_year, "end_year": period.end_year, "authority_source": period.authority_source, "certainty": period.certainty, "notes": period.notes}
+    finally:
+        db.close()
+
+
+@router.get("/temporal-periods")
+async def list_visual_temporal_periods():
+    db = LocalSessionLocal()
+    try:
+        periods = db.query(VisualTemporalPeriod).order_by(VisualTemporalPeriod.start_year.nulls_last(), VisualTemporalPeriod.label).all()
+        return {"periods": [{"period_id": period.period_id, "label": period.label, "start_year": period.start_year, "end_year": period.end_year, "authority_source": period.authority_source, "certainty": period.certainty, "notes": period.notes} for period in periods]}
+    finally:
+        db.close()
+
+
+@router.post("/aligned-runs", status_code=201)
+async def create_aligned_umap_run(request: AlignedUmapRunRequest):
+    db = LocalSessionLocal()
+    try:
+        aligned_run_id = f"aligned-umap-{uuid.uuid4().hex[:12]}"
+        run = AlignedUmapRun(
+            aligned_run_id=aligned_run_id, baseline_projection_id=request.baseline_projection_id,
+            baseline_embedding_set_id=request.baseline_embedding_set_id, corpus_snapshot_id=request.corpus_snapshot_id,
+            dimensions=request.dimensions, parameters_json=request.parameters, method_version=request.method_version,
+            status="pending_validation", created_by=request.created_by,
+        )
+        db.add(run)
+        for item in request.slices:
+            db.add(AlignedUmapSlice(
+                slice_id=item.slice_id, aligned_run_id=aligned_run_id, slice_order=item.slice_order,
+                period_provenance_json=item.period_provenance, membership_query_json=item.membership_query,
+                membership_point_ids_json=item.membership_point_ids, point_count=len(item.membership_point_ids),
+                exclusions_json=item.exclusions,
+            ))
+        for item in request.relations:
+            db.add(AlignedUmapRelation(
+                relation_id=f"aligned-relation-{uuid.uuid4().hex[:12]}", aligned_run_id=aligned_run_id,
+                from_slice_id=item.from_slice_id, to_slice_id=item.to_slice_id,
+                source_point_id=item.source_point_id, target_point_id=item.target_point_id,
+                relation_type=item.relation_type, authority_provenance_json=item.authority_provenance,
+                validator_status="pending",
+            ))
+        db.commit()
+        return {"aligned_run_id": aligned_run_id, "baseline_projection_id": run.baseline_projection_id, "status": run.status, "slice_count": len(request.slices), "relation_count": len(request.relations)}
+    finally:
+        db.close()
+
+
+@router.post("/aligned-runs/{aligned_run_id}/validate")
+async def validate_aligned_umap_run(aligned_run_id: str, request: AlignedUmapValidationRequest):
+    db = LocalSessionLocal()
+    try:
+        run = db.query(AlignedUmapRun).filter(AlignedUmapRun.aligned_run_id == aligned_run_id).first()
+        if not run:
+            raise HTTPException(status_code=404, detail="Aligned UMAP run not found.")
+        slices = db.query(AlignedUmapSlice).filter(AlignedUmapSlice.aligned_run_id == aligned_run_id).order_by(AlignedUmapSlice.slice_order).all()
+        relations = db.query(AlignedUmapRelation).filter(AlignedUmapRelation.aligned_run_id == aligned_run_id).all()
+        diagnostics = []
+        slice_by_id = {item.slice_id: item for item in slices}
+        relation_counts = {}
+        if len(slices) < 2:
+            diagnostics.append("At least two persisted slices are required.")
+        for item in slices:
+            membership_ids = item.membership_point_ids_json or []
+            if item.point_count != len(membership_ids) or not membership_ids:
+                diagnostics.append(f"Slice {item.slice_id} has invalid resolved membership.")
+        for relation in relations:
+            source_slice = slice_by_id.get(relation.from_slice_id)
+            target_slice = slice_by_id.get(relation.to_slice_id)
+            valid = bool(source_slice and target_slice and target_slice.slice_order == source_slice.slice_order + 1 and relation.source_point_id in (source_slice.membership_point_ids_json or []) and relation.target_point_id in (target_slice.membership_point_ids_json or []) and relation.authority_provenance_json)
+            relation.validator_status = "valid" if valid else "invalid"
+            if not valid:
+                diagnostics.append(f"Relation {relation.relation_id} is not a valid explicit consecutive-slice mapping.")
+            else:
+                pair = (relation.from_slice_id, relation.to_slice_id)
+                relation_counts[pair] = relation_counts.get(pair, 0) + 1
+        for source_slice, target_slice in zip(slices, slices[1:]):
+            if not relation_counts.get((source_slice.slice_id, target_slice.slice_id)):
+                diagnostics.append(f"No valid relation maps {source_slice.slice_id} to consecutive slice {target_slice.slice_id}.")
+        status = "validated" if not diagnostics else "invalid"
+        run.status = status
+        coverage = {"slice_count": len(slices), "relation_count": len(relations), "valid_relation_pairs": [{"from_slice_id": source_id, "to_slice_id": target_id, "relation_count": count} for (source_id, target_id), count in relation_counts.items()]}
+        report = AlignedUmapValidationReport(
+            report_id=f"aligned-validation-{uuid.uuid4().hex[:12]}", aligned_run_id=aligned_run_id,
+            relation_coverage_json=coverage, exclusions_json=[item.exclusions_json or [] for item in slices],
+            diagnostics_json={"diagnostics": diagnostics}, reviewer=request.reviewer.strip(),
+        )
+        db.add(report)
+        db.commit()
+        return {"aligned_run_id": aligned_run_id, "status": status, "report_id": report.report_id, "relation_coverage": coverage, "diagnostics": diagnostics}
+    finally:
+        db.close()
+
+
+@router.get("/aligned-runs/{aligned_run_id}/static-comparison")
+async def get_aligned_umap_static_comparison(aligned_run_id: str):
+    db = LocalSessionLocal()
+    try:
+        run = db.query(AlignedUmapRun).filter(AlignedUmapRun.aligned_run_id == aligned_run_id).first()
+        if not run:
+            raise HTTPException(status_code=404, detail="Aligned UMAP run not found.")
+        if run.status != "validated":
+            raise HTTPException(status_code=409, detail="Aligned comparison is unavailable until explicit consecutive-slice relations pass validation.")
+        report = db.query(AlignedUmapValidationReport).filter(AlignedUmapValidationReport.aligned_run_id == aligned_run_id).order_by(AlignedUmapValidationReport.created_at.desc()).first()
+        slices = db.query(AlignedUmapSlice).filter(AlignedUmapSlice.aligned_run_id == aligned_run_id).order_by(AlignedUmapSlice.slice_order).all()
+        relations = db.query(AlignedUmapRelation).filter(AlignedUmapRelation.aligned_run_id == aligned_run_id, AlignedUmapRelation.validator_status == "valid").all()
+        return {
+            "aligned_run": {"aligned_run_id": run.aligned_run_id, "baseline_projection_id": run.baseline_projection_id, "baseline_embedding_set_id": run.baseline_embedding_set_id, "corpus_snapshot_id": run.corpus_snapshot_id, "dimensions": run.dimensions, "parameters": run.parameters_json, "method_version": run.method_version, "status": run.status},
+            "slices": [{"slice_id": item.slice_id, "slice_order": item.slice_order, "period_provenance": item.period_provenance_json, "membership_query": item.membership_query_json, "membership_point_ids": item.membership_point_ids_json, "point_count": item.point_count, "exclusions": item.exclusions_json} for item in slices],
+            "relations": [{"relation_id": item.relation_id, "from_slice_id": item.from_slice_id, "to_slice_id": item.to_slice_id, "source_point_id": item.source_point_id, "target_point_id": item.target_point_id, "relation_type": item.relation_type, "authority_provenance": item.authority_provenance_json} for item in relations],
+            "validation": {"report_id": report.report_id, "relation_coverage": report.relation_coverage_json, "exclusions": report.exclusions_json, "diagnostics": report.diagnostics_json, "reviewer": report.reviewer, "created_at": report.created_at.isoformat() if report and report.created_at else None} if report else None,
+            "interpretation_limit": "This static comparison exposes reviewed relation provenance between slices. It does not create aligned coordinates, historical trajectories, or causal claims.",
+        }
+    finally:
+        db.close()
+
+
+@router.post("/reducer-checkpoints", status_code=201)
+async def create_reducer_checkpoint(request: ReducerCheckpointRequest):
+    db = LocalSessionLocal()
+    try:
+        checkpoint = ReducerCheckpoint(
+            reducer_id=f"reducer-{uuid.uuid4().hex[:12]}", embedding_set_id=request.embedding_set_id,
+            projection_id=request.projection_id, dimensions=request.dimensions,
+            serialization_format=request.serialization_format, checksum=request.checksum,
+            corpus_snapshot_id=request.corpus_snapshot_id, retained_location=request.retained_location,
+            created_by=request.created_by, compatibility_status="unreviewed",
+        )
+        db.add(checkpoint)
+        db.commit()
+        return {"reducer_id": checkpoint.reducer_id, "compatibility_status": checkpoint.compatibility_status}
+    finally:
+        db.close()
+
+
+@router.post("/reducer-checkpoints/{reducer_id}/reviews", status_code=201)
+async def create_reducer_compatibility_review(reducer_id: str, request: ReducerCompatibilityReviewRequest):
+    db = LocalSessionLocal()
+    try:
+        checkpoint = db.query(ReducerCheckpoint).filter(ReducerCheckpoint.reducer_id == reducer_id).first()
+        if not checkpoint:
+            raise HTTPException(status_code=404, detail="Reducer checkpoint not found.")
+        review = ReducerCompatibilityReview(
+            review_id=f"reducer-review-{uuid.uuid4().hex[:12]}", reducer_id=reducer_id,
+            validation_method=request.validation_method, result=request.result,
+            reviewer=request.reviewer.strip(), notes=request.notes,
+        )
+        checkpoint.compatibility_status = "compatible" if request.result == "passed" else "incompatible"
+        db.add(review)
+        db.commit()
+        return {"review_id": review.review_id, "reducer_id": reducer_id, "result": review.result, "compatibility_status": checkpoint.compatibility_status}
+    finally:
+        db.close()
+
+
+@router.post("/reducer-checkpoints/availability")
+async def get_reducer_transform_availability(request: ReducerAvailabilityRequest):
+    db = LocalSessionLocal()
+    try:
+        checkpoint = db.query(ReducerCheckpoint).filter(
+            ReducerCheckpoint.embedding_set_id == request.embedding_set_id,
+            ReducerCheckpoint.projection_id == request.projection_id,
+            ReducerCheckpoint.dimensions == request.dimensions,
+            ReducerCheckpoint.corpus_snapshot_id == request.corpus_snapshot_id,
+            ReducerCheckpoint.compatibility_status == "compatible",
+        ).order_by(ReducerCheckpoint.created_at.desc()).first()
+        if not checkpoint:
+            return {"available": False, "reason": "No compatible retained reducer checkpoint matches this embedding, projection, dimension, and corpus scope."}
+        review = db.query(ReducerCompatibilityReview).filter(
+            ReducerCompatibilityReview.reducer_id == checkpoint.reducer_id,
+            ReducerCompatibilityReview.result == "passed",
+        ).order_by(ReducerCompatibilityReview.created_at.desc()).first()
+        if not review:
+            return {"available": False, "reason": "The matching reducer checkpoint has no passing compatibility review."}
+        return {"available": True, "reducer_id": checkpoint.reducer_id, "review_id": review.review_id, "serialization_format": checkpoint.serialization_format, "interpretation_limit": "Availability confirms recorded compatibility only. A transformed researcher proposition remains non-archival and is not documentary evidence."}
     finally:
         db.close()
 
@@ -1349,6 +2081,8 @@ async def get_umap_projection(
                 d.filename,
                 d.pdf_count,
                 (NULLIF(BTRIM(COALESCE(d.extracted_text, '')), '') IS NOT NULL) AS has_document_extracted_text,
+                LENGTH(NULLIF(BTRIM(COALESCE(d.extracted_text, '')), '')) AS document_text_length,
+                (SELECT COUNT(*) FROM document_chunks document_chunk WHERE document_chunk.document_id = dc.document_id) AS document_chunk_count,
                 (NULLIF(BTRIM(COALESCE(d.authority_data::text, '')), '') IS NOT NULL) AS has_authority_context,
                 d.has_diagrams,
                 dc.chunk_type,
@@ -1404,6 +2138,8 @@ async def get_umap_projection(
                     "excerpt": row.excerpt,
                     "filename": row.filename,
                     "pdf_count": int(row.pdf_count or 0),
+                    "document_text_length": int(row.document_text_length or 0),
+                    "document_chunk_count": int(row.document_chunk_count or 0),
                     "has_diagrams": int(row.has_diagrams or 0),
                     "document_extracted_text": "available" if row.has_document_extracted_text else None,
                     "authority_data": "available" if row.has_authority_context else None,
@@ -1434,6 +2170,15 @@ async def get_umap_projection(
                     "confidence": record["confidence"],
                     "drift_score": record["drift_score"],
                     "excerpt": record["excerpt"],
+                    "documentary_form": {
+                        "file_type": row.file_type or "not_exposed",
+                        "chunk_type": row.chunk_type or "not_exposed",
+                        "extraction_state": "represented_extracted_text" if row.has_chunk_text else "represented_without_extracted_text",
+                        "rights_access_state": "not_exposed",
+                        "metadata_completeness": "not_evaluated",
+                        "document_text_length": record["document_text_length"],
+                        "document_chunk_count": record["document_chunk_count"],
+                    },
                     "evidence_surface": evidence_surface,
                     "missingness": missingness,
                     }

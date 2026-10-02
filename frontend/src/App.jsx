@@ -1,8 +1,9 @@
-import { Suspense, lazy, useState } from 'react'
+import { Suspense, lazy, useEffect, useState } from 'react'
 import { useAuth0 } from '@auth0/auth0-react'
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { Theme, Loading } from '@carbon/react'
 import AppShell from './components/AppShell/AppShell'
+import { configureAccessTokenProvider } from './api/client'
 
 const Dashboard = lazy(() => import('./pages/Dashboard/Dashboard'))
 const CorpusExplorer = lazy(() => import('./pages/CorpusExplorer/CorpusExplorer'))
@@ -19,7 +20,12 @@ const LoginPage = lazy(() => import('./components/Auth/LoginPage'))
 
 function App() {
   const [theme, setTheme] = useState('g100')
-  const { isAuthenticated, isLoading } = useAuth0()
+  const { getAccessTokenSilently, isAuthenticated, isLoading } = useAuth0()
+
+  useEffect(() => {
+    configureAccessTokenProvider(getAccessTokenSilently)
+    return () => configureAccessTokenProvider(null)
+  }, [getAccessTokenSilently])
 
   const routeFallback = (
     <div className="app-loading-state">
