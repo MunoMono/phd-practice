@@ -384,6 +384,125 @@ class EvidencePipelineTests(unittest.TestCase):
         self.assertEqual(result["status"], "CONFLICTING_EVIDENCE")
         self.assertEqual(result["supporting_evidence_ids"], ["ev:1", "ev:2"])
 
+    def test_qualified_analytical_comparison_maps_independent_documentary_claims(self):
+        evidence_map = {
+            "DIRECT_DOCUMENTARY": [
+                {
+                    "source_id": "source-1", "evidence_card_id": "ev:1",
+                    "claim": "The scientific method is a cyclic process linking evidence and theories.",
+                },
+                {
+                    "source_id": "source-2", "evidence_card_id": "ev:2",
+                    "claim": "Systems thinking describes feedback loops in science and design.",
+                },
+            ],
+            "EVIDENCE_CARDS": [
+                {"evidence_card_id": "ev:1", "source_id": "source-1", "evidence_type": "DIRECT_DOCUMENTARY"},
+                {"evidence_card_id": "ev:2", "source_id": "source-2", "evidence_type": "DIRECT_DOCUMENTARY"},
+            ],
+            "CONTEXTUAL": [], "CROSS_SOURCE_INFERENCE": [], "NOT_ESTABLISHED": [],
+        }
+        plan = compile_final_claim_plan(evidence_map, {"cross_source_inferences": []}, [])
+        comparison = NarrativeClaim(
+            text=(
+                "Read comparatively as a qualified interpretation of these passages, "
+                "the scientific method is presented as cyclic, while systems thinking "
+                "is described through feedback loops."
+            ),
+            claim_ids=["c1", "c2"], paragraph=1,
+        )
+
+        result = validate_rendered_claim_support([comparison], plan)[0]
+
+        self.assertEqual(result["status"], "QUALIFIED_ANALYTICAL_SYNTHESIS")
+        self.assertEqual(result["claim_classification"], "QUALIFIED_ANALYTICAL_SYNTHESIS")
+        self.assertEqual(result["supporting_source_ids"], ["source-1", "source-2"])
+        self.assertEqual(result["supporting_evidence_ids"], ["ev:1", "ev:2"])
+        self.assertEqual(
+            [item["claim_id"] for item in result["supporting_propositions"]],
+            ["c1", "c2"],
+        )
+        self.assertEqual(result["reasons"], [])
+
+    def test_analytical_comparison_requires_independent_documentary_sources(self):
+        evidence_map = {
+            "DIRECT_DOCUMENTARY": [
+                {"source_id": "source-1", "evidence_card_id": "ev:1", "claim": "The method is cyclic."},
+                {"source_id": "source-1", "evidence_card_id": "ev:2", "claim": "The model uses feedback."},
+            ],
+            "EVIDENCE_CARDS": [
+                {"evidence_card_id": "ev:1", "source_id": "source-1", "evidence_type": "DIRECT_DOCUMENTARY"},
+                {"evidence_card_id": "ev:2", "source_id": "source-1", "evidence_type": "DIRECT_DOCUMENTARY"},
+            ],
+            "CONTEXTUAL": [], "CROSS_SOURCE_INFERENCE": [], "NOT_ESTABLISHED": [],
+        }
+        plan = compile_final_claim_plan(evidence_map, {"cross_source_inferences": []}, [])
+        comparison = NarrativeClaim(
+            text=(
+                "Read comparatively as a qualified interpretation of these records, "
+                "the method is cyclic while the model uses feedback."
+            ),
+            claim_ids=["c1", "c2"], paragraph=1,
+        )
+
+        result = validate_rendered_claim_support([comparison], plan)[0]
+
+        self.assertEqual(result["status"], "INSUFFICIENT_EVIDENCE")
+        self.assertIn(
+            "qualified analytical synthesis requires at least two distinct source records",
+            result["reasons"],
+        )
+
+    def test_analytical_comparison_blocks_unsupported_historical_relations(self):
+        evidence_map = {
+            "DIRECT_DOCUMENTARY": [
+                {"source_id": "source-1", "evidence_card_id": "ev:1", "claim": "The method is cyclic."},
+                {"source_id": "source-2", "evidence_card_id": "ev:2", "claim": "The model uses feedback."},
+            ],
+            "EVIDENCE_CARDS": [
+                {"evidence_card_id": "ev:1", "source_id": "source-1", "evidence_type": "DIRECT_DOCUMENTARY"},
+                {"evidence_card_id": "ev:2", "source_id": "source-2", "evidence_type": "DIRECT_DOCUMENTARY"},
+            ],
+            "CONTEXTUAL": [], "CROSS_SOURCE_INFERENCE": [], "NOT_ESTABLISHED": [],
+        }
+        plan = compile_final_claim_plan(evidence_map, {"cross_source_inferences": []}, [])
+        comparison = NarrativeClaim(
+            text=(
+                "Read comparatively as an interpretation of these records, "
+                "the first influenced the second and the department adopted its model."
+            ),
+            claim_ids=["c1", "c2"], paragraph=1,
+        )
+
+        result = validate_rendered_claim_support([comparison], plan)[0]
+
+        self.assertEqual(result["status"], "INSUFFICIENT_EVIDENCE")
+        self.assertEqual(result["claim_classification"], "UNSUPPORTED_HISTORICAL_CLAIM")
+        self.assertTrue(any("influence" in reason for reason in result["reasons"]))
+        self.assertTrue(any("institutional adoption" in reason for reason in result["reasons"]))
+
+    def test_negative_historical_relationship_limit_is_not_blocked(self):
+        evidence_map = {
+            "DIRECT_DOCUMENTARY": [
+                {"source_id": "source-1", "evidence_card_id": "ev:1", "claim": "Both names occur in the records."},
+            ],
+            "EVIDENCE_CARDS": [
+                {"evidence_card_id": "ev:1", "source_id": "source-1", "evidence_type": "DIRECT_DOCUMENTARY"},
+            ],
+            "CONTEXTUAL": [], "CROSS_SOURCE_INFERENCE": [], "NOT_ESTABLISHED": [],
+        }
+        plan = compile_final_claim_plan(evidence_map, {"cross_source_inferences": []}, [])
+        limit = NarrativeClaim(
+            text="The passages do not establish collaboration.",
+            claim_ids=["c1"], paragraph=1,
+        )
+
+        result = validate_rendered_claim_support([limit], plan)[0]
+
+        self.assertEqual(result["status"], "SUPPORTED")
+        self.assertEqual(result["claim_classification"], "DIRECT_DOCUMENTARY_CLAIM")
+        self.assertEqual(result["reasons"], [])
+
     def test_rendered_temporal_claim_retains_qualification(self):
         evidence_map = {
             "DIRECT_DOCUMENTARY": [{

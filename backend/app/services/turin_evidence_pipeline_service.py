@@ -805,6 +805,44 @@ def filter_prose_evidence_label_violations(
     return accepted, violations
 
 
+def _unsupported_historical_relationships(
+    rendered_text: str, support_text: str
+) -> list[tuple[str, str]]:
+    relationship_patterns = {
+        "collaboration": r"\bcollaborat\w*\b|\bco[- ]authored\b",
+        "authorship": r"\bauthored\b|\bauthorship\b|\bauthored by\b|\bwritten by\b",
+        "leadership": r"\bproject lead\b|\bled by\b|\bleadership\b",
+        "funding": r"\bfunded by\b|\bfunder\b|\bfunding\b",
+        "influence": r"\binfluenc\w*\b",
+        "causation": (
+            r"\bcaus\w*\b|\bresult(?:ed|ing)? in\b|\bcaused by\b|\bled to\b|"
+            r"\bresponsible for\b|\bcontribut\w* to\b|\bgave rise to\b"
+        ),
+        "intention": (
+            r"\bintention\w*\b|\bintended\b|\bdeliberately\b|\baimed to\b|"
+            r"\bsought to\b|\bpurpose\b"
+        ),
+        "institutional adoption": r"\badopted\b|\bintegrated\b|\binstitution-wide\b|\bdepartment-wide\b",
+        "consensus": r"\bconsensus\b|\bagreed\b|\bagreement\b",
+    }
+    negation_pattern = re.compile(
+        r"\b(?:does not|do not|did not|cannot|never|no evidence of|"
+        r"not established|not evidence of|without)\b(?:\W+\w+){0,4}\W*$",
+        re.IGNORECASE,
+    )
+    issues = []
+    for sentence in re.split(r"(?<=[.!?])\s+", rendered_text):
+        for relationship, pattern in relationship_patterns.items():
+            match = re.search(pattern, sentence, re.IGNORECASE)
+            if match is None:
+                continue
+            if negation_pattern.search(sentence[:match.start()]):
+                continue
+            if not re.search(pattern, support_text, re.IGNORECASE):
+                issues.append((relationship, sentence))
+    return issues
+
+
 def validate_rendered_claim_support(
     claims: list[NarrativeClaim | SynthesisClaim], claim_plan: FinalClaimPlan
 ) -> list[dict[str, Any]]:
@@ -828,7 +866,49 @@ def validate_rendered_claim_support(
             for term in terms:
                 if term in rendered_text and term not in support_text:
                     reasons.append(f"unsupported {category} assertion: {term}")
+        unsupported_relationships = _unsupported_historical_relationships(
+            rendered_text, support_text,
+        )
+        for relationship, sentence in unsupported_relationships:
+            reasons.append(
+                f"unsupported historical {relationship} assertion: {sentence.strip()}"
+            )
         claim_types = {item.claim_type for item in bound}
+        analytical_markers = re.compile(
+            r"\b(?:qualified|analytical|interpretive|interpretation|"
+            r"comparative reading|read comparatively|read together|"
+            r"can be read|may be read|as a comparison)\b",
+            re.IGNORECASE,
+        )
+        analytical_comparison = bool(analytical_markers.search(rendered_text))
+        if analytical_comparison:
+            if any(item.claim_type != "DIRECT_DOCUMENTARY" for item in bound):
+                reasons.append(
+                    "qualified analytical synthesis must use independently supported documentary claims"
+                )
+            if any(
+                not item.supporting_source_ids
+                or not item.supporting_evidence_card_ids
+                or item.evidence_status not in {"SUPPORTED", "SUPPORTED_WITH_QUALIFICATION"}
+                for item in bound
+            ):
+                reasons.append(
+                    "qualified analytical synthesis has a proposition without validated source and evidence provenance"
+                )
+            if len({source_id for item in bound for source_id in item.supporting_source_ids}) < 2:
+                reasons.append(
+                    "qualified analytical synthesis requires at least two distinct source records"
+                )
+            if not re.search(
+                r"\b(?:whereas|while|by contrast|in contrast|compared with|"
+                r"read together|read comparatively|comparison|different formulations|"
+                r"both|rather than)\b",
+                rendered_text,
+                re.IGNORECASE,
+            ):
+                reasons.append(
+                    "analytical interpretation must state an explicit comparison between propositions"
+                )
         invalid_type = bool(
             ("RETROSPECTIVE_TESTIMONY" in claim_types and "recalled" not in support_text and "recalled" in rendered_text)
             or ("DATABASE_AUTHORITY" not in claim_types and "database authority" in rendered_text)
@@ -844,14 +924,21 @@ def validate_rendered_claim_support(
         status = (
             "INVALID_EVIDENCE_TYPE" if invalid_type
             else "INSUFFICIENT_EVIDENCE" if reasons
+            else "QUALIFIED_ANALYTICAL_SYNTHESIS" if analytical_comparison
             else "CONFLICTING_EVIDENCE" if conflicting
             else "SUPPORTED_WITH_QUALIFICATION" if qualified
             else "SUPPORTED"
+        )
+        claim_classification = (
+            "UNSUPPORTED_HISTORICAL_CLAIM" if unsupported_relationships
+            else "QUALIFIED_ANALYTICAL_SYNTHESIS" if analytical_comparison and not reasons
+            else "DIRECT_DOCUMENTARY_CLAIM"
         )
         results.append({
             "paragraph": claim.paragraph,
             "claim_ids": list(claim.claim_ids),
             "status": status,
+            "claim_classification": claim_classification,
             "supporting_evidence_ids": sorted({
                 evidence_id for item in bound for evidence_id in item.supporting_evidence_card_ids
             }),
@@ -861,6 +948,15 @@ def validate_rendered_claim_support(
             "supporting_authority_ids": sorted({
                 authority_id for item in bound for authority_id in item.supporting_authority_ids
             }),
+            "supporting_propositions": [
+                {
+                    "claim_id": item.claim_id,
+                    "proposition": item.proposition or item.text,
+                    "source_ids": list(item.supporting_source_ids),
+                    "evidence_card_ids": list(item.supporting_evidence_card_ids),
+                }
+                for item in bound
+            ] if analytical_comparison else [],
             "reasons": reasons,
         })
     return results
@@ -2747,6 +2843,7 @@ class StagedEvidencePipeline:
                     else "\nWrite three or four coherent research-answer paragraphs from the validated source ledger below. "
                 )
                 + "Use precise, formal scholarly prose appropriate to a peer-reviewed design-research article. Begin with a direct answer to the research question, then develop its main themes and implications. Synthesize related propositions into an argument; do not list excerpts, describe the retrieval process, or say merely that the document addresses the question. "
+                "When comparing propositions from distinct records analytically, explicitly qualify the comparison as an interpretation of those passages, bind the paragraph to the supporting claim IDs, and do not infer historical relationships absent from the ledger. "
                 + ("For a broad named-document or archive-scope overview, write exactly two paragraphs with exactly three evidence-bounded sentences in each: the first should establish the source's central diagnosis or orientation; the second should explain its organisational, methodological, evaluative, or practical implications. Each sentence must name supporting final claim-plan claim_ids. " if document_content_question else "")
                 + electrohome_overview_instruction
                 + "Verbalize only claims in FINAL CLAIM PLAN and retain their evidence class and limits. Use the canonical ledger only to resolve those claim references. Do not claim that contextual evidence is direct documentary proof. "
@@ -2900,6 +2997,8 @@ class StagedEvidencePipeline:
                     "Return JSON with only a `prose` array and exactly one complete paragraph per move in the supplied order. "
                     "Each array item has only `text`; do not return citations, identifiers, source labels, headings, quotations, catalogue strings, or metadata. "
                     "Synthesize propositions into an argument rather than listing them. Paraphrase source language. Each paragraph should contain two to four grammatical sentences and distinguish what the records document from bounded interpretation. "
+                    "When making an analytical comparison across records, explicitly frame it as a qualified interpretation of the cited passages (for example, 'Read comparatively' or 'As an interpretation of these records'). "
+                    "Bind the comparison only to independently supported propositions in its argument move. Do not infer collaboration, authorship, influence, causation, intention, institutional adoption, consensus, leadership, or funding unless the supplied propositions establish that relationship. "
                     "Items marked `single_sentence` must instead contain exactly one complete, evidence-bounded sentence that connects its proposition to the supplied argument move. "
                     "The final move must preserve any supplied qualification without introducing facts, people, dates, causes, or relationships absent from its propositions.\nQUESTION: "
                     + question + "\n\nARGUMENT MOVES:\n"
@@ -3100,6 +3199,20 @@ class StagedEvidencePipeline:
         rendered_claim_validation = validate_rendered_claim_support(
             list(final.synthesis_claims), final_claim_plan,
         )
+        claim_validation_valid = claim_plan_validation["valid"] and all(
+            item["status"] not in {"INSUFFICIENT_EVIDENCE", "INVALID_EVIDENCE_TYPE"}
+            for item in rendered_claim_validation
+        )
+        candidate_state = (
+            "BLOCKED" if not claim_validation_valid
+            else "REVIEW_REQUIRED"
+            if any(
+                item["claim_classification"] == "QUALIFIED_ANALYTICAL_SYNTHESIS"
+                or item["status"] == "CONFLICTING_EVIDENCE"
+                for item in rendered_claim_validation
+            )
+            else "VALIDATED"
+        )
         source_validation = validate_claims([claim for analysis in analyses for claim in analysis.direct_claims], packets)
         final_validation = validate_claims(final.direct_documentary_claims, packets)
         source_analysis_degraded = bool(batch_artifact.get("failed_sources")) or "CONTEXTUAL_ONLY" in str(batch_artifact.get("deterministic_fallback") or "")
@@ -3183,10 +3296,9 @@ class StagedEvidencePipeline:
                 "narrative_artifact": narrative_artifact,
             "missingness_decision": missingness_decision.model_dump() if missingness_decision else None,
             "claim_validation": {
-                "valid": claim_plan_validation["valid"] and all(
-                    item["status"] not in {"INSUFFICIENT_EVIDENCE", "INVALID_EVIDENCE_TYPE"}
-                    for item in rendered_claim_validation
-                ),
+                "valid": claim_validation_valid,
+                "candidate_state": candidate_state,
+                "human_acceptance_status": "UNAPPROVED",
                 "plan_claims": claim_plan_validation["claim_results"],
                 "rendered_claims": rendered_claim_validation,
             },
