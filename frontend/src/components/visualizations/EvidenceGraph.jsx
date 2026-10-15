@@ -5,9 +5,9 @@ import * as d3 from 'd3'
 import { chartColors, carbonColors, chartStyles } from '../../utils/carbonD3Theme'
 
 const sourceLabel = (source, index) => {
-  const title = source.title || source.pid || source.documentId || 'Untitled source'
+  const archiveId = source.pid || source.archiveRecordPid || `Source ${index + 1}`
   const locator = source.page != null ? `p. ${source.page}` : 'page unavailable'
-  return `${index + 1}: ${title.length > 58 ? `${title.slice(0, 57)}…` : title} | ${locator}`
+  return `${archiveId} | ${locator}`
 }
 
 const sourceDetail = (source) => [
@@ -115,11 +115,10 @@ const EvidenceGraph = ({ data }) => {
 
   useEffect(() => {
     setSelectedSource(null)
-    const width = 1024
-    const rowSpacing = 112
-    const topOffset = 190
-    const rowCount = Math.ceil((data?.sources?.length || 0) / 4)
-    const height = data ? Math.max(150, topOffset + (rowCount * rowSpacing) - 12) : 160
+    const width = 1200
+    const rowSpacing = 84
+    const rowCount = data?.sources?.length || 0
+    const height = data ? Math.max(420, (Math.max(rowCount - 1, 0) * rowSpacing) + 140) : 160
 
     d3.select(svgRef.current).selectAll('*').remove()
 
@@ -145,29 +144,37 @@ const EvidenceGraph = ({ data }) => {
     const unavailable = ['synthesis_unavailable', 'evidential_limit'].includes(data.answerState)
       || ['retrieval_only', 'model_parse_failure', 'model_runtime_failure'].includes(data.answerOrigin)
       || (!data.answer && !data.answerParagraphs?.length)
-    const claimStatus = unverified ? 'Unassessed' : data.claimValidation ? 'Checks recorded' : 'Not established'
+    const deterministic = data.answerOrigin?.startsWith('deterministic_')
+    const model = typeof data.model === 'string' ? data.model : data.model?.name || data.model?.display_name || ''
+    const construction = unavailable ? 'No model synthesis'
+      : deterministic ? 'Evidence-bound assembly'
+        : /granite/i.test(model) ? 'Granite evidence synthesis' : 'Model evidence synthesis'
     const nodes = [
-      { id: 'question', label: 'Question', status: 'Submitted', detail: data.prompt || data.query, column: 0, group: 'query' },
-      { id: 'selection', label: 'Retrieval', status: `${sources.length} passages`, detail: 'Source nomination and passage selection, not proof of historical action.', column: 1, group: 'document' },
-      { id: 'evidence-set', label: 'Evidence', status: sources.length ? 'Inspectable' : 'Not supplied', detail: `${sources.length} passages from ${archiveIds.size || 'unresolved'} archival records`, column: 2, group: 'pid' },
-      { id: 'claims', label: 'Validated claims', status: claimStatus, detail: 'Inspect the actual claim assessments below. This stage label does not establish human acceptance.', column: 3, group: 'document' },
-      { id: 'argument', label: 'Scholarly argument', status: unavailable ? 'Unavailable' : unverified ? 'Unverified draft' : 'Response recorded', detail: `Construction: ${data.answerOrigin || 'not recorded'}; model: ${data.model || 'not recorded'}`, column: 4, group: 'model' },
-      { id: 'citations', label: 'Citations', status: data.unresolvedCitationCount ? 'Unresolved references' : data.citationCount ? `${data.citationCount} linked notes` : 'None mapped', detail: 'Links resolve only to supplied evidence; they do not independently validate a claim.', column: 5, group: 'pid' },
-      { id: 'qualification', label: 'Bounded Qualification', status: data.evidentialLimits?.length || data.missingness?.length ? 'Limits recorded' : 'Not assessed', detail: 'Absence within a retrieved scope does not prove historical absence.', column: 6, group: 'document' },
+      { id: 'question', label: 'Research question', detail: data.prompt || data.query, column: 0, group: 'query' },
+      { id: 'selection', label: 'Archive-first selection', detail: `${sources.length} retained passages. Catalogue association is not proof of historical action.`, column: 1, group: 'document' },
+      { id: 'evidence-set', label: 'Inspectable evidence set', detail: `${sources.length} passages from ${archiveIds.size || 'unresolved'} archival records`, column: 3, group: 'pid' },
+      { id: 'construction', label: construction, detail: `Construction: ${data.answerOrigin || 'not recorded'}; model: ${model || 'not recorded'}`, column: 4, group: 'model' },
+      { id: 'answer', label: 'Research response', status: unverified ? 'Unverified draft' : unavailable ? 'Synthesis unavailable' : 'Researcher review required', detail: 'Read alongside the selected passages and stated limits. No human acceptance is implied.', column: 5, group: 'answer' },
     ]
-    const links = nodes.slice(1).map((node, index) => ({ source: nodes[index].id, target: node.id, value: 1, framework: true }))
+    const links = [
+      { source: 'question', target: 'selection' },
+      { source: 'evidence-set', target: 'construction' },
+      { source: 'construction', target: 'answer' },
+    ]
 
     sources.forEach((source, index) => {
       const sourceId = source.anchor || `passage-${index}`
 
-      nodes.push({ id: sourceId, label: sourceLabel(source, index), detail: sourceDetail(source), source, column: index % 4, row: Math.floor(index / 4), group: 'chunk' })
+      nodes.push({ id: sourceId, label: sourceLabel(source, index), detail: sourceDetail(source), source, column: 2, row: index, group: 'chunk' })
+      links.push({ source: 'selection', target: sourceId })
+      links.push({ source: sourceId, target: 'evidence-set' })
     })
 
-    const columns = [72, 218, 364, 510, 656, 802, 948]
+    const columns = [90, 280, 505, 730, 920, 1100]
 
     nodes.forEach((node) => {
-      node.x = node.source ? 128 + (node.column * 256) : columns[node.column]
-      node.y = node.source ? topOffset + (node.row * rowSpacing) : 44
+      node.x = columns[node.column]
+      node.y = node.source ? (height - ((rowCount - 1) * rowSpacing)) / 2 + (node.row * rowSpacing) : height / 2
     })
 
     const nodeLookup = new Map(nodes.map((node) => [node.id, node]))
@@ -186,35 +193,13 @@ const EvidenceGraph = ({ data }) => {
     const linkGroup = svg.append('g').attr('class', 'evidence-graph__links')
     const nodeGroup = svg.append('g').attr('class', 'evidence-graph__nodes')
 
-    if (sources.length) {
-      linkGroup.append('path')
-        .attr('class', 'evidence-graph__source-rail')
-        .attr('d', `M${columns[2]},60V125H30V${topOffset + ((rowCount - 1) * rowSpacing) - 35}`)
-        .attr('fill', 'none')
-      for (let row = 0; row < rowCount; row += 1) {
-        const count = Math.min(sources.length - row * 4, 4)
-        linkGroup.append('path')
-          .attr('class', 'evidence-graph__source-rail')
-          .attr('d', `M30,${topOffset + row * rowSpacing - 35}H${128 + (count - 1) * 256}`)
-          .attr('fill', 'none')
-      }
-      linkGroup.selectAll('.evidence-graph__source-branch')
-        .data(nodes.filter((node) => node.source))
-        .enter().append('line')
-        .attr('class', 'evidence-graph__source-branch')
-        .attr('x1', (node) => node.x).attr('x2', (node) => node.x)
-        .attr('y1', (node) => node.y - 35)
-        .attr('y2', (node) => node.y - 12)
-    }
-
     linkGroup.selectAll('line')
       .data(hydratedLinks)
       .enter()
       .append('line')
       .attr('stroke', carbonColors.gray[50])
       .attr('stroke-opacity', 0.65)
-      .attr('stroke-dasharray', (d) => d.framework ? '4 4' : null)
-      .attr('stroke-width', (d) => Math.max(1.5, Math.min(4, d.value * 3)))
+      .attr('stroke-width', 2)
       .attr('x1', (d) => d.source.x)
       .attr('y1', (d) => d.source.y)
       .attr('x2', (d) => d.target.x)
@@ -240,7 +225,7 @@ const EvidenceGraph = ({ data }) => {
 
     node.append('title').text((d) => `${d.label}\n${d.detail || ''}`)
     node.append('circle')
-      .attr('r', (node) => node.source ? 10 : 8)
+      .attr('r', 22)
       .attr('fill', (d) => colorMap[d.group] || carbonColors.gray[60])
       .attr('stroke', chartColors.selectionStroke)
       .attr('stroke-width', 1.5)
@@ -249,9 +234,9 @@ const EvidenceGraph = ({ data }) => {
       .attr('class', 'evidence-graph__label')
       .attr('fill', chartStyles.timeline.text.fill)
       .attr('text-anchor', 'middle')
-      .attr('y', (node) => node.source ? 26 : 30)
+      .attr('y', 36)
       .each(function appendLabelLines(nodeData) {
-        labelLines(nodeData.label, nodeData.source ? 30 : 22).forEach((line, index) => {
+        labelLines(nodeData.label, nodeData.source ? 30 : 20).forEach((line, index) => {
           d3.select(this)
             .append('tspan')
             .attr('x', 0)
@@ -259,16 +244,24 @@ const EvidenceGraph = ({ data }) => {
             .text(line)
         })
       })
-    node.filter((d) => !d.source).append('text')
+    node.filter((d) => d.status).append('text')
         .attr('class', 'evidence-graph__stage-status')
         .attr('text-anchor', 'middle')
-        .attr('y', 58)
-        .text((d) => d.status)
+        .attr('y', 84)
+        .each(function appendStatusLines(nodeData) {
+          labelLines(nodeData.status, 18).forEach((line, index) => {
+            d3.select(this).append('tspan').attr('x', 0).attr('dy', index ? 16 : 0).text(index ? ` ${line}` : line)
+          })
+        })
 
   }, [data])
 
   return (
     <div className="evidence-graph">
+      <div className="evidence-graph__heading">
+        <h4>Retrieval trail</h4>
+        <p>Trace-derived map of the retrieved archival passages. Each passage names its archive identifier and page; hover for its title and evidential classification.</p>
+      </div>
       {data && (
         <div className="evidence-graph__toolbar" aria-label="Retrieval trail export controls">
           <Button kind="ghost" size="sm" renderIcon={Download} onClick={exportSvg}>Download SVG</Button>
@@ -276,7 +269,6 @@ const EvidenceGraph = ({ data }) => {
         </div>
       )}
       {exportError && <InlineNotification lowContrast kind="error" title="Retrieval trail export failed" subtitle={exportError} />}
-      <p className="evidence-graph__framework-note">Research framework, not seven model calls or human acceptance. Select a passage to inspect its provenance.</p>
       <div className="evidence-graph__viewport" tabIndex={0} role="region" aria-label="Scrollable retrieval trail">
         <svg ref={svgRef} aria-label="Evidence retrieval trail" role="img"></svg>
       </div>
@@ -286,7 +278,7 @@ const EvidenceGraph = ({ data }) => {
           <dl>
             <div><dt>Document</dt><dd>{selectedSource.title || 'Unavailable'}</dd></div>
             <div><dt>Archive identity</dt><dd>{selectedSource.identity?.recordPid || 'record unavailable'} → {selectedSource.identity?.mediaPid || 'media unavailable'} → {selectedSource.pid || 'asset unavailable'}</dd></div>
-            <div><dt>Passage locator</dt><dd>Page {selectedSource.page || 'unavailable'} | {selectedSource.chunkId || 'chunk unavailable'}</dd></div>
+            <div><dt>Passage locator</dt><dd>Page {selectedSource.page ?? 'unavailable'} | {selectedSource.chunkId || 'chunk unavailable'}</dd></div>
             <div><dt>Relation</dt><dd>{selectedSource.evidenceClassification?.relationship_to_question || selectedSource.evidenceClassification?.classification || 'Not classified'}</dd></div>
             <div><dt>Retrieval strength</dt><dd>{formatScore(selectedSource.score)} overall | {formatScore(selectedSource.sourceNominationScore)} nomination | {formatScore(selectedSource.passageScore)} passage</dd></div>
             <div><dt>Provenance status</dt><dd>{selectedSource.provenanceStatus || 'Unavailable'}</dd></div>
@@ -294,6 +286,11 @@ const EvidenceGraph = ({ data }) => {
           <a href={`#${selectedSource.anchor || ''}`}>Read selected source passage</a>
         </aside>
       )}
+      <details className="evidence-graph__framework-note">
+        <summary>Research framework and evidential limits</summary>
+        <p>Question → Retrieval → Evidence → Validated claims → Scholarly argument → Citations → Bounded Qualification.</p>
+        <p>The framework is not seven model calls or human acceptance. Retrieved passages and graph connections do not independently validate historical claims. Inspect the recorded assessments below.</p>
+      </details>
     </div>
   )
 }

@@ -1,0 +1,31 @@
+RETRIEVAL TRAIL - FIGURE 1 PRESENTATION
+Base: 9ce0ccf043f22fe34e23c2dc75d4106fe69beb97
+Date: 2026-10-15
+
+Restore the researcher's supplied Figure 1 graph composition using the
+existing graph component: research question, archive-first selection,
+vertically fanned archival passages, inspectable evidence set, Granite
+evidence synthesis, research response. Use the existing Carbon blue,
+purple, green, yellow, light-blue and red palette with outlined circles.
+Passage labels show supplied archive PID and page; complete titles and
+classification remain in native tooltips and the keyboard-accessible
+selected-passage inspector. Equal-width edges express recorded membership,
+not fabricated confidence or historical causation.
+
+Granite is named from the actual recorded model. Unavailable/retrieval-only
+responses show No model synthesis; deterministic assembly remains distinct.
+The response node explicitly marks unverified drafts or review requirements,
+not historical validation. Preserve the seven epistemological framework
+labels in a collapsed explanation, separate from the trace-derived graph.
+
+Keep SVG/PNG exports, theme-resolved text and backgrounds, source navigation,
+all source passages and provenance, and mobile graph scrolling. Retain the
+Research answer label, 24px generated text, 18px citations and full-width
+left alignment unchanged. No inference, retrieval or archival changes.
+
+Frontend-only overlay on the current 9ce0ccf image with exact-image rollback.
+Test Figure 1 topology, real archive/page labels, six palette roles,
+Granite/no-synthesis wording, honest statuses, inspector keyboard operation,
+exports, themes and answer typography. Verify protected production screens
+with identical read-only responses and static atlas controls before/after
+activation. Backend, corpus, authority records and frozen UAT remain intact.

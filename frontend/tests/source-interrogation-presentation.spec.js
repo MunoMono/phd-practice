@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 import { readFile } from 'node:fs/promises'
 
-const stages = ['Question', 'Retrieval', 'Evidence', 'Validated claims', 'Scholarly argument', 'Citations', 'Bounded Qualification']
+const stages = ['Research question', 'Archive-first selection', 'Inspectable evidence set', 'Granite evidence synthesis', 'Research response']
 const response = {
   query_id: 'presentation-fixture', status: 'completed', mode: 'exploratory',
   answer: null, original_draft: 'A **bounded formulation ** [EV‑123456789abc]. A second claim [EV-abcdef123456]. Repeated [EV-123456789abc]. Unknown [EV-000000000000].\n\nConnections — not implementation — are inferred. "Original—words" remain unchanged.',
@@ -68,12 +68,16 @@ test('canonical citations preserve evidence, punctuation, warning visibility and
   expect(errors).toEqual([])
 })
 
-test('seven-stage trail is legible, keyboard-operable, themed and exportable at mobile width', async ({ page }) => {
+test('Figure 1 retrieval trail is legible, keyboard-operable, themed and exportable at mobile width', async ({ page }) => {
   await submit(page)
   const graph = page.locator('.evidence-graph')
   expect(await graph.locator('[data-stage]').evaluateAll((nodes) => nodes.map((node) => node.dataset.stage))).toEqual(stages)
-  await expect(graph.locator('.evidence-graph__stage-status')).toHaveCount(7)
-  await expect(graph.locator('[data-stage="Validated claims"]')).toContainText('Unassessed')
+  await expect(graph.locator('.evidence-graph__stage-status')).toHaveCount(1)
+  await expect(graph.locator('[data-stage="Research response"]')).toContainText('Unverified draft')
+  await expect(graph).not.toContainText('Qwen')
+  await graph.locator('summary').click()
+  await expect(graph).toContainText('Validated claims')
+  await expect(graph).toContainText('Bounded Qualification')
   const boxes = await graph.locator('.evidence-graph__stage .evidence-graph__label').evaluateAll((nodes) => nodes.map((node) => {
     const box = node.getBoundingClientRect()
     return { left: box.left, right: box.right, top: box.top, bottom: box.bottom }
@@ -92,8 +96,8 @@ test('seven-stage trail is legible, keyboard-operable, themed and exportable at 
   const svg = await svgDownload
   expect(await svg.failure()).toBeNull()
   const svgText = await readFile(await svg.path(), 'utf8')
-  expect(svgText).toContain('Bounded Qualification')
-  expect(svgText).toContain('stroke-dasharray="4 4"')
+  expect(svgText).toContain('Granite evidence')
+  expect(svgText).not.toContain('Qwen')
   expect(svgText).toMatch(/<rect[^>]+fill="rgb\(/)
   const pngDownload = page.waitForEvent('download')
   await graph.getByRole('button', { name: 'Download PNG' }).click()
@@ -104,7 +108,7 @@ test('seven-stage trail is legible, keyboard-operable, themed and exportable at 
   await page.setViewportSize({ width: 390, height: 844 })
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
   expect(await graph.locator('.evidence-graph__viewport').evaluate((node) => node.scrollWidth > node.clientWidth)).toBe(true)
-  expect(await graph.getByRole('img', { name: 'Evidence retrieval trail' }).evaluate((node) => node.getBoundingClientRect().width / node.viewBox.baseVal.width)).toBeGreaterThanOrEqual(1)
+  expect(await graph.getByRole('img', { name: 'Evidence retrieval trail' }).evaluate((node) => node.getBoundingClientRect().width / node.viewBox.baseVal.width)).toBeGreaterThanOrEqual(0.8)
 })
 
 test('Markdown memo exports citation links and every original source passage without changing quotations', async ({ page }) => {
@@ -123,7 +127,7 @@ test('Markdown memo exports citation links and every original source passage wit
   expect(markdown).toContain('Unresolved citation: EV-000000000000')
 })
 
-test('eight passages use a compact graph and consistently aligned reading surfaces', async ({ page }) => {
+test('eight archive-labelled passages fan between selection and evidence with Figure 1 colours', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 })
   await submit(page, {
     ...response,
@@ -139,9 +143,18 @@ test('eight passages use a compact graph and consistently aligned reading surfac
   })
   const graph = page.locator('.evidence-graph')
   await expect(graph.locator('.evidence-graph__source')).toHaveCount(8)
-  expect(await graph.getByRole('img', { name: 'Evidence retrieval trail' }).evaluate((node) => node.viewBox.baseVal.height)).toBeLessThanOrEqual(410)
-  const positions = await graph.locator('.evidence-graph__source').evaluateAll((nodes) => nodes.map((node) => node.getAttribute('transform')))
-  expect(new Set(positions).size).toBe(8)
+  const positions = await graph.locator('.evidence-graph__source').evaluateAll((nodes) => nodes.map((node) => {
+    const transform = node.transform.baseVal.getItem(0).matrix
+    return { x: transform.e, y: transform.f }
+  }))
+  expect(new Set(positions.map((node) => node.x)).size).toBe(1)
+  expect(new Set(positions.map((node) => node.y)).size).toBe(8)
+  await expect(graph.locator('.evidence-graph__links line')).toHaveCount(19)
+  await expect(graph.locator('.evidence-graph__source').first()).toContainText('pid1 | p. 4')
+  await expect(graph.locator('.evidence-graph__source title').first()).toContainText('Job 171')
+  const colors = await graph.locator('.evidence-graph__nodes circle').evaluateAll((nodes) => nodes.map((node) => getComputedStyle(node).fill))
+  expect(colors.slice(0, 5)).toEqual(['rgb(15, 98, 254)', 'rgb(138, 63, 252)', 'rgb(241, 194, 27)', 'rgb(69, 137, 255)', 'rgb(218, 30, 40)'])
+  expect(colors.slice(5).every((color) => color === 'rgb(36, 161, 72)')).toBe(true)
   const layout = await page.evaluate(() => {
     const answer = document.querySelector('.tracer__answer-body').getBoundingClientRect()
     const panel = document.querySelector('.tracer__panel--answer').getBoundingClientRect()
@@ -158,12 +171,27 @@ test('eight passages use a compact graph and consistently aligned reading surfac
       summaryPadding: parseFloat(getComputedStyle(summary).paddingTop),
     }
   })
+
   expect(layout.answerWidth).toBeGreaterThan(650)
   expect(Math.abs(layout.answerWidth - layout.availableWidth)).toBeLessThan(2)
   expect(Math.abs(layout.answerLeft - layout.contentLeft)).toBeLessThan(2)
   expect(layout.sourceWidth).toBeLessThanOrEqual(1024)
   expect(layout.quoteWidth).toBeGreaterThan(layout.sourceWidth * 0.85)
   expect(layout.summaryPadding).toBeGreaterThanOrEqual(12)
+})
+
+test('retrieval-only and unavailable synthesis are not presented as successful Granite generation', async ({ page }) => {
+  await submit(page, {
+    ...response,
+    original_draft: null,
+    answer: 'A bounded authority statement.',
+    answer_state: 'synthesis_unavailable',
+    answer_origin: 'retrieval_only',
+  })
+  const graph = page.locator('.evidence-graph')
+  await expect(graph.locator('[data-stage="No model synthesis"]')).toHaveCount(1)
+  await expect(graph.locator('[data-stage="Research response"]')).toContainText('Synthesis unavailable')
+  await expect(graph.locator('[data-stage="Granite evidence synthesis"]')).toHaveCount(0)
 })
 
 test('Research answer fills the box at half its previous size with proportional citations', async ({ page }) => {
@@ -227,8 +255,8 @@ test('scoped-missingness answers share documentary citation rendering without im
 
   await expect(page.locator('.tracer__answer-body sup a')).toHaveText(['1'])
   await expect(page.locator('.tracer__answer-state')).toContainText('Evidential limit')
-  await expect(page.locator('[data-stage="Scholarly argument"]')).toContainText('Unavailable')
-  await expect(page.locator('[data-stage="Bounded Qualification"]')).toContainText('Limits recorded')
+  await expect(page.locator('[data-stage="No model synthesis"]')).toHaveCount(1)
+  await expect(page.locator('.tracer__answer-state')).toContainText('Evidential limit')
 })
 
 test('a saved Granite draft rehydrates original prose and citation mappings without another model request', async ({ page }) => {

@@ -1,6 +1,7 @@
 @use '@carbon/react/scss/spacing' as *;
 @use '@carbon/react/scss/theme' as *;
 @use '@carbon/react/scss/type' as *;
+@use '@carbon/react/scss/breakpoint' as *;
 
 .evidence-graph {
   width: 100%;
@@ -10,13 +11,20 @@
   &__framework-note {
     @include type-style('body-compact-01');
     color: $text-secondary;
-    margin-bottom: $spacing-05;
+    margin-top: $spacing-05;
+    summary { cursor: pointer; padding-block: $spacing-03; }
+    p { margin-top: $spacing-03; }
+  }
+
+  &__heading {
+    h4 { @include type-style('heading-02'); margin: 0 0 $spacing-03; }
+    p { @include type-style('label-01'); color: $text-secondary; margin: 0; }
   }
 
   &__viewport {
     overflow-x: auto;
     &:focus-visible { outline: 2px solid $focus; }
-    svg { min-width: 64rem; }
+    svg { min-width: 60rem; }
   }
 
   &__label, &__stage-status, &__empty {
@@ -26,18 +34,14 @@
 
   &__stage-status { fill: $text-secondary; }
   &__links line { stroke: $border-strong-01; }
-  &__source-rail, &__source-branch {
-    stroke: $border-subtle-01;
-    stroke-width: 1;
-  }
-  &__stage circle { fill: $layer-accent-01; stroke: $border-interactive; }
-  &__source circle { fill: $support-info; stroke: $border-interactive; }
+  &__stage circle, &__source circle { stroke: $text-primary; }
 
   &__toolbar {
     display: flex;
     justify-content: flex-end;
     gap: $spacing-03;
     margin-bottom: $spacing-03;
+    margin-top: $spacing-03;
   }
 
   &__nodes g[role='button'] {
@@ -69,6 +73,7 @@
       grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: $spacing-04 $spacing-06;
       margin: 0;
+      @include breakpoint-down(md) { grid-template-columns: 1fr; }
     }
 
     dt {
