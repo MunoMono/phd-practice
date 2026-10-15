@@ -33,6 +33,7 @@ from app.services.authority_registry import AuthorityRegistry
 from app.services.turin_question_route import classify_question_route
 from app.services.provenance_integrity import experiment_evidence_digest, experiment_run_digest
 from app.models.research_outputs import ExperimentRun, ExperimentRunEvidence
+from app.services.turin_research_answer_service import generate_documentary_synthesis, _evidence_records
 
 router = APIRouter()
 exploratory_router = APIRouter()
@@ -1050,7 +1051,7 @@ def _project_staged_exploratory_response(
                 "curated_cited_evidence_synthesis"
                 if (pipeline.get("narrative_artifact") or {}).get("deterministic_fallback")
                 == "CURATED_ELECTROHOME_PASSAGE_SYNTHESIS"
-                else "qwen_cited_evidence_synthesis"
+                else "model_cited_evidence_synthesis"
             )
     if (
         (
@@ -1775,7 +1776,7 @@ def get_researcher_ui_capture(capture_id: str):
 
 @exploratory_router.post("/interrogate")
 async def interrogate_exploratory_corpus(request: ExploratoryInterrogationRequest, http_request: Request = None):
-    """Run an ephemeral Qwen-backed corpus interrogation without formal-run persistence."""
+    """Run an ephemeral model-backed corpus interrogation without formal-run persistence."""
     if request.mode not in {"exploratory", "comparison", CAPTURE_MODE}:
         raise HTTPException(status_code=400, detail="Unsupported source interrogation mode.")
     started = time.perf_counter()
@@ -1805,6 +1806,13 @@ async def interrogate_exploratory_corpus(request: ExploratoryInterrogationReques
             "inference_calls": [], "corpus_version": settings.TURIN_ARCHIVE_FIRST_CORPUS_VERSION, "persisted": False,
         }
     route_decision = classify_question_route(request.query)
+    if (
+        settings.TURIN_GRANITE_DOCUMENTARY_ENABLED
+        and request.mode == "exploratory"
+        and route_decision.family == "DOCUMENTARY"
+        and not scope_overview_request
+    ):
+        return await research_answer_corpus(request)
     thematic_preset = matching_archive_question_preset(request.query)
     thematic_document_question = thematic_preset is not None
     authority_evidence = _catalogue_authorities(request.query, request.top_k) if (
@@ -1915,7 +1923,7 @@ async def interrogate_exploratory_corpus(request: ExploratoryInterrogationReques
         }
     inference_service = get_inference_service()
     if inference_service.get_load_status().get("model_status") != "ready":
-        raise HTTPException(status_code=503, detail="Active Qwen runtime is unavailable for exploratory interrogation.")
+        raise HTTPException(status_code=503, detail="Active research runtime is unavailable for exploratory interrogation.")
     if request.mode == CAPTURE_MODE:
         capture_sources = [{**source, "source_id": f"S{index}"} for index, source in enumerate(sources, start=1)]
         prompt = build_one_shot_prompt(request.query, capture_sources)
@@ -1942,7 +1950,7 @@ async def interrogate_exploratory_corpus(request: ExploratoryInterrogationReques
                 "retrieved_sources": classified_sources, "selected_passages": classified_sources,
                 "qwen_raw_output": generated["raw_response"], "parsed_output_if_available": None,
                 "provenance_result": provenance, "evidential_limits": limits,
-                "model_config": {**model_info, "temperature": inference_service.temperature, "output_token_limit": inference_service.final_synthesis_max_output_tokens, "qwen_calls": 1},
+                "model_config": {**model_info, "temperature": inference_service.temperature, "output_token_limit": inference_service.final_synthesis_max_output_tokens, "model_calls": 1},
                 "claim_provenance": claims, "source_classifications": source_classifications,
             })
         finally:
@@ -2312,6 +2320,102 @@ def _build_exploratory_packets(sources: list[dict[str, Any]], named_document: bo
         )
     finally:
         db.close()
+
+
+def _build_research_answer_packets(sources: list[dict[str, Any]], question: str):
+    db = LocalSessionLocal()
+    try:
+        return EvidencePacketBuilder().build(
+            db, sources, max_sources=8, local_token_budget=1800, question=question,
+        )
+    finally:
+        db.close()
+
+
+@exploratory_router.post("/research-answer")
+async def research_answer_corpus(request: ExploratoryInterrogationRequest):
+    """Return the existing documentary scholarly draft for researcher assessment."""
+    if not settings.TURIN_GRANITE_DOCUMENTARY_ENABLED:
+        raise HTTPException(status_code=404, detail="The documentary research-answer path is disabled.")
+    if request.mode != "exploratory":
+        raise HTTPException(status_code=400, detail="The documentary research-answer path accepts exploratory mode only.")
+    route_decision = classify_question_route(request.query)
+    if route_decision.family != "DOCUMENTARY" or _is_archive_scope_overview_request(request):
+        raise HTTPException(status_code=409, detail={
+            "error": "unsupported_question_class", "route_family": route_decision.family,
+            "message": "Use the established authority, hybrid, scoped-missingness or archive-overview route.",
+        })
+    started = time.perf_counter()
+    retrieval_started = time.perf_counter()
+    retrieval = _retrieve_exploratory(request)
+    _hydrate_source_display_dates(retrieval["results"])
+    retrieval_ms = round((time.perf_counter() - retrieval_started) * 1000, 1)
+    if not retrieval["results"]:
+        raise HTTPException(status_code=404, detail="No relevant archival evidence was retrieved.")
+    packet_started = time.perf_counter()
+    try:
+        packets = _build_research_answer_packets(retrieval["results"], request.query)
+        if not packets:
+            raise HTTPException(status_code=404, detail="No eligible documentary passages were available.")
+        packet_ms = round((time.perf_counter() - packet_started) * 1000, 1)
+        inference_service = get_inference_service()
+        result = await generate_documentary_synthesis(
+            request.query, _evidence_records(packets, request.query), inference_service,
+        )
+    except InferenceTimeoutError as exc:
+        raise HTTPException(status_code=504, detail={
+            "error": "inference_timeout", "stage": exc.stage, "message": str(exc),
+            "answer_state": AnswerState.SYNTHESIS_UNAVAILABLE.value,
+        }) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    model_info = inference_service.get_model_info()
+    result.update({
+        "answer_state": "unverified_research_draft",
+        "draft_label": "UNVERIFIED RESEARCH DRAFT",
+        "answer_origin": "granite_documentary_research_draft",
+        "verification_status": "not_performed",
+        "researcher_facing": {
+            "original_draft": result["original_draft"], "answer": None, "verified_answer": None,
+            "draft_label": "UNVERIFIED RESEARCH DRAFT",
+            "verification_status": "not_performed", "human_acceptance_status": "UNASSESSED",
+        },
+        "query_id": f"research-answer-{uuid.uuid4().hex[:12]}",
+        "mode": "research_answer", "response_schema": "turin-research-answer-v1",
+        "status": "completed",
+        "model": {"name": model_info["model"], "display_name": model_info["display_name"], "runtime": model_info["runtime"]},
+        "runtime": model_info, "retrieved_evidence": retrieval["results"],
+        "retrieval": retrieval["transparency"], "retrieval_diagnostics": retrieval["diagnostics"],
+        "corpus_version": settings.TURIN_ARCHIVE_FIRST_CORPUS_VERSION, "persisted": False,
+        "source_analysis": {
+            "performed": False,
+            "reason": "Original documentary passages supplied to the existing two-stage construction.",
+        },
+        "stage_execution": {
+            "classification": "UNVERIFIED DOCUMENTARY RESEARCH DRAFT",
+            "stages": ["archive_first_retrieval", "evidence_packet_assembly", *[
+                call["stage"] for call in result["inference_calls"]
+            ]],
+            "call_count": result["inference_call_count"],
+            "source_ids": [str(packet.source_id) for packet in packets],
+        },
+        "provenance_validation": {
+            "valid": False, "semantic_status": "UNASSESSED",
+            "source_count": len(result["evidence_sources"]),
+            "claim_count": len(result["citation_bindings"]),
+            "claim_provenance": result["citation_bindings"],
+        },
+        "timings": {
+            "query_planning_and_retrieval_ms": retrieval_ms,
+            "source_packet_construction_ms": packet_ms,
+            "total_backend_request_ms": round((time.perf_counter() - started) * 1000, 1),
+        },
+        "authority_evidence": [], "documentary_evidence": result["evidence_sources"],
+        "contextual_evidence": [], "testimony_evidence": [], "inferences": [], "missingness": [],
+    })
+    return result
 
 
 @exploratory_router.post("/retrieve")

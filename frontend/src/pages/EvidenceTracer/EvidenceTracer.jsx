@@ -5,14 +5,13 @@ import {
   Button,
   InlineLoading,
   InlineNotification,
-  Link,
   Select,
   SelectItem,
   Tag,
   TextArea,
   Tile
 } from '@carbon/react'
-import { Copy, Download, Launch, Search, Checkmark } from '@carbon/icons-react'
+import { Copy, Download, Search, Checkmark } from '@carbon/icons-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { exportExperimentRunJson, getArchiveScopes, getExperimentRun, getResearcherUiCapture, interrogateExploratory, retrieveExploratoryV3 } from '../../api/experiments'
@@ -76,6 +75,7 @@ const findQueryNamedDocument = (query, documents) => {
 }
 
 const AnswerAiLabel = ({ answerOrigin, model, sourceCount, confidence, queryId }) => {
+  const isGraniteDraft = answerOrigin === 'granite_documentary_research_draft'
   const isDeterministicFallback = [
     'deterministic_evidence_bound_fallback',
     'curated_cited_evidence_synthesis'
@@ -89,12 +89,12 @@ const AnswerAiLabel = ({ answerOrigin, model, sourceCount, confidence, queryId }
           <h4>Evidence-assisted answer</h4>
           <p>{isDeterministicFallback
             ? 'This response is compiled from the selected documentary evidence using a fixed evidence-bound method.'
-            : 'This response is a Qwen synthesis of the selected documentary evidence.'}</p>
+            : isGraniteDraft ? 'This is an unverified Granite research draft. Historical assertions require independent researcher assessment.' : `This response is a ${model || 'research model'} synthesis of the selected documentary evidence.`}</p>
           <hr />
           <h5>How this answer was prepared</h5>
           <ol>
             <li>Archival sources were identified and passages selected for the question.</li>
-            <li>{isDeterministicFallback ? 'The final response was assembled from those passages without adding a model interpretation.' : 'Qwen prepared a synthesis from the supplied evidence map.'}</li>
+            <li>{isDeterministicFallback ? 'The final response was assembled from those passages without adding a model interpretation.' : isGraniteDraft ? 'Granite prepared an evidence analysis and scholarly draft; neither is independent claim validation.' : 'The recorded model prepared a synthesis from the supplied evidence map.'}</li>
             <li>{sourceCount > 0 ? `${sourceCount} retrieved passage${sourceCount === 1 ? '' : 's'} remain available for inspection.` : 'No retrieved passages were supplied.'}</li>
           </ol>
           <p className="tracer__ai-note">Archive records, documentary excerpts, and database authority context are source material, not AI-generated content.</p>
@@ -102,7 +102,7 @@ const AnswerAiLabel = ({ answerOrigin, model, sourceCount, confidence, queryId }
         <AILabelActions>
           <div className="tracer__ai-model">
             <span>AI model</span>
-            <Link href="https://huggingface.co/Qwen/Qwen3-8B-GGUF" target="_blank" rel="noreferrer" renderIcon={Launch}>Qwen3-8B GGUF</Link>
+            <span>{model || 'Active research runtime'}</span>
           </div>
         </AILabelActions>
       </AILabelContent>
@@ -111,6 +111,7 @@ const AnswerAiLabel = ({ answerOrigin, model, sourceCount, confidence, queryId }
 }
 
 const answerStatePresentation = {
+  unverified_research_draft: { title: 'UNVERIFIED RESEARCH DRAFT', kind: 'warning', subtitle: 'Complete model-generated draft for researcher review. Historical claims have not been independently verified; no human UAT acceptance is implied.' },
   synthesis_valid: { title: 'Answer', kind: 'success', subtitle: 'Validated synthesis with resolvable source citations.' },
   synthesis_partial: { title: 'Partial synthesis', kind: 'warning', subtitle: 'Supported material is shown, but one or more validation checks remain under review.' },
   synthesis_unavailable: { title: 'Synthesis unavailable', kind: 'warning', subtitle: 'Relevant evidence was retrieved, but a validated synthesis could not be produced for this run.' },
@@ -235,14 +236,14 @@ const mapAuthorityEvidence = (authorityContext = {}) => {
       authority_type: item.authority_type,
       authority_id: item.authority_id,
       source: item.source,
-      job_number: fields.job_number || item.authority_id,
-      title: fields.title || fields.label,
-      funder_name: fields.funder_name,
-      duration_text: fields.duration_text,
-      project_lead_name: fields.project_lead_name,
-      start_year: fields.start_year,
-      end_year: fields.end_year,
-      filter: fields.authority_filter
+      job_number: fields.job_number || item.job_number || item.authority_id,
+      title: fields.title || fields.label || item.title,
+      funder_name: fields.funder_name || item.funder_name,
+      duration_text: fields.duration_text || item.duration_text,
+      project_lead_name: fields.project_lead_name || item.project_lead_name,
+      start_year: fields.start_year || item.start_year,
+      end_year: fields.end_year || item.end_year,
+      filter: fields.authority_filter || item.filter
     }
   }
   if (item.authority_type === 'agent_employment') {
@@ -250,20 +251,20 @@ const mapAuthorityEvidence = (authorityContext = {}) => {
       authority_type: item.authority_type,
       authority_id: item.authority_id,
       source: item.source,
-      assertion: fields.name || fields.label,
-      role: fields.job_title_label,
-      tenure: { start_date: fields.start_date, end_date: fields.end_date }
+      assertion: fields.name || fields.label || item.assertion,
+      role: fields.job_title_label || item.role,
+      tenure: { start_date: fields.start_date || item.tenure?.start_date, end_date: fields.end_date || item.tenure?.end_date }
     }
   }
   return {
     authority_type: item.authority_type,
     authority_id: item.authority_id,
     source: item.source,
-    label: fields.label,
-    code: fields.code,
-    description: fields.description,
-    epistemic_type: fields.epistemic_type,
-    authority_classification: fields.authority_classification
+    label: fields.label || item.label,
+    code: fields.code || item.code,
+    description: fields.description || item.description,
+    epistemic_type: fields.epistemic_type || item.epistemic_type,
+    authority_classification: fields.authority_classification || item.authority_classification
   }
   })
 }
@@ -308,6 +309,7 @@ const mapPersistedRunToTrace = (run) => {
     inferences: response.inferences || [],
     contradictions: response.contradictions || [],
     missingness: response.missingness || [],
+    evidentialLimits: response.evidential_limits || response.missingness || [],
     retrievalDiagnostics: run.retrieval_diagnostics || null,
     followUpQueries: response.follow_up_queries || [],
     runStatus: run.status,
@@ -439,18 +441,68 @@ const displayCaptureAnswer = (trace) => {
   return (trace.answer || '').replace(/\n\*{0,2}EXACT REGISTERED QUESTION\*{0,2}[\s\S]*$/, '')
 }
 
+const documentaryCitationNotes = (text = '') => Array.from(
+  text.matchAll(/\[(EV-[0-9a-f]{12}(?:\s*,\s*EV-[0-9a-f]{12})*)\]/g)
+).flatMap((match) => match[1].split(/\s*,\s*/))
+
+const displayAnswerTypography = (text = '') => text
+  .split(/("[^"]*(?:"|$)|\u201c[^\u201d]*(?:\u201d|$)|\u2018[^\u2019]*(?:\u2019|$)|^>[^\n]*)/m)
+  .map((part, index) => index % 2 ? part : part.replace(/[ \t]*\u2014[ \t]*/g, ' \u2013 '))
+  .join('')
+
+const renderAnswerTextWithSourceLinks = (text, evidence = [], noteOffset = 0) => {
+  let noteNumber = noteOffset
+  return text.split(/(\[(?:\d+(?:,\s*\d+)*|EV-[0-9a-f]{12}(?:\s*,\s*EV-[0-9a-f]{12})*)\])/).map((part, partIndex) => {
+  const evidenceCitation = part.match(/^\[(EV-[0-9a-f]{12}(?:\s*,\s*EV-[0-9a-f]{12})*)\]$/)
+  if (evidenceCitation) {
+    return <sup className="tracer__source-citation" key={`evidence-citation-${partIndex}`}>
+      {evidenceCitation[1].split(/\s*,\s*/).map((id, index) => {
+        const number = ++noteNumber
+        return (
+          <span key={id}>{index > 0 ? ', ' : ''}{evidence.some((source) => source.evidence_id === id)
+            ? <a href={`#documentary-note-${number}`} aria-label={`Jump to citation ${number}`}>{number}</a>
+            : <span title={`Unresolved evidence ${id}`}>{number} (unresolved)</span>}</span>
+        )
+      })}
+    </sup>
+  }
+  const citation = part.match(/^\[(\d+(?:,\s*\d+)*)\]$/)
+  if (!citation) return part
+  return (
+    <sup className="tracer__source-citation" key={`answer-citation-${partIndex}`}>
+      {citation[1].split(/,\s*/).map((sourceNumber, citationIndex) => (
+        <span key={sourceNumber}>{citationIndex > 0 ? ', ' : ''}<a href={`#grouped-source-${sourceNumber}`} aria-label={`Jump to source ${sourceNumber}`}>{sourceNumber}</a></span>
+      ))}
+    </sup>
+  )
+})
+}
+
 const AnswerWithSourceLinks = ({ trace }) => {
+  const answer = displayAnswerTypography(displayCaptureAnswer(trace))
+  if (answer) {
+    let noteOffset = 0
+    return answer.split(/\n{2,}/).map((paragraph, paragraphIndex) => {
+      const rendered = renderAnswerTextWithSourceLinks(paragraph, trace.documentarySpans, noteOffset)
+      noteOffset += documentaryCitationNotes(paragraph).length
+      return (
+        <div className="tracer__answer-paragraph" key={`rendered-answer-paragraph-${paragraphIndex}`}>
+          <p>{rendered}</p>
+        </div>
+      )
+    })
+  }
   if (trace?.answerParagraphs?.length > 0) {
     return trace.answerParagraphs.map((paragraph, paragraphIndex) => (
       <div className="tracer__answer-paragraph" key={`answer-paragraph-${paragraphIndex}`}>
-        {paragraph.title && <h4>{paragraph.title}</h4>}
+        {paragraph.title && <h4>{displayAnswerTypography(paragraph.title)}</h4>}
         <p>
           {paragraph.claims.map((claim, claimIndex) => {
           const sourceNumbers = claim.sourceNumbers || claim.source_numbers || []
           const authorityNumbers = claim.authorityNumbers || claim.authority_numbers || []
           return (
             <span key={`answer-claim-${paragraphIndex}-${claimIndex}`}>
-            {claim.text}
+            {displayAnswerTypography(claim.text)}
             {sourceNumbers.length > 0 && <sup className="tracer__source-citation">
               {sourceNumbers.map((sourceNumber, citationIndex) => (
                 <span key={sourceNumber}>{citationIndex > 0 ? ', ' : ''}<a href={`#grouped-source-${sourceNumber}`} aria-label={`Jump to source ${sourceNumber}`}>{sourceNumber}</a></span>
@@ -468,7 +520,7 @@ const AnswerWithSourceLinks = ({ trace }) => {
       </div>
     ))
   }
-  return displayCaptureAnswer(trace)
+  return ''
 }
 
 const getRetrievalDiagnosticItems = (diagnostics) => {
@@ -479,6 +531,7 @@ const getRetrievalDiagnosticItems = (diagnostics) => {
   const items = []
   if (Number.isInteger(diagnostics.result_count)) {
     items.push(`Retrieved passages: ${diagnostics.result_count}.`)
+    if (diagnostics.result_count === 0) items.push('This is a retrieval-scope result, not evidence of historical absence.')
   }
   if (Number.isInteger(diagnostics.retained_source_count)) {
     items.push(`Retained capture sources: ${diagnostics.retained_source_count}.`)
@@ -569,6 +622,7 @@ const getRetrievalDiagnosticItems = (diagnostics) => {
 const EvidenceTracer = () => {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
+  const returnToVisualAnalytics = searchParams.get('returnTo') === 'visual-analytics'
   const [activeSession] = useState(() => loadSourceInterrogationSession())
   const [query, setQuery] = useState(() => activeSession?.query || '')
   const [availableDocuments, setAvailableDocuments] = useState([])
@@ -649,7 +703,6 @@ const EvidenceTracer = () => {
       return undefined
     }
 
-    let cancelled = false
     let rehydrationRequest = rehydrationRequestRef.current
     if (!rehydrationRequest || rehydrationRequest.runId !== runId) {
       currentRunIdRef.current = runId
@@ -660,7 +713,7 @@ const EvidenceTracer = () => {
     setLoading(true)
     rehydrationRequest.promise
       .then((run) => {
-        if (cancelled) return
+        if (rehydrationRequestRef.current !== rehydrationRequest) return
         const restoredTrace = mapPersistedRunToTrace(run)
         currentRunIdRef.current = runId
         setTraceData(restoredTrace)
@@ -668,17 +721,16 @@ const EvidenceTracer = () => {
         persistActiveSession(restoredTrace)
       })
       .catch((loadError) => {
-        if (cancelled) return
+        if (rehydrationRequestRef.current !== rehydrationRequest) return
         currentRunIdRef.current = null
         if (rehydrationRequestRef.current === rehydrationRequest) {
           rehydrationRequestRef.current = null
         }
         setSavedRunLoadError(loadError.message || 'The requested saved interrogation could not be loaded.')
       })
-      .finally(() => !cancelled && setLoading(false))
+      .finally(() => rehydrationRequestRef.current === rehydrationRequest && setLoading(false))
 
-    return () => { cancelled = true }
-  }, [searchParams, traceData?.queryId])
+  }, [searchParams.get('runId'), traceData?.queryId])
 
   useEffect(() => {
     let cancelled = false
@@ -787,10 +839,13 @@ const EvidenceTracer = () => {
         corpusVersion: analysis.corpus_version || null,
         retrievalMethod: analysis.retrieval_method || null,
         retrieval: analysis.retrieval || null,
-        answer: analysis.answer || (mode === 'retrieval-v3' ? 'Retrieval-only diagnostic completed. No model inference was requested.' : ''),
+        answer: analysis.answer_state === 'unverified_research_draft'
+          ? analysis.original_draft || ''
+          : analysis.answer || (mode === 'retrieval-v3' ? 'Retrieval-only diagnostic completed. No model inference was requested.' : ''),
+        documentarySpans: analysis.evidence_sources || [],
         answerParagraphs,
         response: analysis.answer || '',
-        answerOrigin: analysis.answer_origin || (mode === 'retrieval-v3' ? 'retrieval_only' : 'qwen_generated_synthesis'),
+        answerOrigin: analysis.answer_origin || (mode === 'retrieval-v3' ? 'retrieval_only' : 'model_generated_synthesis'),
         answerState: analysis.answer_state || null,
         synthesisFailure: analysis.synthesis_failure || null,
         sourceUsage,
@@ -828,14 +883,14 @@ const EvidenceTracer = () => {
         evidenceLedger,
         sourceGroups: analysis.source_groups || [],
         authorityRoles: analysis.authority_roles || null,
-        documentaryEvidence: analysis.researcher_facing?.documentary_evidence || [],
+        documentaryEvidence: analysis.researcher_facing?.documentary_evidence || analysis.documentary_evidence || [],
         testimonyEvidence: analysis.researcher_facing?.testimony_evidence || analysis.testimony_evidence || [],
         diagnosticDocumentaryEvidence: analysis.documentary_evidence || [],
         contextualEvidence: analysis.contextual_evidence || [],
         inferences: analysis.inferences || [],
         contradictions: analysis.contradictions || [],
         missingness: analysis.missingness || [],
-        evidentialLimits: analysis.researcher_facing?.evidential_limits || [],
+        evidentialLimits: analysis.researcher_facing?.evidential_limits || analysis.missingness || [],
         retrievalDiagnostics: analysis.retrieval_diagnostics || { ...(analysis.diagnostics || {}), retrieval_adequacy: analysis.retrieval_adequacy },
         retrievalV3: mode === 'retrieval-v3' ? analysis : null,
         followUpQueries: analysis.follow_up_queries || [],
@@ -851,7 +906,7 @@ const EvidenceTracer = () => {
 
       const completedTrace = {
         ...nextTrace,
-        persisted: Boolean(analysis.persisted),
+        persisted: Boolean(analysis.persisted || analysis.run_id),
         retrievedChunkCount: nextTrace.retrievedChunkIds.length,
         failureReason: analysis.error_message || null
       }
@@ -1068,7 +1123,7 @@ const EvidenceTracer = () => {
   )
 
   const validationFailure = traceData?.missingness?.find((item) => validationFailureCategories.has(item.category))
-  const isModelRuntimeFailure = traceData?.errorCode === 'runtime_failure'
+  const isModelRuntimeFailure = ['runtime_failure', 'granite_failure'].includes(traceData?.errorCode)
   const scopedLimits = traceData?.missingness?.filter((item) => !validationFailureCategories.has(item.category)) || []
   const retrievalDiagnosticItems = getRetrievalDiagnosticItems(traceData?.retrievalDiagnostics)
   const canUseRetrievalMemo = Boolean(traceData && !error)
@@ -1080,11 +1135,9 @@ const EvidenceTracer = () => {
         <PageHeader
           title="Source interrogation"
           description="Ask research questions against retrieved archival chunks, then inspect the source stack, caveats, and provenance trail."
-          actions={(
-            <Tag type={provenanceStatus.type} size="md">
+          actions={(<>{returnToVisualAnalytics && <Button kind="ghost" size="sm" onClick={() => navigate('/visual-analytics')}>Return to Visual Analytics</Button>}<Tag type={provenanceStatus.type} size="md">
               <Checkmark size={16} /> {provenanceStatus.label}
-            </Tag>
-          )}
+            </Tag></>)}
         />
       </Column>
 
@@ -1106,7 +1159,7 @@ const EvidenceTracer = () => {
             />
 
             <Select id="trace-mode" labelText="Mode / model selector" value={mode} onChange={(e) => setMode(e.target.value)} disabled={Boolean(traceData?.capture)}>
-              <SelectItem value="runtime" text={runtimeInfo?.display_name ? `${runtimeInfo.display_name} · Staged exploratory pipeline` : 'Staged Qwen evidence pipeline (exploratory)'} />
+              <SelectItem value="runtime" text={runtimeInfo?.display_name ? `${runtimeInfo.display_name} · Staged exploratory pipeline` : 'Staged research evidence pipeline (exploratory)'} />
               <SelectItem value="comparison" text="Document comparison · two selected sources" />
               <SelectItem value="archive-first-one-shot" text="Legacy one-shot researcher capture" />
               <SelectItem value="retrieval-v3" text="Retrieval v3 diagnostic (no model)" />
@@ -1125,7 +1178,7 @@ const EvidenceTracer = () => {
               {availableDocuments.filter((document) => document.id !== firstDocumentId).map((document) => <SelectItem key={document.id} value={document.id} text={document.title} />)}
             </Select>}
             {mode === 'comparison' && <p>Comparison is limited to passages retrieved independently from documents A and B. Unsupported agreement, difference, or omission remains unestablished.</p>}
-            {mode === 'archive-first-one-shot' && <p>This non-formal compatibility workflow makes one Qwen call and does not run the staged evidence pipeline.</p>}
+            {mode === 'archive-first-one-shot' && <p>This non-formal compatibility workflow makes one model call and does not run the staged evidence pipeline.</p>}
           </div>
 
           <div className="tracer__query-actions">
@@ -1255,6 +1308,37 @@ const EvidenceTracer = () => {
 
           {traceData && (
             <div className="tracer__structured-response">
+              {documentaryCitationNotes(displayCaptureAnswer(traceData)).length > 0 && (
+                <section aria-label="Documentary citation notes">
+                  <h4>Notes</h4>
+                  <ol>
+                    {documentaryCitationNotes(displayCaptureAnswer(traceData)).map((id, index) => {
+                      const source = traceData.documentarySpans?.find((item) => item.evidence_id === id)
+                      return (
+                        <li key={`${id}-${index}`} id={`documentary-note-${index + 1}`}>
+                          {source
+                            ? <><a href={`#evidence-${id}`} aria-label={`Jump to evidence ${id}, note ${index + 1}`}>{source.title || 'Untitled documentary source'}</a>, {source.page != null ? `p. ${source.page}` : 'page unavailable'}.</>
+                            : <>Unresolved evidence reference: {id}.</>}
+                        </li>
+                      )
+                    })}
+                  </ol>
+                </section>
+              )}
+              {traceData.documentarySpans?.length > 0 && (
+                <section aria-label="Citable documentary passages">
+                  <h4>Citable documentary passages</h4>
+                  {traceData.documentarySpans.map((source) => (
+                    <div key={source.evidence_id} id={`evidence-${source.evidence_id}`}>
+                      <p><strong>{source.evidence_id}: {source.title}</strong> | Page {source.page ?? 'unavailable'} | {source.evidence_status} | {source.evidence_role}</p>
+                      <p>{source.text}</p>
+                      <p>Document: {source.document_id} | Asset: {source.asset_id} | Chunk: {source.chunk_id}</p>
+                      <p>Archive PID: {source.archive_record_pid || 'unavailable'} | Media PID: {source.attached_media_pid || 'unavailable'} | Asset PID: {source.asset_pid || 'unavailable'}</p>
+                      {source.source_uri && <a href={source.source_uri} target="_blank" rel="noreferrer">Open source {source.evidence_id}</a>}
+                    </div>
+                  ))}
+                </section>
+              )}
               {traceData.comparison && (
                 <section aria-label="Document comparison evidence">
                   <h4>Document comparison evidence</h4>
@@ -1292,7 +1376,7 @@ const EvidenceTracer = () => {
                   <p>Planner entity resolution: {traceData.authorityRoles.planner_entity_resolution?.length > 0 ? traceData.authorityRoles.planner_entity_resolution.map((item) => `${item.label} (${item.authority_type})`).join('; ') : 'None'}.</p>
                   <p>Controlled lexical expansion: {traceData.authorityRoles.controlled_lexical_expansion?.used ? 'Yes' : 'No'}.</p>
                   <p>Authority retrieval nomination influence: {traceData.authorityRoles.retrieval_nomination?.used ? 'Yes' : 'No'}.</p>
-                  <p>Authority context supplied to Qwen: {traceData.authorityRoles.qwen_authority_context?.supplied ? 'Yes' : 'No'}.</p>
+                  <p>Authority context supplied to the model: {traceData.authorityRoles.qwen_authority_context?.supplied ? 'Yes' : 'No'}.</p>
                   <p>Persisted authority audit: {traceData.authorityRoles.persisted_authority_audit?.persisted ? 'Yes' : 'No'}.</p>
                 </>}
               </section>}
@@ -1369,21 +1453,21 @@ const EvidenceTracer = () => {
                   ))}
                 </section>
               )}
-              <section aria-label="Qwen interpretation">
-                <h4>Qwen interpretation</h4>
+              <section aria-label="Model interpretation">
+                <h4>Model interpretation</h4>
                 {['deterministic_catalogue_result', 'targeted_document_evidence_limit'].includes(traceData.answerOrigin)
                   ? <p>Not used. This result was determined from the selected-document retrieval result without model synthesis.</p>
                   : traceData.pipelineFailure
-                  ? <><p>Qwen interpretation unavailable</p><p>Formal run stopped at {traceData.pipelineFailure.stage === 'source_analysis' ? 'Stage A schema validation' : traceData.pipelineFailure.stage}.</p><p>{traceData.pipelineFailure.raw_output_preserved ? 'Raw Stage A model output is preserved with the immutable run.' : traceData.errorMessage || 'No final synthesis was produced.'}</p>{traceData.pipelineFailure.raw_output_preserved && traceData.rawModelResponse && <details className="tracer__raw-capture"><summary>Raw Stage A model output (immutable audit record)</summary><pre>{traceData.rawModelResponse}</pre></details>}</>
+                  ? <><p>Model interpretation unavailable</p><p>Formal run stopped at {traceData.pipelineFailure.stage === 'source_analysis' ? 'Stage A schema validation' : traceData.pipelineFailure.stage}.</p><p>{traceData.pipelineFailure.raw_output_preserved ? 'Raw Stage A model output is preserved with the immutable run.' : traceData.errorMessage || 'No final synthesis was produced.'}</p>{traceData.pipelineFailure.raw_output_preserved && traceData.rawModelResponse && <details className="tracer__raw-capture"><summary>Raw Stage A model output (immutable audit record)</summary><pre>{traceData.rawModelResponse}</pre></details>}</>
                   : traceData.inferences?.length > 0
                   ? traceData.inferences.map((item, index) => <p key={item?.claim_id || item?.inference || `inference-${index}`}>{formatInference(item)}</p>)
-                  : <p>No generated inference is asserted.</p>}
+                  : <p>{traceData.answerState === 'unverified_research_draft' ? 'The complete draft above is unverified model interpretation, not established historical findings.' : 'No generated inference is asserted.'}</p>}
                 {traceData.contradictions?.map((item, index) => <p key={`contradiction-${index}`}>Qualification: {item.description || item.claim || item}</p>)}
-                {traceData.stageExecution && <p>Stages run: {traceData.stageExecution.stages?.join(', ') || 'not recorded'} ({traceData.stageExecution.call_count ?? 0} Qwen calls).</p>}
+                {traceData.stageExecution && <p>Stages run: {traceData.stageExecution.stages?.join(', ') || 'not recorded'} ({traceData.stageExecution.call_count ?? 0} model calls).</p>}
               </section>
               <section aria-label="Evidential limits">
                 <h4>Evidential limits</h4>
-                {traceData.evidentialLimits.length > 0
+                {traceData.evidentialLimits?.length > 0
                   ? traceData.evidentialLimits.map((item, index) => (
                     <p key={item.claim_id || `${item.category}-${index}`}>
                       <strong>{missingnessOriginLabel(item)}:</strong> {item.claim_text || item.explanation}
@@ -1413,10 +1497,10 @@ const EvidenceTracer = () => {
                 {traceData.claimProvenance?.length > 0 && (
                   <div className="tracer__claim-provenance">
                     {traceData.claimProvenance.map((claim) => (
-                      <div className="tracer__claim" key={claim.claim_id}>
-                        <p><strong>{claim.section}</strong></p>
-                        <p>{claim.claim_text}</p>
-                        <p>Source IDs: {claim.source_ids?.join(', ') || 'None'} | Status: <strong>{claim.provenance_status}</strong></p>
+                      <div className="tracer__claim" key={claim.claim_id || claim.claim_number}>
+                        <p><strong>{claim.section || `Claim ${claim.claim_number}`}</strong></p>
+                        <p>{claim.claim_text || claim.assertion}</p>
+                        <p>Source IDs: {(claim.source_ids || claim.evidence_ids)?.join(', ') || 'None'} | Status: <strong>{claim.provenance_status || claim.semantic_status}</strong></p>
                       </div>
                     ))}
                   </div>
@@ -1456,6 +1540,7 @@ const EvidenceTracer = () => {
           />
           <EvidenceChain
             sources={traceData?.sources || []}
+            model={runtimeInfo?.display_name}
             showEmptyState={showNoSourcesReturned}
             onCopyCitation={handleCopyCitation}
             onOpenCorpus={goToCorpus}
