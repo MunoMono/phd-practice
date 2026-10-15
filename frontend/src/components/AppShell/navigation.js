@@ -11,7 +11,7 @@ import {
 export const PRIMARY_SECTIONS = [
   { key: 'workbench', label: 'Workbench', path: '/workbench', icon: Chip },
   { key: 'sources', label: 'Sources', path: '/sources', icon: Search },
-  { key: 'analysis', label: 'Analysis', path: '/source-interrogation', icon: DataVis_4 },
+  { key: 'analysis', label: 'Research queries', path: '/source-interrogation', icon: DataVis_4 },
   { key: 'visual-analytics', label: 'Visual analytics', path: '/visual-analytics', icon: DataVis_4 },
   { key: 'evidence', label: 'Evidence', path: '/provenance', icon: CheckmarkOutline },
   { key: 'documentation', label: 'Documentation', path: '/documentation', icon: Catalog },

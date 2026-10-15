@@ -71,8 +71,8 @@ const CorpusComposition = ({ composition }) => {
                 <title>{`${segment.data.label}: ${segment.data.value} assets`}</title>
               </path>
             ))}
-            <text textAnchor="middle" dy="-3" className="dashboard__donut-value">{composition.current_assets}</text>
-            <text textAnchor="middle" dy="17" className="dashboard__donut-label">current assets</text>
+            <text textAnchor="middle" dy="-3" className="dashboard__donut-value" pointerEvents="none">{composition.current_assets}</text>
+            <text textAnchor="middle" dy="17" className="dashboard__donut-label" pointerEvents="none">current assets</text>
           </g>
         </svg>
         <ul className="dashboard__chart-key">

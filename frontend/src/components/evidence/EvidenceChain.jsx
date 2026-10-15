@@ -3,6 +3,7 @@ import EvidenceSourceCard from './EvidenceSourceCard'
 
 const EvidenceChain = ({
   sources,
+  model,
   showEmptyState = false,
   onCopyCitation,
   onOpenCorpus,
@@ -31,6 +32,7 @@ const EvidenceChain = ({
           key={source.chunkId || `source-${index}`}
           id={`source-${index + 1}`}
           source={source}
+          model={model}
           index={index}
           onCopyCitation={() => onCopyCitation(source)}
           onOpenCorpus={() => onOpenCorpus(source)}

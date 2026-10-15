@@ -94,6 +94,7 @@ const AppShell = ({ currentTheme, onThemeToggle, children }) => {
   const isDark = currentTheme === 'g100'
   const navigationContext = getNavigationContext(location.pathname)
   const isVisualAnalyticsWorkspace = navigationContext.primarySection.key === 'visual-analytics'
+  const isDetachedProjector = location.pathname === '/visual-analytics' && new URLSearchParams(location.search).get('projector') === 'detached'
   const secondaryItems = isVisualAnalyticsWorkspace ? [] : navigationContext.secondaryItems
   const breadcrumbs = isVisualAnalyticsWorkspace ? [] : navigationContext.breadcrumbs
   const greetingName = user?.given_name || user?.name?.split(' ')?.[0] || user?.email?.split('@')?.[0] || 'there'
@@ -105,7 +106,7 @@ const AppShell = ({ currentTheme, onThemeToggle, children }) => {
 
   return (
     <>
-      <CarbonHeader aria-label="DDR testamentary traces" className="ddr-app-shell-header">
+      {!isDetachedProjector && <CarbonHeader aria-label="DDR testamentary traces" className="ddr-app-shell-header">
         <SkipToContent />
         <HeaderMenuButton
           aria-label={isMobileNavExpanded ? 'Close navigation' : 'Open navigation'}
@@ -151,9 +152,9 @@ const AppShell = ({ currentTheme, onThemeToggle, children }) => {
             <UserAvatar size={20} />
           </HeaderGlobalAction>
         </HeaderGlobalBar>
-      </CarbonHeader>
+      </CarbonHeader>}
 
-      {isMobileNavExpanded ? (
+      {!isDetachedProjector && isMobileNavExpanded ? (
         <SideNav
           aria-label="Application navigation"
           className="ddr-app-shell-mobile-nav"
@@ -205,7 +206,7 @@ const AppShell = ({ currentTheme, onThemeToggle, children }) => {
       ) : null}
 
       <div
-        className={`ddr-app-shell${secondaryItems.length ? ' ddr-app-shell--with-sidebar' : ''}${isDesktopSidebarCollapsed ? ' ddr-app-shell--sidebar-collapsed' : ''}`}
+        className={`ddr-app-shell${secondaryItems.length ? ' ddr-app-shell--with-sidebar' : ''}${isDesktopSidebarCollapsed ? ' ddr-app-shell--sidebar-collapsed' : ''}${isDetachedProjector ? ' ddr-app-shell--projector-only' : ''}`}
       >
         {secondaryItems.length ? (
           <SecondaryNavigation
@@ -219,7 +220,7 @@ const AppShell = ({ currentTheme, onThemeToggle, children }) => {
 
         <main
           id="main-content"
-          className={`ddr-app-shell__main${secondaryItems.length ? '' : ' ddr-app-shell__main--standalone'}`}
+          className={`ddr-app-shell__main${secondaryItems.length ? '' : ' ddr-app-shell__main--standalone'}${isDetachedProjector ? ' ddr-app-shell__main--projector-only' : ''}`}
         >
           {breadcrumbs.length ? (
             <div className="ddr-app-shell__breadcrumbs">

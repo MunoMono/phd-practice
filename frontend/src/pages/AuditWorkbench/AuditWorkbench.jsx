@@ -158,7 +158,7 @@ const AuditWorkbench = () => {
       {
         label: 'Runtime readiness',
         value: loading ? 'Loading...' : runtimeStatus?.model_status || 'Unavailable',
-        note: loading ? 'Checking model state' : runtimeStatus?.model_ready ? 'Qwen3 8B ready for evidence-bound synthesis' : 'Model is not ready for synthesis',
+        note: loading ? 'Checking model state' : runtimeStatus?.model_ready ? 'Configured runtime ready for evidence-bound synthesis' : 'Model is not ready for synthesis',
       },
       {
         label: 'Query runs',

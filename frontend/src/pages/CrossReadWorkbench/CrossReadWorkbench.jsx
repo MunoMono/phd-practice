@@ -57,6 +57,7 @@ const createEmptyMappingForm = () => ({
 const CrossReadWorkbench = () => {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
+  const returnToVisualAnalytics = searchParams.get('returnTo') === 'visual-analytics'
   const sourceDocumentId = searchParams.get('sourceDocumentId') || ''
   const sourceChunkId = searchParams.get('sourceChunkId') || ''
   const sourcePid = searchParams.get('pid') || ''
@@ -347,11 +348,9 @@ const CrossReadWorkbench = () => {
         <PageHeader
           title="Cross-readings"
           description="Use testimony and interpretive passages as probes against archival records, then annotate convergence, contradiction, complication, or no trace."
-          actions={(
-            <Tag type="cyan" size="md">
+          actions={(<>{returnToVisualAnalytics && <Button kind="ghost" size="sm" onClick={() => navigate('/visual-analytics')}>Return to Visual Analytics</Button>}<Tag type="cyan" size="md">
               <ArrowsHorizontal size={16} /> Testimony to record mapping
-            </Tag>
-          )}
+            </Tag></>)}
         />
       </Column>
 

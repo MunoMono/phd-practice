@@ -327,3 +327,19 @@
 .ddr-app-shell__content {
   min-width: 0;
 }
+
+.ddr-app-shell--projector-only {
+  min-height: 0;
+  height: 100dvh;
+  overflow: hidden;
+}
+
+.ddr-app-shell__main--projector-only,
+.ddr-app-shell__main--projector-only .ddr-app-shell__content {
+  height: 100%;
+  overflow: hidden;
+}
+
+.ddr-app-shell__main--projector-only .ddr-app-shell__content {
+  padding-top: 0;
+}

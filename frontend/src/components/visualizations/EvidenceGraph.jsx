@@ -115,7 +115,7 @@ const EvidenceGraph = ({ data }) => {
       ? 'Evidence-bound assembly'
       : data.answerOrigin === 'retrieval_only'
         ? 'No model synthesis'
-        : 'Qwen evidence synthesis'
+        : 'Model evidence synthesis'
     const nodes = [
       { id: 'question', label: 'Research question', detail: data.prompt || data.query || 'Question text unavailable', column: 0, row: 0, group: 'query' },
       { id: 'selection', label: 'Archive-first selection', detail: `${sources.length} retained passage${sources.length === 1 ? '' : 's'} nominated from the available evidence surface`, column: 1, row: 0, group: 'document' },

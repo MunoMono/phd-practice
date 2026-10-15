@@ -1,5 +1,4 @@
-import { AILabel, AILabelActions, AILabelContent, Button, Link, Tile } from '@carbon/react'
-import { Launch } from '@carbon/icons-react'
+import { AILabel, AILabelActions, AILabelContent, Button, Tile } from '@carbon/react'
 
 const renderCitation = (citation) => {
   if (!citation) {
@@ -19,7 +18,7 @@ const renderCitation = (citation) => {
   ].filter(Boolean).join(' | ')
 }
 
-const SourceAiLabel = ({ source, classificationLabel }) => (
+const SourceAiLabel = ({ source, model, classificationLabel }) => (
   <AILabel
     className="evidence-source-card__ai-label"
     size="xs"
@@ -42,7 +41,7 @@ const SourceAiLabel = ({ source, classificationLabel }) => (
       <AILabelActions>
         <div className="evidence-source-card__ai-model">
           <span>AI model</span>
-          <Link href="https://huggingface.co/Qwen/Qwen3-8B-GGUF" target="_blank" rel="noreferrer" renderIcon={Launch}>Qwen3-8B GGUF</Link>
+          <span>{model || 'Active research runtime'}</span>
         </div>
       </AILabelActions>
     </AILabelContent>
@@ -60,6 +59,7 @@ const EvidenceSourceCard = ({
   id,
   source,
   index,
+  model,
   onCopyCitation,
   onOpenCorpus,
   onShowAnalytics,
@@ -86,7 +86,7 @@ const EvidenceSourceCard = ({
           <p>{title} | {source.date || 'Date not recorded'}</p>
         </div>
         <div className="evidence-source-card__header-actions">
-          <SourceAiLabel source={source} classificationLabel={classificationLabel} />
+          <SourceAiLabel source={source} model={model} classificationLabel={classificationLabel} />
           <dl className="evidence-source-card__status" aria-label="Source retrieval status">
             <div><dt>Archive ID</dt><dd>{source.pid || 'Unavailable'}</dd></div>
             <div><dt>Answer use</dt><dd>{source.evidenceState || 'Retrieved candidate'}</dd></div>

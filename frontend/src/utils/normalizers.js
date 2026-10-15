@@ -330,7 +330,19 @@ export const normalizeUmapProjection = (raw = {}) => ({
     y: toNumber(firstDefined(point.y, point.umap_y), 0),
       z: toNumber(firstDefined(point.z, point.umap_z), null),
     year: firstDefined(point.year, point.publication_year, null),
-    sourceType: firstDefined(point.sourceType, point.source_type, 'unknown'),
+    sourceType: firstDefined(
+      point.sourceType && point.sourceType !== 'unknown' ? point.sourceType : null,
+      point.source_type && point.source_type !== 'unknown' ? point.source_type : null,
+      point.documentaryForm?.fileType && point.documentaryForm.fileType !== 'not_exposed' ? point.documentaryForm.fileType : null,
+      point.documentary_form?.file_type && point.documentary_form.file_type !== 'not_exposed' ? point.documentary_form.file_type : null,
+      'unknown'
+    ),
+    evidenceClass: {
+      kind: firstDefined(point.evidenceClass?.kind, point.evidence_class?.kind, 'documentary_record'),
+      label: firstDefined(point.evidenceClass?.label, point.evidence_class?.label, 'Archival document'),
+      basis: firstDefined(point.evidenceClass?.basis, point.evidence_class?.basis, null),
+      temporalClass: firstDefined(point.evidenceClass?.temporalClass, point.evidence_class?.temporal_class, null)
+    },
     documentaryForm: {
       fileType: firstDefined(point.documentaryForm?.fileType, point.documentary_form?.file_type, 'not_exposed'),
       chunkType: firstDefined(point.documentaryForm?.chunkType, point.documentary_form?.chunk_type, 'not_exposed'),
@@ -392,6 +404,12 @@ export const normalizeUmapProjection = (raw = {}) => ({
     projectionMethod: firstDefined(raw.metadata?.projectionMethod, raw.metadata?.projection_method, 'none'),
     projectionId: firstDefined(raw.metadata?.projectionId, raw.metadata?.projection_id, null),
     embeddingSetId: firstDefined(raw.metadata?.embeddingSetId, raw.metadata?.embedding_set_id, null),
+    challengeRunId: firstDefined(raw.metadata?.challengeRunId, raw.metadata?.challenge_run_id, null),
+    sourceProjectionId: firstDefined(raw.metadata?.sourceProjectionId, raw.metadata?.source_projection_id, null),
+    algorithmLibrary: firstDefined(raw.metadata?.algorithmLibrary, raw.metadata?.algorithm_library, null),
+    metric: firstDefined(raw.metadata?.metric, null),
+    sampleOrder: firstDefined(raw.metadata?.sampleOrder, raw.metadata?.sample_order, null),
+    outputScope: firstDefined(raw.metadata?.outputScope, raw.metadata?.output_scope, null),
     randomSeed: firstDefined(raw.metadata?.randomSeed, raw.metadata?.random_seed, null),
     nNeighbors: firstDefined(raw.metadata?.nNeighbors, raw.metadata?.n_neighbors, null),
     minDist: firstDefined(raw.metadata?.minDist, raw.metadata?.min_dist, null),
@@ -418,6 +436,9 @@ export const normalizeUmapProjection = (raw = {}) => ({
       distinctPidsRepresented: toNumber(firstDefined(raw.metadata?.evidenceSurfaceScope?.distinctPidsRepresented, raw.metadata?.evidence_surface_scope?.distinct_pids_represented), 0),
       totalCandidates: toNumber(firstDefined(raw.metadata?.evidenceSurfaceScope?.totalCandidates, raw.metadata?.evidence_surface_scope?.total_candidates), 0),
       returnedPoints: toNumber(firstDefined(raw.metadata?.evidenceSurfaceScope?.returnedPoints, raw.metadata?.evidence_surface_scope?.returned_points), 0),
+      eligibleCount: toNumber(firstDefined(raw.metadata?.evidenceSurfaceScope?.eligibleCount, raw.metadata?.evidence_surface_scope?.eligible_count), 0),
+      representedCount: toNumber(firstDefined(raw.metadata?.evidenceSurfaceScope?.representedCount, raw.metadata?.evidence_surface_scope?.represented_count), 0),
+      renderedCount: toNumber(firstDefined(raw.metadata?.evidenceSurfaceScope?.renderedCount, raw.metadata?.evidence_surface_scope?.rendered_count), 0),
       scopeNote: firstDefined(raw.metadata?.evidenceSurfaceScope?.scopeNote, raw.metadata?.evidence_surface_scope?.scope_note, null)
     },
     interpretationWarnings: toArray(firstDefined(raw.metadata?.interpretationWarnings, raw.metadata?.interpretation_warnings, []))

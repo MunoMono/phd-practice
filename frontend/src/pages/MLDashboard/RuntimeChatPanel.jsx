@@ -11,8 +11,12 @@ import PanelHeader from '../../components/layout/PanelHeader';
 import { getRuntimeModelInfo } from '../../api/runtime';
 
 const formatRuntimeModel = (modelName) => (
-  modelName === 'qwen3:8b-q4_K_M' ? 'Qwen3 8B · Q4_K_M' : modelName || 'Unavailable'
-);
+  modelName === 'qwen3:8b-q4_K_M'
+    ? 'Qwen3 8B · Q4_K_M'
+    : modelName === 'qwen3:14b-q4_K_M'
+      ? 'Qwen3 14B · Q4_K_M'
+      : modelName || 'Unavailable'
+)
 
 // Extract usable citation info from a context chunk
 function extractSourceInfo(chunk) {

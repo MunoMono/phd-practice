@@ -17,7 +17,7 @@ import {
 } from '@carbon/react'
 import { WarningAlt, Download } from '@carbon/icons-react'
 import { useEffect, useMemo, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import PageHeader from '../../components/layout/PageHeader'
 import PanelHeader from '../../components/layout/PanelHeader'
 import { PageGrid, PageColumn as Column } from '../../components/layout/PageGrid'
@@ -48,6 +48,8 @@ const getEventIdFromTableRow = (row) => {
 
 const MissingnessWorkbench = () => {
   const [searchParams] = useSearchParams()
+  const navigate = useNavigate()
+  const returnToVisualAnalytics = searchParams.get('returnTo') === 'visual-analytics'
   const requestedEventId = searchParams.get('eventId') || ''
   const sourceDocumentId = searchParams.get('sourceDocumentId') || ''
   const sourceChunkId = searchParams.get('sourceChunkId') || ''
@@ -200,10 +202,10 @@ const MissingnessWorkbench = () => {
 
     const saveTargetEventId = selectedEvent.event_id
     const savePayload = {
-      type: draftType,
-      status: draftStatus,
-      reviewer_note: draftReviewerNote,
-      follow_up_action: draftFollowUpAction
+      ...(draftType !== selectedEvent.type ? { type: draftType } : {}),
+      ...(draftStatus !== selectedEvent.status ? { status: draftStatus } : {}),
+      ...(draftReviewerNote !== (selectedEvent.reviewer_note || '') ? { reviewer_note: draftReviewerNote } : {}),
+      ...(draftFollowUpAction !== (selectedEvent.follow_up_action || '') ? { follow_up_action: draftFollowUpAction } : {})
     }
 
     setSavingEventId(saveTargetEventId)
@@ -245,11 +247,9 @@ const MissingnessWorkbench = () => {
         <PageHeader
           title="Absences"
           description="Make scoped retrieval, metadata, registry, access, and description conditions available as analytical evidence."
-          actions={(
-            <Tag type="magenta" size="md">
+          actions={(<>{returnToVisualAnalytics && <Button kind="ghost" size="sm" onClick={() => navigate('/visual-analytics')}>Return to Visual Analytics</Button>}<Tag type="magenta" size="md">
               <WarningAlt size={16} /> Analytical gaps visible
-            </Tag>
-          )}
+            </Tag></>)}
         />
       </Column>
 

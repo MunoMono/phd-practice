@@ -87,7 +87,22 @@ export const getSemanticNeighbourhood = (payload) => apiRequest('/api/viz/semant
   body: payload
 })
 
+export const getQueryNeighbourhood = (payload) => apiRequest('/api/viz/query-neighbourhood', {
+  method: 'POST',
+  body: payload
+})
+
+export const getCohortNeighbourhood = (payload) => apiRequest('/api/viz/cohort-neighbourhood', {
+  method: 'POST',
+  body: payload
+})
+
 export const getProjectionFidelity = (payload) => apiRequest('/api/viz/projection-fidelity', {
+  method: 'POST',
+  body: payload
+})
+
+export const getOriginalSpaceDensity = (payload) => apiRequest('/api/viz/original-space-density', {
   method: 'POST',
   body: payload
 })
@@ -111,9 +126,15 @@ export const createVisualTemporalPeriod = (payload) => apiRequest('/api/viz/temp
 
 export const getVisualTemporalPeriods = () => apiRequest('/api/viz/temporal-periods')
 
+export const getAlignedUmapRuns = () => apiRequest('/api/viz/aligned-runs')
+
 export const getAlignedUmapStaticComparison = (alignedRunId) => apiRequest(`/api/viz/aligned-runs/${encodeURIComponent(alignedRunId)}/static-comparison`)
+
+export const getAlignedUmapCoordinates = (alignedRunId) => apiRequest(`/api/viz/aligned-runs/${encodeURIComponent(alignedRunId)}/coordinates`)
 
 export const challengeUmapProjection = (payload) => apiRequest('/api/viz/umap/challenge', {
   method: 'POST',
   body: payload
 })
+
+export const getUmapChallengeRun = (challengeRunId) => apiRequest(`/api/viz/umap/challenge/${encodeURIComponent(challengeRunId)}`)

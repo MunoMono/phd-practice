@@ -1,6 +1,6 @@
 import { Suspense, lazy, useEffect, useState } from 'react'
 import { useAuth0 } from '@auth0/auth0-react'
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { Theme, Loading } from '@carbon/react'
 import AppShell from './components/AppShell/AppShell'
 import { configureAccessTokenProvider } from './api/client'
@@ -17,6 +17,11 @@ const AuditWorkbench = lazy(() => import('./pages/AuditWorkbench/AuditWorkbench'
 const ResearchRuns = lazy(() => import('./pages/ResearchRuns/ResearchRuns'))
 const Documentation = lazy(() => import('./pages/Documentation/Documentation'))
 const LoginPage = lazy(() => import('./components/Auth/LoginPage'))
+
+function SemanticAtlasRedirect() {
+  const location = useLocation()
+  return <Navigate to={`/visual-analytics${location.search}`} replace />
+}
 
 function App() {
   const [theme, setTheme] = useState('g100')
@@ -73,7 +78,7 @@ function App() {
                   <Route path="/absences" element={<MissingnessWorkbench />} />
                   <Route path="/cross-readings" element={<CrossReadWorkbench />} />
                   <Route path="/visual-analytics" element={<VisualAnalytics />} />
-                  <Route path="/semantic-atlas" element={<Navigate to="/visual-analytics" replace />} />
+                  <Route path="/semantic-atlas" element={<SemanticAtlasRedirect />} />
                   <Route path="/semantic-neighbourhoods" element={<Navigate to="/visual-analytics?view=neighbourhoods" replace />} />
                   <Route path="/comparative-views" element={<Navigate to="/visual-analytics?view=comparative" replace />} />
                   <Route path="/temporal-documentary-change" element={<Navigate to="/visual-analytics?view=temporal" replace />} />

@@ -1,4 +1,4 @@
-import { InlineNotification, Tag } from '@carbon/react'
+import { Button, InlineNotification, Tag } from '@carbon/react'
 import { Search } from '@carbon/icons-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
@@ -25,6 +25,7 @@ const CorpusExplorer = () => {
   const handoffDocumentId = searchParams.get('documentId') || ''
   const handoffPid = searchParams.get('pid') || ''
   const handoffRequested = searchParams.has('documentId') || searchParams.has('pid')
+  const returnToVisualAnalytics = searchParams.get('returnTo') === 'visual-analytics'
   const [filters, setFilters] = useState(defaultFilters)
   const [documents, setDocuments] = useState([])
   const [loading, setLoading] = useState(true)
@@ -304,11 +305,7 @@ const CorpusExplorer = () => {
         <PageHeader
           title="Sources"
           description="Inspect DDR records, ingestion status, metadata, PID links, and source handoffs before moving into interrogation or analysis."
-          actions={(
-            <Tag type="blue" size="md">
-              <Search size={16} /> Endpoint-driven
-            </Tag>
-          )}
+          actions={<>{returnToVisualAnalytics && <Button kind="ghost" size="sm" onClick={() => navigate('/visual-analytics')}>Return to Visual Analytics</Button>}<Tag type="blue" size="md"><Search size={16} /> Endpoint-driven</Tag></>}
         />
       </Column>
 
