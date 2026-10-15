@@ -17,7 +17,7 @@ from app.core.database import LocalSessionLocal
 from app.core.config import settings
 from app.core.auth import get_optional_user
 from app.core.ddr_temporal_scope import DDR_DOCUMENT_SQL_SCOPE
-from app.models.research_outputs import AlignedUmapRelation, AlignedUmapRun, AlignedUmapSlice, AlignedUmapValidationReport, EmbeddingReadinessReview, MissingnessEvent, ReducerCheckpoint, ReducerCompatibilityReview, VisualAnnotation, VisualAnnotationRevision, VisualCohort, VisualCriticalProbe, VisualInquiry, VisualTemporalPeriod
+from app.models.research_outputs import AlignedUmapCoordinate, AlignedUmapRelation, AlignedUmapRun, AlignedUmapSlice, AlignedUmapValidationReport, EmbeddingReadinessReview, MissingnessEvent, ReducerCheckpoint, ReducerCompatibilityReview, VisualAnnotation, VisualAnnotationRevision, VisualCohort, VisualCriticalProbe, VisualInquiry, VisualTemporalPeriod, VisualUmapChallengeRun
 from app.services.corpus_status_service import get_corpus_status
 
 router = APIRouter()
@@ -44,6 +44,21 @@ SCOPED_MISSINGNESS_V02_BASELINE = {
 }
 
 ReadinessStatus = Literal["draft", "blocked", "approved"]
+
+ANNOTATION_TYPES = {
+    "role_action", "attribution", "anonymity", "identity_alias", "contested_label",
+    "representation_condition", "interpretive_note",
+    # Retained for existing annotations created before the controlled vocabulary.
+    "researcher_note", "interpretive_question", "contested_reading",
+}
+ANNOTATION_CONTROLLED_VALUES = {
+    "role_action": {"administrative", "technical", "care", "teaching", "workshop", "coordination", "maintenance", "research", "authorship", "collaboration", "supervision", "management", "other_uncertain"},
+    "attribution": {"named_individual", "collective_attribution", "unnamed_actor", "inferred_uncertain", "absent_not_described"},
+    "anonymity": {"identified", "anonymous", "not_exposed"},
+    "representation_condition": {"documentary_trace", "descriptive_trace", "oral_history_trace", "authority_context", "computational_cue", "missingness_condition"},
+}
+ANNOTATION_RESEARCHER_VALUE_TYPES = {"identity_alias", "contested_label", "interpretive_note"}
+ANNOTATION_VOCABULARY_VERSION = "visual-annotation-v1"
 
 
 class EmbeddingReadinessReviewRequest(BaseModel):
@@ -96,14 +111,18 @@ class AtlasCoverageMissingnessRequest(BaseModel):
 
 class SemanticNeighbourhoodRequest(BaseModel):
     focal_chunk_id: str = Field(min_length=1, max_length=255)
-    size: int = Field(default=10, ge=5, le=50)
+    size: int = Field(default=10, ge=1, le=100)
 
-    @field_validator("size")
-    @classmethod
-    def display_k_must_use_configured_step(cls, value: int) -> int:
-        if value % 5:
-            raise ValueError("Neighbourhood display k must increase in steps of 5.")
-        return value
+
+class QueryNeighbourhoodRequest(BaseModel):
+    query: str = Field(min_length=2, max_length=500)
+    size: int = Field(default=10, ge=1, le=100)
+
+
+class CohortNeighbourhoodRequest(BaseModel):
+    cohort_name: str = Field(min_length=1, max_length=255)
+    chunk_ids: List[str] = Field(min_length=1, max_length=100)
+    size: int = Field(default=10, ge=1, le=100)
 
 
 class CriticalProbeRequest(BaseModel):
@@ -234,6 +253,11 @@ class ProjectionFidelityRequest(BaseModel):
     neighbourhood_size: int = Field(default=10, ge=2, le=50)
 
 
+class OriginalSpaceDensityRequest(BaseModel):
+    chunk_ids: List[str] = Field(min_length=3, max_length=200)
+    embedding_set_id: str = Field(min_length=1, max_length=255)
+
+
 class VisualInquiryRequest(BaseModel):
     researcher: Optional[str] = Field(default=None, max_length=255)
     view: str = Field(min_length=1, max_length=64)
@@ -264,12 +288,25 @@ class VisualAnnotationRequest(BaseModel):
     value: Dict
     evidence_source: Optional[str] = Field(default=None, max_length=255)
     reviewer: Optional[str] = Field(default=None, max_length=255)
-    status: Literal["draft", "reviewed", "contested"] = "draft"
+    status: Literal["draft", "reviewing", "reviewed", "contested", "withdrawn"] = "draft"
 
     @model_validator(mode="after")
     def requires_source_identifier(self):
         if not self.document_id and not self.chunk_id:
             raise ValueError("A document_id or chunk_id is required for a visual annotation.")
+        if self.annotation_type not in ANNOTATION_TYPES:
+            raise ValueError("annotation_type must be a supported controlled vocabulary type")
+        allowed_values = ANNOTATION_CONTROLLED_VALUES.get(self.annotation_type)
+        if allowed_values:
+            controlled_value = self.value.get("controlled_value")
+            if controlled_value not in allowed_values:
+                raise ValueError("controlled_value must be valid for the selected annotation_type")
+            if self.value.get("vocabulary_version", ANNOTATION_VOCABULARY_VERSION) != ANNOTATION_VOCABULARY_VERSION:
+                raise ValueError("vocabulary_version is not supported")
+        if self.annotation_type in ANNOTATION_RESEARCHER_VALUE_TYPES:
+            researcher_value = self.value.get("researcher_value")
+            if not isinstance(researcher_value, str) or not researcher_value.strip() or len(researcher_value) > 500:
+                raise ValueError("researcher_value must be a non-blank value of at most 500 characters")
         return self
 
 
@@ -278,6 +315,7 @@ class UmapChallengeRequest(BaseModel):
     n_neighbors: int = Field(default=15, ge=2, le=100)
     min_dist: float = Field(default=0.1, ge=0.0, le=0.99)
     sample_size: int = Field(default=500, ge=50, le=1000)
+    researcher_note: Optional[str] = Field(default=None, max_length=4000)
 
 
 def _semantic_point_payload(row) -> dict:
@@ -294,6 +332,7 @@ def _semantic_point_payload(row) -> dict:
         "title": row.title or "Untitled trace",
         "year": int(row.year) if row.year is not None else None,
         "source_type": _infer_source_type(row.file_type, row.chunk_type, row.citation),
+        "evidence_class": _evidence_classification(row.document_id),
         "documentary_form": {
             "file_type": row.file_type or "not_exposed",
             "chunk_type": row.chunk_type or "not_exposed",
@@ -339,6 +378,18 @@ def _semantic_point_payload(row) -> dict:
             "database_authority_context_status": "not_exposed",
         },
     }
+
+
+def _evidence_classification(document_id: Optional[str]) -> dict:
+    """Return only registered evidence classifications; do not infer testimony from text."""
+    if document_id == "doc_930287260339_cf797b8d4ce2":
+        return {
+            "kind": "oral_history_testimony",
+            "label": "Later oral testimony / interview",
+            "basis": "Registered document identity and June 2013 interview description",
+            "temporal_class": "Later testimony (June 2013)",
+        }
+    return {"kind": "documentary_record", "label": "Archival document"}
 
 
 def _mapping_value(value: Any) -> Dict:
@@ -617,6 +668,25 @@ def _extract_key_concepts(value) -> List[str]:
         return [str(item).strip() for item in value if str(item).strip()]
 
     return []
+
+
+def _extract_documentary_topics(value) -> List[str]:
+    if isinstance(value, str):
+        try:
+            value = json.loads(value)
+        except json.JSONDecodeError:
+            return []
+    if not isinstance(value, dict):
+        return []
+
+    topics = []
+    for field_name in ("keywords", "key_concepts", "concepts", "themes", "subjects", "tags", "topic"):
+        field_value = value.get(field_name)
+        if isinstance(field_value, str):
+            topics.extend(part.strip() for part in field_value.split(",") if part.strip())
+        elif isinstance(field_value, (list, tuple)):
+            topics.extend(str(item).strip() for item in field_value if str(item).strip())
+    return list(dict.fromkeys(topics))
 
 
 def _extract_entities(value) -> List[str]:
@@ -1282,6 +1352,105 @@ async def get_semantic_neighbourhood(request: SemanticNeighbourhoodRequest):
         db.close()
 
 
+@router.post("/query-neighbourhood")
+async def get_query_neighbourhood(request: QueryNeighbourhoodRequest):
+    """Retrieve original-space neighbours for a non-persisted researcher query focal."""
+    db = LocalSessionLocal()
+    try:
+        projection = _get_completed_semantic_atlas_projection(db)
+        if not projection:
+            raise HTTPException(status_code=404, detail="No completed Semantic Atlas projection is available.")
+        embedding_set = db.execute(text("""
+            SELECT model_name, model_revision, vector_dimensions
+            FROM semantic_embedding_sets
+            WHERE embedding_set_id = :embedding_set_id AND status = 'completed'
+        """), {"embedding_set_id": projection["embedding_set_id"]}).mappings().first()
+        if not embedding_set:
+            raise HTTPException(status_code=404, detail="The completed embedding set is unavailable.")
+        query_vector = _load_probe_embedding(embedding_set["model_name"], request.query.strip())
+        if len(query_vector) != embedding_set["vector_dimensions"]:
+            raise HTTPException(status_code=503, detail="The query encoder does not match the completed embedding dimensions.")
+        chunk_columns = _get_table_columns(db, "document_chunks")
+        citation_select = "dc.citation" if "citation" in chunk_columns else "NULL::jsonb AS citation"
+        rows = db.execute(text(_semantic_neighbour_query("1 - (sce.embedding <=> CAST(:query_vector AS vector))", citation_select)), {
+            "embedding_set_id": projection["embedding_set_id"],
+            "projection_id": projection["projection_id"],
+            "query_vector": "[" + ",".join(str(value) for value in query_vector) + "]",
+            "size": request.size,
+        }).fetchall()
+        return {
+            "query": request.query.strip(),
+            "neighbours": [{**_semantic_point_payload(row), "rank": rank} for rank, row in enumerate(rows, start=1)],
+            "metadata": {
+                "embedding_model": embedding_set["model_name"],
+                "model_revision": embedding_set["model_revision"],
+                "vector_dimensions": embedding_set["vector_dimensions"],
+                "embedding_set_id": projection["embedding_set_id"],
+                "projection_id": projection["projection_id"],
+                "metric": "cosine similarity",
+                "requested_k": request.size,
+                "returned_k": len(rows),
+                "method": "Original-space cosine similarity between a researcher query and the completed embedding set.",
+                "interpretation_limit": "The researcher query is not a stored corpus record or point in the UMAP projection. Returned passages are retrieval candidates, not historical relationships or evidence of a query location in the atlas.",
+            },
+        }
+    finally:
+        db.close()
+
+
+@router.post("/cohort-neighbourhood")
+async def get_cohort_neighbourhood(request: CohortNeighbourhoodRequest):
+    """Retrieve original-space neighbours of a non-persisted cohort embedding centroid."""
+    db = LocalSessionLocal()
+    try:
+        projection = _get_completed_semantic_atlas_projection(db)
+        if not projection:
+            raise HTTPException(status_code=404, detail="No completed Semantic Atlas projection is available.")
+        rows = db.execute(text("""
+            SELECT embedding::text AS embedding
+            FROM semantic_chunk_embeddings
+            WHERE embedding_set_id = :embedding_set_id
+                AND status = 'embedded'
+                AND chunk_id = ANY(:chunk_ids)
+        """), {"embedding_set_id": projection["embedding_set_id"], "chunk_ids": request.chunk_ids}).mappings().all()
+        if not rows:
+            raise HTTPException(status_code=404, detail="No selected cohort chunks are represented in the completed embedding set.")
+        vectors = [np.fromstring(row["embedding"].strip("[]"), sep=",") for row in rows]
+        centroid = np.mean(vectors, axis=0)
+        norm = np.linalg.norm(centroid)
+        if not norm:
+            raise HTTPException(status_code=422, detail="The selected cohort cannot form an original-space centroid.")
+        query_vector = "[" + ",".join(str(value) for value in centroid / norm) + "]"
+        chunk_columns = _get_table_columns(db, "document_chunks")
+        citation_select = "dc.citation" if "citation" in chunk_columns else "NULL::jsonb AS citation"
+        result_rows = db.execute(text(_semantic_neighbour_query("1 - (sce.embedding <=> CAST(:query_vector AS vector))", citation_select)), {
+            "embedding_set_id": projection["embedding_set_id"],
+            "projection_id": projection["projection_id"],
+            "query_vector": query_vector,
+            "size": request.size + len(rows),
+        }).fetchall()
+        selected_ids = set(request.chunk_ids)
+        neighbours = [{**_semantic_point_payload(row), "rank": rank} for rank, row in enumerate((row for row in result_rows if row.chunk_id not in selected_ids), start=1)][:request.size]
+        return {
+            "cohort_name": request.cohort_name,
+            "neighbours": neighbours,
+            "metadata": {
+                "embedding_set_id": projection["embedding_set_id"],
+                "projection_id": projection["projection_id"],
+                "metric": "cosine similarity",
+                "selected_chunk_count": len(request.chunk_ids),
+                "represented_chunk_count": len(rows),
+                "excluded_unrepresented_chunk_count": len(request.chunk_ids) - len(rows),
+                "requested_k": request.size,
+                "returned_k": len(neighbours),
+                "method": "Normalized centroid of selected original-space chunk embeddings followed by cosine retrieval.",
+                "interpretation_limit": "The cohort centroid is a computational aggregate, not a historical actor, project, category, or point in the stored UMAP projection.",
+            },
+        }
+    finally:
+        db.close()
+
+
 @router.post("/projection-fidelity")
 async def get_projection_fidelity(request: ProjectionFidelityRequest):
     """Compare original-space and projected local neighbourhoods without altering stored coordinates."""
@@ -1454,6 +1623,7 @@ async def create_aligned_umap_run(request: AlignedUmapRunRequest):
             status="pending_validation", created_by=request.created_by,
         )
         db.add(run)
+        db.flush()
         for item in request.slices:
             db.add(AlignedUmapSlice(
                 slice_id=item.slice_id, aligned_run_id=aligned_run_id, slice_order=item.slice_order,
@@ -1461,6 +1631,7 @@ async def create_aligned_umap_run(request: AlignedUmapRunRequest):
                 membership_point_ids_json=item.membership_point_ids, point_count=len(item.membership_point_ids),
                 exclusions_json=item.exclusions,
             ))
+        db.flush()
         for item in request.relations:
             db.add(AlignedUmapRelation(
                 relation_id=f"aligned-relation-{uuid.uuid4().hex[:12]}", aligned_run_id=aligned_run_id,
@@ -1521,6 +1692,76 @@ async def validate_aligned_umap_run(aligned_run_id: str, request: AlignedUmapVal
         db.close()
 
 
+@router.get("/aligned-runs")
+async def list_aligned_umap_runs():
+    db = LocalSessionLocal()
+    try:
+        runs = db.query(AlignedUmapRun).order_by(AlignedUmapRun.created_at.desc()).limit(100).all()
+        payload = []
+        for run in runs:
+            latest_report = db.query(AlignedUmapValidationReport).filter(
+                AlignedUmapValidationReport.aligned_run_id == run.aligned_run_id
+            ).order_by(AlignedUmapValidationReport.created_at.desc()).first()
+            payload.append({
+                "aligned_run_id": run.aligned_run_id,
+                "baseline_projection_id": run.baseline_projection_id,
+                "baseline_embedding_set_id": run.baseline_embedding_set_id,
+                "corpus_snapshot_id": run.corpus_snapshot_id,
+                "status": run.status,
+                "created_by": run.created_by,
+                "created_at": run.created_at.isoformat() if run.created_at else None,
+                "slice_count": db.query(AlignedUmapSlice).filter(AlignedUmapSlice.aligned_run_id == run.aligned_run_id).count(),
+                "relation_count": db.query(AlignedUmapRelation).filter(AlignedUmapRelation.aligned_run_id == run.aligned_run_id).count(),
+                "validation_diagnostics": latest_report.diagnostics_json if latest_report else None,
+            })
+        return {"runs": payload, "interpretation_limit": "Readiness status records relation validation only. It does not indicate that aligned coordinates, trails, or historical continuity are available."}
+    finally:
+        db.close()
+
+
+@router.post("/original-space-density")
+async def get_original_space_density(request: OriginalSpaceDensityRequest):
+    db = LocalSessionLocal()
+    try:
+        rows = db.execute(text("""
+            WITH selected AS (
+                SELECT chunk_id, embedding
+                FROM semantic_chunk_embeddings
+                WHERE embedding_set_id = :embedding_set_id
+                  AND status = 'embedded'
+                  AND chunk_id = ANY(CAST(:chunk_ids AS text[]))
+            )
+            SELECT focal.chunk_id, AVG(neighbour.embedding <=> focal.embedding) AS mean_cosine_distance
+            FROM selected focal
+            JOIN selected neighbour ON neighbour.chunk_id <> focal.chunk_id
+            GROUP BY focal.chunk_id
+            ORDER BY focal.chunk_id
+        """), {"embedding_set_id": request.embedding_set_id, "chunk_ids": request.chunk_ids}).fetchall()
+        if len(rows) < 3:
+            raise HTTPException(status_code=409, detail="At least three requested chunks require embeddings in the named embedding set.")
+        raw_density = {row.chunk_id: 1 / max(float(row.mean_cosine_distance), np.finfo(float).eps) for row in rows}
+        values = np.array(list(raw_density.values()), dtype=float)
+        lower, upper = float(values.min()), float(values.max())
+        normalized = {chunk_id: 0.5 if upper == lower else (value - lower) / (upper - lower) for chunk_id, value in raw_density.items()}
+        first_quartile, third_quartile = np.quantile(values, [0.25, 0.75])
+        sparse_threshold = float(first_quartile - 1.5 * (third_quartile - first_quartile))
+        return {
+            "densities": [{"chunk_id": chunk_id, "density": normalized[chunk_id], "mean_cosine_distance": 1 / raw_density[chunk_id], "sparse_candidate": raw_density[chunk_id] < sparse_threshold} for chunk_id in sorted(raw_density)],
+            "metadata": {
+                "algorithm": "visible_surface_mean_cosine_radius_inverse",
+                "metric": "cosine_distance",
+                "input_count": len(request.chunk_ids),
+                "computed_count": len(rows),
+                "normalization": "min_max_0_to_1_within_declared_visible_surface",
+                "sparse_candidate_threshold": sparse_threshold,
+                "threshold_method": "lower_iqr_fence_on_inverse_mean_cosine_radius",
+                "interpretation_limit": "Computational density cue in the submitted original embedding-space surface. It is not historical concentration, importance, marginalisation, or archive completeness.",
+            },
+        }
+    finally:
+        db.close()
+
+
 @router.get("/aligned-runs/{aligned_run_id}/static-comparison")
 async def get_aligned_umap_static_comparison(aligned_run_id: str):
     db = LocalSessionLocal()
@@ -1539,6 +1780,31 @@ async def get_aligned_umap_static_comparison(aligned_run_id: str):
             "relations": [{"relation_id": item.relation_id, "from_slice_id": item.from_slice_id, "to_slice_id": item.to_slice_id, "source_point_id": item.source_point_id, "target_point_id": item.target_point_id, "relation_type": item.relation_type, "authority_provenance": item.authority_provenance_json} for item in relations],
             "validation": {"report_id": report.report_id, "relation_coverage": report.relation_coverage_json, "exclusions": report.exclusions_json, "diagnostics": report.diagnostics_json, "reviewer": report.reviewer, "created_at": report.created_at.isoformat() if report and report.created_at else None} if report else None,
             "interpretation_limit": "This static comparison exposes reviewed relation provenance between slices. It does not create aligned coordinates, historical trajectories, or causal claims.",
+        }
+    finally:
+        db.close()
+
+
+@router.get("/aligned-runs/{aligned_run_id}/coordinates")
+async def get_aligned_umap_coordinates(aligned_run_id: str):
+    db = LocalSessionLocal()
+    try:
+        run = db.query(AlignedUmapRun).filter(AlignedUmapRun.aligned_run_id == aligned_run_id).first()
+        if not run:
+            raise HTTPException(status_code=404, detail="Aligned UMAP run not found.")
+        if run.status != "validated":
+            raise HTTPException(status_code=409, detail="Aligned coordinates are unavailable until explicit consecutive-slice relations pass validation.")
+        slices = db.query(AlignedUmapSlice).filter(AlignedUmapSlice.aligned_run_id == aligned_run_id).order_by(AlignedUmapSlice.slice_order).all()
+        coordinates = db.query(AlignedUmapCoordinate).filter(AlignedUmapCoordinate.aligned_run_id == aligned_run_id).order_by(AlignedUmapCoordinate.slice_id, AlignedUmapCoordinate.chunk_id).all()
+        expected_count = sum(item.point_count for item in slices)
+        if len(coordinates) != expected_count:
+            raise HTTPException(status_code=409, detail="Aligned coordinate output is incomplete for the validated slice manifests.")
+        return {
+            "aligned_run_id": run.aligned_run_id,
+            "baseline_projection_id": run.baseline_projection_id,
+            "baseline_embedding_set_id": run.baseline_embedding_set_id,
+            "coordinates": [{"slice_id": item.slice_id, "chunk_id": item.chunk_id, "x": item.x, "y": item.y, "z": item.z} for item in coordinates],
+            "interpretation_limit": "Coordinates are a separately generated aligned computational output. They do not establish historical trajectories, continuity, or causation without source review.",
         }
     finally:
         db.close()
@@ -1607,7 +1873,7 @@ async def get_reducer_transform_availability(request: ReducerAvailabilityRequest
 
 
 @router.post("/umap/challenge")
-async def challenge_umap_projection(request: UmapChallengeRequest):
+async def challenge_umap_projection(request: UmapChallengeRequest, user: Optional[dict] = Depends(get_optional_user)):
     """Generate a temporary, parameterised projection without altering the persisted Atlas."""
     db = LocalSessionLocal()
     try:
@@ -1664,18 +1930,76 @@ async def challenge_umap_projection(request: UmapChallengeRequest):
                 "source_page": row.source_page,
                 "source_section": row.source_section,
             })
+        challenge_run_id = f"umap-challenge-{uuid.uuid4().hex[:12]}"
+        parameters = {
+            "random_seed": request.random_seed,
+            "n_neighbors": min(request.n_neighbors, max(2, len(points) - 1)),
+            "min_dist": request.min_dist,
+        }
+        method_record = {
+            "projection_method": method,
+            "metric": "euclidean",
+            "sample_order": "document_chunks.chunk_id ascending",
+            "algorithm_library": "umap-learn" if method == "UMAP" else "scikit-learn PCA fallback",
+        }
+        output_scope = {
+            "returned_points": len(points),
+            "requested_sample_size": request.sample_size,
+            "selection_policy": "first eligible scoped embedded chunks in ascending chunk ID order",
+        }
+        response_metadata = {
+            "challenge_run_id": challenge_run_id,
+            "projection_method": method_record["projection_method"],
+            "embedding_set_id": projection["embedding_set_id"],
+            "source_projection_id": projection["projection_id"],
+            **parameters,
+            "sample_size": len(points),
+            "sample_order": method_record["sample_order"],
+            "metric": method_record["metric"],
+            "algorithm_library": method_record["algorithm_library"],
+            "output_scope": output_scope,
+            "interpretation_limit": "This temporary projection tests computational sensitivity. Apparent relationships must be checked against source evidence and other parameter settings.",
+        }
+        response_payload = {"points": points, "metadata": response_metadata}
+        db.add(VisualUmapChallengeRun(
+            challenge_run_id=challenge_run_id,
+            source_projection_id=projection["projection_id"],
+            embedding_set_id=projection["embedding_set_id"],
+            parameters_json=parameters,
+            method_json=method_record,
+            sample_chunk_ids_json=[point["chunk_id"] for point in points],
+            output_scope_json=output_scope,
+            result_json=response_payload,
+            researcher_note=request.researcher_note,
+            created_by=(user or {}).get("user_id"),
+        ))
+        db.commit()
+        return response_payload
+    finally:
+        db.close()
+
+
+@router.get("/umap/challenge/{challenge_run_id}")
+async def get_umap_challenge_run(challenge_run_id: str):
+    db = LocalSessionLocal()
+    try:
+        challenge_run = db.query(VisualUmapChallengeRun).filter(
+            VisualUmapChallengeRun.challenge_run_id == challenge_run_id
+        ).first()
+        if not challenge_run:
+            raise HTTPException(status_code=404, detail="Challenge projection record not found.")
         return {
-            "points": points,
-            "metadata": {
-                "projection_method": method,
-                "embedding_set_id": projection["embedding_set_id"],
-                "source_projection_id": projection["projection_id"],
-                "random_seed": request.random_seed,
-                "n_neighbors": min(request.n_neighbors, max(2, len(points) - 1)),
-                "min_dist": request.min_dist,
-                "sample_size": len(points),
-                "interpretation_limit": "This temporary projection tests computational sensitivity. Apparent relationships must be checked against source evidence and other parameter settings.",
-            },
+            "challenge_run_id": challenge_run.challenge_run_id,
+            "source_projection_id": challenge_run.source_projection_id,
+            "embedding_set_id": challenge_run.embedding_set_id,
+            "parameters": challenge_run.parameters_json,
+            "method": challenge_run.method_json,
+            "sample_chunk_ids": challenge_run.sample_chunk_ids_json,
+            "output_scope": challenge_run.output_scope_json,
+            "result": challenge_run.result_json,
+            "researcher_note": challenge_run.researcher_note,
+            "created_by": challenge_run.created_by,
+            "created_at": challenge_run.created_at.isoformat() if challenge_run.created_at else None,
         }
     finally:
         db.close()
@@ -2042,6 +2366,7 @@ async def get_umap_projection(
     source_type: Optional[str] = Query(None),
     include_missingness: bool = Query(True),
     limit: int = Query(1000, ge=1, le=5000),
+    offset: int = Query(0, ge=0),
     refresh: bool = Query(False),
 ):
     """
@@ -2067,7 +2392,59 @@ async def get_umap_projection(
         chunk_title_expr = "COALESCE(d.title, dc.citation->>'title', 'Untitled trace')" if "citation" in document_chunk_columns else "COALESCE(d.title, 'Untitled trace')"
         projection_z_select = "pp.z" if "z" in projection_point_columns else "NULL::double precision AS z"
 
-        atlas_projection = _get_completed_semantic_atlas_projection(db) if point_type == "chunks" else None
+        atlas_projection = _get_completed_semantic_atlas_projection(db)
+        if point_type == "documents" and atlas_projection:
+            projection_z_aggregate = "AVG(pp.z) AS z" if "z" in projection_point_columns else "NULL::double precision AS z"
+            query = f"""
+            WITH document_projection AS (
+                SELECT dc.document_id, COUNT(*) AS document_chunk_count,
+                    AVG(pp.x) AS x, AVG(pp.y) AS y, {projection_z_aggregate}
+                FROM semantic_atlas_projection_points pp
+                JOIN document_chunks dc ON dc.chunk_id = pp.chunk_id
+                WHERE pp.projection_id = :projection_id
+                GROUP BY dc.document_id
+            )
+            SELECT d.document_id AS point_id, d.document_id, NULL::text AS chunk_id,
+                d.pid, d.title, d.publication_year AS year, d.file_type, d.filename,
+                d.pdf_count,
+                (NULLIF(BTRIM(COALESCE(d.extracted_text, '')), '') IS NOT NULL) AS has_document_extracted_text,
+                LENGTH(NULLIF(BTRIM(COALESCE(d.extracted_text, '')), '')) AS document_text_length,
+                dp.document_chunk_count,
+                (NULLIF(BTRIM(COALESCE(d.authority_data::text, '')), '') IS NOT NULL) AS has_authority_context,
+                d.has_diagrams, d.doc_metadata, NULL::text AS chunk_type, NULL::jsonb AS citation,
+                d.ml_themes AS key_concepts, d.ml_entities AS entities, d.ml_confidence AS confidence,
+                NULL::double precision AS drift_score,
+                LEFT(COALESCE(d.ml_summary, d.extracted_text, ''), 240) AS excerpt,
+                (NULLIF(BTRIM(COALESCE(d.extracted_text, '')), '') IS NOT NULL) AS has_chunk_text,
+                NULL::integer AS source_page, NULL::text AS source_section, dp.x, dp.y, dp.z
+            FROM document_projection dp
+            JOIN documents d ON d.document_id = dp.document_id
+            WHERE d.pid IS NOT NULL AND {DDR_DOCUMENT_SQL_SCOPE}
+            """
+            params = {"projection_id": atlas_projection["projection_id"], "limit": limit, "offset": offset}
+            if year_min is not None:
+                query += " AND d.publication_year >= :year_min"
+                params["year_min"] = year_min
+            if year_max is not None:
+                query += " AND d.publication_year <= :year_max"
+                params["year_max"] = year_max
+            if theme:
+                query += " AND EXISTS (SELECT 1 FROM unnest(d.ml_themes) AS theme_item WHERE LOWER(theme_item) LIKE LOWER(:theme_pattern))"
+                params["theme_pattern"] = f"%{theme}%"
+            query += " ORDER BY d.publication_year NULLS LAST, d.document_id LIMIT :limit OFFSET :offset"
+            rows = db.execute(text(query), params).fetchall()
+            points = []
+            for row in rows:
+                concepts = _extract_key_concepts(row.key_concepts) or _extract_documentary_topics(row.doc_metadata)
+                inferred_source_type = _infer_source_type(row.file_type, row.chunk_type, row.citation)
+                if source_type and inferred_source_type != source_type:
+                    continue
+                record = {"id": row.point_id, "document_id": row.document_id, "chunk_id": None, "pid": row.pid, "title": row.title or "Untitled trace", "year": int(row.year) if row.year is not None else None, "source_type": inferred_source_type, "themes": concepts, "entities": _extract_entities(row.entities), "confidence": float(row.confidence) if row.confidence is not None else None, "drift_score": None, "excerpt": row.excerpt, "filename": row.filename, "pdf_count": int(row.pdf_count or 0), "document_text_length": int(row.document_text_length or 0), "document_chunk_count": int(row.document_chunk_count or 0), "has_diagrams": int(row.has_diagrams or 0), "document_extracted_text": "available" if row.has_document_extracted_text else None, "authority_data": "available" if row.has_authority_context else None, "has_embedding": True, "chunk_text": "available" if row.has_chunk_text else None}
+                evidence_surface = _infer_evidence_surface(record)
+                cluster_label = concepts[0] if concepts else "Unclustered"
+                points.append({"id": record["id"], "document_id": record["document_id"], "chunk_id": None, "pid": record["pid"], "title": record["title"], "x": float(row.x), "y": float(row.y), "z": float(row.z) if row.z is not None else None, "year": record["year"], "source_type": record["source_type"], "evidence_class": _evidence_classification(record["document_id"]), "themes": record["themes"], "entities": record["entities"], "cluster_id": _slugify_cluster(cluster_label), "cluster_label": cluster_label, "confidence": record["confidence"], "drift_score": None, "excerpt": record["excerpt"], "documentary_form": {"file_type": row.file_type or "not_exposed", "chunk_type": "not_exposed", "extraction_state": "represented_extracted_text" if row.has_document_extracted_text else "represented_without_extracted_text", "rights_access_state": "not_exposed", "metadata_completeness": "not_evaluated", "document_text_length": record["document_text_length"], "document_chunk_count": record["document_chunk_count"]}, "evidence_surface": evidence_surface, "missingness": _build_missingness(record, evidence_surface) if include_missingness else None})
+            distinct_pids = len({point["pid"] for point in points if point.get("pid")})
+            return {"points": points, "clusters": _summarize_clusters(points), "metadata": {"embedding_model": "BAAI/bge-m3", "umap_model": "persisted-umap", "projection_method": atlas_projection["algorithm"], "generated_at": atlas_projection["completed_at"].isoformat() if atlas_projection["completed_at"] else None, "point_type": point_type, "is_demo": False, "source": "semantic_atlas_projection_points.document_aggregate", "embedding_set_id": atlas_projection["embedding_set_id"], "projection_id": atlas_projection["projection_id"], "total_candidates": len(rows), "returned_points": len(points), "distinct_pids_represented": distinct_pids, "evidence_surface_scope": _build_evidence_surface_scope(point_type, len(rows), len(points), distinct_pids, db_counts), "interpretation_warnings": _build_interpretation_warnings() + ["Each document marker is the arithmetic mean of its represented chunk coordinates in the completed projection; it is a display aggregation, not a document-level embedding or a historical claim."], "message": None}, "message": None}
         if atlas_projection:
             query = f"""
             SELECT
@@ -2085,6 +2462,7 @@ async def get_umap_projection(
                 (SELECT COUNT(*) FROM document_chunks document_chunk WHERE document_chunk.document_id = dc.document_id) AS document_chunk_count,
                 (NULLIF(BTRIM(COALESCE(d.authority_data::text, '')), '') IS NOT NULL) AS has_authority_context,
                 d.has_diagrams,
+                d.doc_metadata,
                 dc.chunk_type,
                 {chunk_citation_select},
                 dc.key_concepts,
@@ -2105,7 +2483,7 @@ async def get_umap_projection(
                 AND d.pid IS NOT NULL
                 AND {DDR_DOCUMENT_SQL_SCOPE}
             """
-            params = {"projection_id": atlas_projection["projection_id"], "limit": limit}
+            params = {"projection_id": atlas_projection["projection_id"], "limit": limit, "offset": offset}
             if year_min is not None:
                 query += " AND COALESCE(dc.publication_year, d.publication_year) >= :year_min"
                 params["year_min"] = year_min
@@ -2115,11 +2493,11 @@ async def get_umap_projection(
             if theme:
                 query += " AND LOWER(COALESCE(dc.key_concepts::text, '')) LIKE LOWER(:theme_pattern)"
                 params["theme_pattern"] = f"%{theme}%"
-            query += " ORDER BY dc.chunk_id LIMIT :limit"
+            query += " ORDER BY dc.chunk_id LIMIT :limit OFFSET :offset"
             rows = db.execute(text(query), params).fetchall()
             points = []
             for row in rows:
-                concepts = _extract_key_concepts(row.key_concepts)
+                concepts = _extract_key_concepts(row.key_concepts) or _extract_documentary_topics(row.doc_metadata)
                 inferred_source_type = _infer_source_type(row.file_type, row.chunk_type, row.citation)
                 if source_type and inferred_source_type != source_type:
                     continue
@@ -2163,6 +2541,7 @@ async def get_umap_projection(
                     "z": float(row.z) if row.z is not None else None,
                     "year": record["year"],
                     "source_type": record["source_type"],
+                    "evidence_class": _evidence_classification(record["document_id"]),
                     "themes": record["themes"],
                     "entities": record["entities"],
                     "cluster_id": _slugify_cluster(cluster_label),
@@ -2234,7 +2613,7 @@ async def get_umap_projection(
                 logger.info("UMAP requested for documents, but embeddings column is unavailable")
                 return _empty_umap_response("documents", message, "documents.embeddings", 0)
 
-            query = """
+            query = f"""
             SELECT
                 d.document_id AS point_id,
                 d.document_id,
@@ -2266,7 +2645,7 @@ async def get_umap_projection(
                 AND d.pid IS NOT NULL
                 AND {DDR_DOCUMENT_SQL_SCOPE}
             """
-            params = {"limit": limit}
+            params = {"limit": limit, "offset": offset}
             source = "documents.embeddings"
 
             if year_min is not None:
@@ -2279,7 +2658,7 @@ async def get_umap_projection(
                 query += " AND EXISTS (SELECT 1 FROM unnest(d.ml_themes) AS theme_item WHERE LOWER(theme_item) LIKE LOWER(:theme_pattern))"
                 params["theme_pattern"] = f"%{theme}%"
 
-            query += " ORDER BY d.publication_year NULLS LAST, d.document_id LIMIT :limit"
+            query += " ORDER BY d.publication_year NULLS LAST, d.document_id LIMIT :limit OFFSET :offset"
         else:
             query = f"""
             SELECT
@@ -2314,7 +2693,7 @@ async def get_umap_projection(
                 AND d.pid IS NOT NULL
                 AND {DDR_DOCUMENT_SQL_SCOPE}
             """
-            params = {"limit": limit}
+            params = {"limit": limit, "offset": offset}
             source = "document_chunks.embedding_vector"
 
             if year_min is not None:
@@ -2327,7 +2706,7 @@ async def get_umap_projection(
                 query += " AND LOWER(COALESCE(dc.key_concepts::text, '')) LIKE LOWER(:theme_pattern)"
                 params["theme_pattern"] = f"%{theme}%"
 
-            query += " ORDER BY COALESCE(dc.publication_year, d.publication_year) NULLS LAST, dc.chunk_id LIMIT :limit"
+            query += " ORDER BY COALESCE(dc.publication_year, d.publication_year) NULLS LAST, dc.chunk_id LIMIT :limit OFFSET :offset"
 
         try:
             result = db.execute(text(query), params)

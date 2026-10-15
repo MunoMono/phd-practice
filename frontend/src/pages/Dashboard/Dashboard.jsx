@@ -136,7 +136,7 @@ const Dashboard = () => {
         detail: `${item.count} recent event${item.count === 1 ? '' : 's'}`
       }))
     : [
-        { label: 'Local inference runtime', detail: 'Qwen-powered source analysis is available when the active model is ready.' },
+        { label: 'Remote inference runtime', detail: 'Granite-powered source analysis is available when the active model is ready.' },
         {
           label: 'Frozen corpus',
           detail: analyticalSurface
@@ -179,13 +179,13 @@ const Dashboard = () => {
             <h2 className="dashboard__runtime-hero-title">Research apparatus status</h2>
             <p className="dashboard__runtime-hero-description">Live retrieval is available alongside frozen corpus controls, immutable research runs, provenance tracing, and human-authored assessment.</p>
             <div className="dashboard__model-cards" aria-label="Research apparatus models">
-              <div className="dashboard__model-card dashboard__model-card--qwen">
+              <div className="dashboard__model-card dashboard__model-card--granite">
                 <div className="dashboard__model-card-heading">
-                  <span className="dashboard__model-mark" aria-hidden="true"><img src="/qwen_logo.svg" alt="" /></span>
-                  <span>Qwen</span>
+                  <span className="dashboard__model-mark" aria-hidden="true"><img src="/granite-logo.png" alt="" /></span>
+                  <span>IBM Granite</span>
                 </div>
                 <h3>Source interpretation</h3>
-                <p>Qwen3 8B · evidence-grounded synthesis</p>
+                <p>{runtimeInfo?.display_name || 'IBM Granite 4.1 30B · Q4_K_M'} · evidence-grounded synthesis</p>
                 <span>Interprets retrieved documentary passages into bounded, cited research responses.</span>
               </div>
               <div className="dashboard__model-card dashboard__model-card--baai">
