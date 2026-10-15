@@ -14,6 +14,7 @@ from app.services.retrieval_contract_service import (
     RetrievalContract,
     candidate_project_anchor_matches,
     candidate_matches_requested_family,
+    candidate_matches_facet,
     derive_retrieval_contract,
     diversify_candidates,
 )
@@ -775,6 +776,11 @@ class TurinArchiveFirstRetrievalService:
                 -item["score"], str(item.get("asset_pid") or item.get("asset_id")),
             ),
         )
+        covered_activities = {
+            facet.value for facet in contract.required_facets
+            if facet.facet_type == "activity"
+            and any(candidate_matches_facet(result, facet) for result in results)
+        }
         for nomination in ordered_nominations:
             availability = nomination["availability"]
             if not availability["docling_text_available"]:
@@ -792,6 +798,17 @@ class TurinArchiveFirstRetrievalService:
             """), {"document_id": availability["document_id"], "corpus_version": corpus_version, "question": documentary_query}).mappings().all()
             permitted = [dict(row) for row in chunk_rows if self._page_permitted(row.get("source_page"), nomination["ml_pages"])]
             permitted = self._requested_subject_passages(permitted, question, contract)
+            uncovered_facets = [
+                facet for facet in contract.required_facets
+                if facet.facet_type == "activity" and facet.value == "measurement"
+                and facet.value not in covered_activities
+            ]
+            facet_passages = [
+                row for row in permitted
+                if any(candidate_matches_facet(row, facet) for facet in uncovered_facets)
+            ]
+            if facet_passages:
+                permitted = facet_passages
             passage = ExploratoryRetrievalService._select_best_passage(permitted, query_terms)
             if passage is None:
                 nomination["availability"] = {**availability, "classification": "DOCUMENTARY_EVIDENCE_INSUFFICIENT"}
@@ -813,6 +830,11 @@ class TurinArchiveFirstRetrievalService:
                 "retrieval_match_type": "ARCHIVE_FIRST_WITHIN_SOURCE_PASSAGE",
                 "metadata_is_documentary_evidence": False,
             })
+            covered_activities.update(
+                facet.value for facet in contract.required_facets
+                if facet.facet_type == "activity"
+                and candidate_matches_facet(results[-1], facet)
+            )
             selected_document_ids.add(passage["document_id"])
             selected_families.add(self._source_family(nomination))
             if len(results) == max(selected_top_k * 3, selected_top_k):

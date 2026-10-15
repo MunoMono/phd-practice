@@ -1,0 +1,32 @@
+Final targeted Granite remediation
+
+Five backend implementation files; no production frontend, corpus, authority,
+model configuration, schema, frozen evaluation or acceptance changes.
+
+Hybrid questions reuse the existing two-call documentary construction, replacing
+the old staged quote/claim fallback. Database authority values are rendered
+deterministically and separately; the complete joined answer remains an
+UNVERIFIED RESEARCH DRAFT. Authority-only and scoped-missingness routes retain
+their existing execution. Missing packets or failed construction preserve
+authority context and explicitly report the documentary failure.
+
+Hybrid clause extraction starts after the authority/documentary connective and
+uses the existing plural project parser. Documentary dates retain archive
+display dates. Institutional chronology includes already-supplied transition
+sentences, distinguishing an announcement from completion and retaining the
+frozen date bounds. Explicit measurement requests prefer a measurement-bearing
+passage inside the already-nominated document, using the existing facet matcher
+and passage selector. No additional model calls or retrieval architecture.
+
+Instructions require substantive coverage of each requested concept, a
+source-bounded opening, qualified comparisons and two or three coherent
+paragraphs. Model proposals are not independent verification or human UAT PASS.
+
+The 1985 Rector's report announces closure in August 1986. This announcement is
+within the frozen reporting period; its future event date must remain explicit.
+The candidate packet preserves that original sentence, source identity and page.
+
+Deployment overlays the preserved Granite dashboard backend image. The existing
+frontend image remains unchanged. Preserve both current images as rollback.
+Following deployment and health checks, capture the ten authorised frozen
+questions once, sequentially, in a fresh Mac desktop report. No scholarly grading.

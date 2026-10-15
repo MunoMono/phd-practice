@@ -95,6 +95,7 @@ _ACTIVITY_FACET_PATTERNS = (
     ("simulation", r"\bsimulations?\b"),
     ("modelling", r"\bmodell?ing\b"),
     ("learning_by_doing", r"\blearning[- ]by[- ]doing\b"),
+    ("measurement", r"\bmeasur\w*\b"),
 )
 _RELATIONSHIP_FACET_PATTERNS = (
     ("collaborated", r"\bcollaborat\w*\b"),

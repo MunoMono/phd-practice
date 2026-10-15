@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 from dataclasses import asdict, dataclass
 from typing import Any, Literal
+from app.services.retrieval_contract_service import project_anchors_from_question
 
 
 RouteFamily = Literal[
@@ -123,7 +124,13 @@ def decompose_hybrid_question(question: str) -> HybridQuestionDecomposition | No
     normalized = " ".join(question.split())
     if classify_question_route(normalized).family != "HYBRID_AUTHORITY_DOCUMENTARY":
         return None
-    match = HYBRID_DOCUMENTARY_CLAUSE_PATTERN.search(normalized)
+    connector = re.search(
+        r"\band\s+(?=(?:what|how)\b|documentary\s+(?:evidence|traces)\b)",
+        normalized, re.IGNORECASE,
+    )
+    match = HYBRID_DOCUMENTARY_CLAUSE_PATTERN.search(
+        normalized, connector.end() if connector else 0,
+    )
     if match is None:
         return None
     documentary_query = match.group("documentary").strip()
@@ -133,7 +140,11 @@ def decompose_hybrid_question(question: str) -> HybridQuestionDecomposition | No
         anchor.group(0).strip()
         for anchor in EXPLICIT_DOCUMENTARY_ANCHOR_PATTERN.finditer(normalized)
     ))
-    authority_query = normalized[:match.start()].strip(" ,;")
+    anchors.extend(
+        f"Job {number}" for number in project_anchors_from_question(normalized)
+        if not any(re.search(rf"\b{number}\b", anchor) for anchor in anchors)
+    )
+    authority_query = normalized[:connector.start() if connector else match.start()].strip(" ,;")
     return HybridQuestionDecomposition(
         authority_query=authority_query,
         documentary_query=documentary_query,

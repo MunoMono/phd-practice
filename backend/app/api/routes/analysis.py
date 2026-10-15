@@ -30,7 +30,7 @@ from app.services.turin_question_policy import matching_turin_question_policy
 from app.services.turin_retrieval_v3_service import TurinRetrievalV3Service
 from app.services.researcher_ui_capture_service import CAPTURE_MODE, ResearcherUiCaptureService, build_one_shot_prompt, parse_one_shot_output, project_claim_provenance
 from app.services.authority_registry import AuthorityRegistry
-from app.services.turin_question_route import classify_question_route
+from app.services.turin_question_route import classify_question_route, decompose_hybrid_question
 from app.services.provenance_integrity import experiment_evidence_digest, experiment_run_digest
 from app.models.research_outputs import ExperimentRun, ExperimentRunEvidence
 from app.services.turin_research_answer_service import generate_documentary_synthesis, _evidence_records
@@ -1834,7 +1834,7 @@ async def interrogate_exploratory_corpus(request: ExploratoryInterrogationReques
     if (
         settings.TURIN_GRANITE_DOCUMENTARY_ENABLED
         and request.mode == "exploratory"
-        and route_decision.family == "DOCUMENTARY"
+        and route_decision.family in {"DOCUMENTARY", "HYBRID_AUTHORITY_DOCUMENTARY"}
         and not scope_overview_request
     ):
         return await research_answer_corpus(request)
@@ -2345,27 +2345,51 @@ def _build_exploratory_packets(sources: list[dict[str, Any]], named_document: bo
 def _build_research_answer_packets(sources: list[dict[str, Any]], question: str):
     db = LocalSessionLocal()
     try:
-        return EvidencePacketBuilder().build(
+        packets = EvidencePacketBuilder().build(
             db, sources, max_sources=8, local_token_budget=1800, question=question,
         )
+        dates = {
+            f"{source['document_id']}:{source['chunk_id']}": source.get("display_date")
+            for source in sources
+        }
+        for packet in packets:
+            if dates.get(packet.source_id):
+                packet.document["date"] = dates[packet.source_id]
+        return packets
     finally:
         db.close()
 
 
 @exploratory_router.post("/research-answer")
 async def research_answer_corpus(request: ExploratoryInterrogationRequest):
-    """Return the existing documentary scholarly draft for researcher assessment."""
+    """Construct a documentary draft, retaining separate deterministic hybrid authorities."""
     if not settings.TURIN_GRANITE_DOCUMENTARY_ENABLED:
         raise HTTPException(status_code=404, detail="The documentary research-answer path is disabled.")
     if request.mode != "exploratory":
         raise HTTPException(status_code=400, detail="The documentary research-answer path accepts exploratory mode only.")
     route_decision = classify_question_route(request.query)
-    if route_decision.family != "DOCUMENTARY" or _is_archive_scope_overview_request(request):
+    if route_decision.family not in {"DOCUMENTARY", "HYBRID_AUTHORITY_DOCUMENTARY"} or _is_archive_scope_overview_request(request):
         raise HTTPException(status_code=409, detail={
             "error": "unsupported_question_class", "route_family": route_decision.family,
-            "message": "Use the established authority, hybrid, scoped-missingness or archive-overview route.",
+            "message": "Use the established authority, scoped-missingness or archive-overview route.",
         })
     started = time.perf_counter()
+    hybrid = route_decision.family == "HYBRID_AUTHORITY_DOCUMENTARY"
+    decomposition = decompose_hybrid_question(request.query) if hybrid else None
+    authority_evidence = _catalogue_authorities(request.query, request.top_k) if hybrid else []
+    authority_projection = _deterministic_authority_response(authority_evidence) if hybrid else None
+    if hybrid and (
+        decomposition is None or not authority_evidence
+        or _authority_claim_violations(authority_projection["final_claim_plan"]["claims"], authority_evidence)
+    ):
+        return _synthesis_unavailable_response(
+            request, {"results": [], "transparency": {}, "diagnostics": {}},
+            stage="hybrid_authority_reconciliation",
+            failure_code="hybrid_context_unresolved",
+            failure_message="The requested authority facts or documentary clause could not be resolved.",
+            authority_evidence=authority_evidence,
+        )
+    documentary_question = decomposition.documentary_query if decomposition else request.query
     retrieval_started = time.perf_counter()
     retrieval = _retrieve_exploratory(request)
     _hydrate_source_display_dates(retrieval["results"])
@@ -2375,35 +2399,46 @@ async def research_answer_corpus(request: ExploratoryInterrogationRequest):
             request, retrieval, stage="archive_first_retrieval",
             failure_code="no_admissible_documentary_passages",
             failure_message="No documentary passages were retrieved in the configured corpus.",
+            authority_evidence=authority_evidence,
         )
     packet_started = time.perf_counter()
     try:
-        packets = _build_research_answer_packets(retrieval["results"], request.query)
+        packets = _build_research_answer_packets(retrieval["results"], documentary_question)
         if not packets:
             return _synthesis_unavailable_response(
                 request, retrieval, stage="evidence_packet_assembly",
                 failure_code="no_eligible_documentary_packets",
                 failure_message="Retrieved passages did not yield eligible documentary packets.",
+                authority_evidence=authority_evidence,
             )
         packet_ms = round((time.perf_counter() - packet_started) * 1000, 1)
         inference_service = get_inference_service()
         result = await generate_documentary_synthesis(
-            request.query, _evidence_records(packets, request.query), inference_service,
+            request.query, _evidence_records(packets, documentary_question), inference_service,
         )
-    except InferenceTimeoutError as exc:
-        raise HTTPException(status_code=504, detail={
-            "error": "inference_timeout", "stage": exc.stage, "message": str(exc),
-            "answer_state": AnswerState.SYNTHESIS_UNAVAILABLE.value,
-        }) from exc
-    except RuntimeError as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
-    except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except (InferenceTimeoutError, RuntimeError, ValueError) as exc:
+        if hybrid:
+            logger.warning("Hybrid documentary construction failed: %s", exc)
+            return _synthesis_unavailable_response(
+                request, retrieval, stage="documentary_scholarly_construction",
+                failure_code="documentary_generation_failed",
+                failure_message=str(exc), authority_evidence=authority_evidence,
+            )
+        if isinstance(exc, InferenceTimeoutError):
+            raise HTTPException(status_code=504, detail={
+                "error": "inference_timeout", "stage": exc.stage, "message": str(exc),
+                "answer_state": AnswerState.SYNTHESIS_UNAVAILABLE.value,
+            }) from exc
+        raise HTTPException(status_code=422 if isinstance(exc, ValueError) else 503, detail=str(exc)) from exc
     model_info = inference_service.get_model_info()
+    if hybrid:
+        result["original_draft"] = "\n\n".join(
+            (authority_projection["answer"], result["original_draft"]),
+        )
     result.update({
         "answer_state": "unverified_research_draft",
         "draft_label": "UNVERIFIED RESEARCH DRAFT",
-        "answer_origin": "granite_documentary_research_draft",
+        "answer_origin": "granite_hybrid_research_draft" if hybrid else "granite_documentary_research_draft",
         "verification_status": "not_performed",
         "researcher_facing": {
             "original_draft": result["original_draft"], "answer": None, "verified_answer": None,
@@ -2422,7 +2457,7 @@ async def research_answer_corpus(request: ExploratoryInterrogationRequest):
             "reason": "Original documentary passages supplied to the existing two-stage construction.",
         },
         "stage_execution": {
-            "classification": "UNVERIFIED DOCUMENTARY RESEARCH DRAFT",
+            "classification": "UNVERIFIED HYBRID RESEARCH DRAFT" if hybrid else "UNVERIFIED DOCUMENTARY RESEARCH DRAFT",
             "stages": ["archive_first_retrieval", "evidence_packet_assembly", *[
                 call["stage"] for call in result["inference_calls"]
             ]],
@@ -2440,7 +2475,7 @@ async def research_answer_corpus(request: ExploratoryInterrogationRequest):
             "source_packet_construction_ms": packet_ms,
             "total_backend_request_ms": round((time.perf_counter() - started) * 1000, 1),
         },
-        "authority_evidence": [], "documentary_evidence": result["evidence_sources"],
+        "authority_evidence": authority_evidence, "documentary_evidence": result["evidence_sources"],
         "contextual_evidence": [], "testimony_evidence": [], "inferences": [], "missingness": [],
     })
     return result

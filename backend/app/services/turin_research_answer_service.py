@@ -9,6 +9,7 @@ import time
 from typing import Any, Literal, Mapping
 
 from pydantic import BaseModel, ConfigDict, Field
+from app.services.turin_question_route import decompose_hybrid_question
 
 
 class SupportingQuote(BaseModel):
@@ -138,6 +139,12 @@ def _question_facets(question: str) -> list[set[str]]:
         terms = _content_terms(question)
         if terms:
             facets.append(terms)
+    if re.search(r"\b(institutional|department)\b", question, re.I) and re.search(
+        r"\b(changes?|across|over time)\b", question, re.I,
+    ):
+        facets.extend([{term} for term in (
+            "close", "clos", "closure", "abolish", "reorganis", "reorganiz",
+        )])
     return facets
 
 
@@ -533,6 +540,11 @@ def build_documentary_analysis_prompt(
         "to a later department; any proposed continuity must be qualified as interpretation. "
         "Cover the question's "
         "distinct concepts using concise, non-redundant propositions with unique IDs. "
+        "For every explicitly requested concept identify a substantive mechanism or use, "
+        "not merely a title or list mentioning it; where none is evidenced, identify that "
+        "specific gap. For institutional chronology retain adverse transitions as well as "
+        "growth. Distinguish the date of a report announcing a future change from the "
+        "date that change is proposed to occur. An announcement is not proof it occurred. "
         "Keep documentary propositions separate from proposed interpretative relationships. "
         "For each meaningful comparison explain the documentary_basis: what specific statements "
         "connect or differ, what that warrants analytically, and what it does not establish. "
@@ -545,7 +557,22 @@ def build_documentary_analysis_prompt(
         "exclude. These notes are proposed reasoning for independent assessment, not validated "
         "history. Keep the complete analysis brief; spend words on documentary reasoning, not "
         "administrative repetition.\n\n"
-        f"RESEARCH QUESTION:\n{question}\n\nEVIDENCE:\n{_documentary_reading_packet(evidence)}"
+        f"RESEARCH QUESTION:\n{question}\n{_hybrid_documentary_task(question)}"
+        f"\nEVIDENCE:\n{_documentary_reading_packet(evidence)}"
+    )
+
+def _hybrid_documentary_task(question: str) -> str:
+    decomposition = decompose_hybrid_question(question)
+    if decomposition is None:
+        return ""
+    return (
+        "\nDOCUMENTARY TASK:\n" + decomposition.documentary_query
+        + "\nThe application supplies database authority facts separately. Do not infer "
+        "employment, leadership or funding from these passages. Interpret and compare "
+        "the documentary material requested here, rather than quoting snippets. "
+        "A report can establish its research problems or design work without proving "
+        "the named person's complete role. Attribute personal contributions only where "
+        "the documentary evidence explicitly warrants them.\n"
     )
 
 
@@ -589,10 +616,20 @@ def build_documentary_composition_prompt(
         + "\n\nEVIDENCE-TO-CLAIM ANALYSIS:\n"
         + analysis.model_dump_json()
         + "\n\nCOMPOSITION TASK:\n"
-        "Write 300–450 words in two or three substantive paragraphs where supported. "
+        + _hybrid_documentary_task(question)
+        + "Write 300–450 words in two or three substantive paragraphs where supported. "
         "Open with the substantive answer, not an introduction to the archive or a discussion "
-        "of this analysis. Attribute observations to their actors or documents and compare "
-        "specific differences, continuities or methodological positions. Useful, explicitly "
+        "of this analysis. "
+        "The opening must not assert integration, causation or agreement beyond the "
+        "passages and then try to retract it in a closing qualification. Cover every "
+        "explicitly requested concept substantively, with its evidenced mechanism or a "
+        "precise scoped gap. Do not replace mechanisms with generic methodological labels. "
+        "In chronological answers include documented contraction, changed appointments "
+        "or closure announcements, not an assumed story of continuous growth. Keep the "
+        "question's date bounds: a dated report within them may announce a later change; "
+        "name the later date explicitly and do not claim the event had already occurred. "
+        "Attribute observations to their actors or documents and compare specific "
+        "differences, continuities or methodological positions. Useful, explicitly "
         "qualified interpretation is welcome when its documentary basis is stated; a source "
         "need not explicitly compare itself with another source for you to compare them. "
         "Consolidate significant uncertainties into one or two precise qualifications rather "
