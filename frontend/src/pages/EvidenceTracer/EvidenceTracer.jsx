@@ -447,7 +447,11 @@ const documentaryCitationNotes = (text = '') => Array.from(
 
 const displayAnswerTypography = (text = '') => text
   .split(/("[^"]*(?:"|$)|\u201c[^\u201d]*(?:\u201d|$)|\u2018[^\u2019]*(?:\u2019|$)|^>[^\n]*)/m)
-  .map((part, index) => index % 2 ? part : part.replace(/[ \t]*\u2014[ \t]*/g, ' \u2013 '))
+  .map((part, index) => index % 2 ? part : part
+    .replace(/\b(Proposition|proposition)\s+P\d+\b/g, '$1')
+    .replace(/\[P\d+(?:\s*,\s*P\d+)*\]/g, '')
+    .replace(/\bP\d+\b/g, 'the proposition')
+    .replace(/[ \t]*\u2014[ \t]*/g, ' \u2013 '))
   .join('')
 
 const renderAnswerTextWithSourceLinks = (text, evidence = [], noteOffset = 0) => {

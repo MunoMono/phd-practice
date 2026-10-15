@@ -124,13 +124,51 @@ def scoped_missingness_limit_narrative(
             "No visual description is inferred from catalogue or OCR text alone."
         )
     else:
-        text = (
-            f"Taken together, the searched {decision.bounded_limit_text_inputs['surface']} "
-            f"supports only the bounded documentary traces above; it does not establish "
-            f"{decision.claim_predicate}. This does not show that the requested historical "
-            f"relationship or event did not occur."
-        )
+        if decision.coverage_status == "INADEQUATE":
+            text = (
+                f"The retained traces do not establish {decision.claim_predicate}. "
+                "Retrieval coverage is incomplete, so this run cannot establish absence "
+                "even within the configured digitised corpus."
+            )
+        else:
+            text = (
+                f"Taken together, the searched {decision.bounded_limit_text_inputs['surface']} "
+                f"supports only the bounded documentary traces above; it does not establish "
+                f"{decision.claim_predicate}. This does not show that the requested historical "
+                f"relationship or event did not occur."
+            )
     return [NarrativeClaim(text=text, claim_ids=claim_ids, paragraph=1)]
+
+
+def retain_missingness_traces_without_passage_dumps(
+    narrative: list[NarrativeClaim], claim_plan: FinalClaimPlan,
+    packets: list[SourceEvidencePacket],
+) -> None:
+    plan_by_id = {claim.claim_id: claim for claim in claim_plan.claims}
+    packets_by_id = {packet.source_id: packet for packet in packets}
+    for claim in narrative:
+        supporting_packets = [
+            packets_by_id[source_id]
+            for claim_id in claim.claim_ids if claim_id in plan_by_id
+            for source_id in plan_by_id[claim_id].supporting_source_ids
+            if source_id in packets_by_id
+        ]
+        compact = " ".join(claim.text.split())
+        copied_passage = any(
+            compact in " ".join(chunk["text"].split())
+            for packet in supporting_packets
+            for chunk in packet.document_context["ordered_chunks"]
+        )
+        if supporting_packets and (copied_passage or not readable_claim_text(claim.text)):
+            packet = supporting_packets[0]
+            title = packet.document.get("title") or "the retained document"
+            date = packet.document.get("date") or "date unavailable"
+            claim.text = (
+                f"The nearest retrieved trace is {title} ({date}). "
+                "Its original passage remains inspectable, but a source fragment or "
+                "catalogue association is not by itself an account of the requested "
+                "historical relationship."
+            )
 
 
 def evidence_reference_snippet(text: str) -> str:
@@ -3151,6 +3189,9 @@ class StagedEvidencePipeline:
             except EvidencePipelineStageError as exc:
                 narrative_artifact = {**exc.artifact, "deterministic_fallback": "INVALID_NARRATIVE_PROSE"}
         if route_family == "SCOPED_MISSINGNESS" and missingness_decision:
+            retain_missingness_traces_without_passage_dumps(
+                final.synthesis_claims, final_claim_plan, packets,
+            )
             if missingness_decision.missingness_state == "MEDIA_NOT_ML_ENABLED":
                 final.synthesis_claims = scoped_missingness_limit_narrative(
                     final_claim_plan, missingness_decision,

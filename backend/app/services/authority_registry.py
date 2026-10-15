@@ -10,6 +10,7 @@ from sqlalchemy import text
 
 from app.services.database_authorities_sync import AUTHORITY_ALLOWED_ROLES, AUTHORITY_DEFINITIONS
 from app.services.turin_experiment_service import AuthorityContext
+from app.services.retrieval_contract_service import project_anchors_from_question
 
 
 @dataclass(frozen=True)
@@ -153,7 +154,7 @@ class AuthorityRegistry:
 
     @staticmethod
     def _project_matches(question: str, question_terms: set[str], rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
-        job_ids = re.findall(r"\bjob(?: number)?\s+(\d+)\b", question, re.IGNORECASE)
+        job_ids = project_anchors_from_question(question)
         if job_ids:
             rows_by_id = {str(row["authority_id"]): row for row in rows}
             return [rows_by_id[job_id] for job_id in job_ids if job_id in rows_by_id]

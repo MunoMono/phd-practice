@@ -13,6 +13,7 @@ from app.services.ml_policy import parse_ml_pages
 from app.services.retrieval_contract_service import (
     RetrievalContract,
     candidate_project_anchor_matches,
+    candidate_matches_requested_family,
     derive_retrieval_contract,
     diversify_candidates,
 )
@@ -56,6 +57,21 @@ class TurinArchiveFirstRetrievalService:
     def __init__(self) -> None:
         self.planner = ExploratoryQueryPlanner()
         self.mapper = RetrievalValidationService()
+
+    @staticmethod
+    def _requested_subject_passages(
+        rows: list[dict[str, Any]], question: str, contract: RetrievalContract,
+    ) -> list[dict[str, Any]]:
+        if "rector_report" not in contract.required_evidence_types or not re.search(r"\bDDR\b", question, re.IGNORECASE):
+            return rows
+        named_department = [
+            row for row in rows
+            if re.search(r"\b(?:DDR|design\s+research)\b", str(row.get("chunk_text") or ""), re.IGNORECASE)
+        ]
+        return named_department or [
+            row for row in rows
+            if re.search(r"\bresearch\s+unit\b", str(row.get("chunk_text") or ""), re.IGNORECASE)
+        ]
 
     @staticmethod
     def _candidate_matches(asset: Mapping[str, Any], plan: Mapping[str, Any]) -> dict[str, Any]:
@@ -611,9 +627,10 @@ class TurinArchiveFirstRetrievalService:
                      WHERE dc.document_id = d.document_id AND dc.corpus_version = :corpus_version
                    ) AS docling_text_available
             FROM documents d
-                        WHERE d.asset_pid = :asset_pid OR d.asset_id = :asset_id
-                             OR d.asset_id_or_asset_pid IN (:asset_pid, :asset_id)
-            ORDER BY d.document_id
+            WHERE d.asset_pid = :asset_pid OR d.asset_id = :asset_id
+                  OR d.asset_id_or_asset_pid IN (:asset_pid, :asset_id)
+            ORDER BY docling_text_available DESC,
+                     (d.corpus_version = :corpus_version) DESC, d.document_id
             LIMIT 1
         """), {"corpus_version": corpus_version, "asset_pid": asset.get("asset_pid"), "asset_id": asset.get("asset_id")}).mappings().first()
         if asset.get("use_for_ml") is not True:
@@ -718,6 +735,8 @@ class TurinArchiveFirstRetrievalService:
             ]
         nominations = []
         for asset in assets:
+            if not candidate_matches_requested_family({**asset, "title": asset.get("label")}, contract):
+                continue
             matches = self._candidate_matches(asset, plan)
             if matches["score"]:
                 nominations.append({
@@ -772,6 +791,7 @@ class TurinArchiveFirstRetrievalService:
                 ORDER BY score DESC, dc.chunk_id ASC
             """), {"document_id": availability["document_id"], "corpus_version": corpus_version, "question": documentary_query}).mappings().all()
             permitted = [dict(row) for row in chunk_rows if self._page_permitted(row.get("source_page"), nomination["ml_pages"])]
+            permitted = self._requested_subject_passages(permitted, question, contract)
             passage = ExploratoryRetrievalService._select_best_passage(permitted, query_terms)
             if passage is None:
                 nomination["availability"] = {**availability, "classification": "DOCUMENTARY_EVIDENCE_INSUFFICIENT"}

@@ -77,11 +77,12 @@ class RetrievalCoverage:
 
 
 _PROJECT_SERIES_PATTERN = re.compile(
-    r"\b(?:job|project)s?\s+(\d{1,3})(?:\s*(?:,|and|&)\s*(\d{1,3}))*",
+    r"\b(?:job|project)s?\s+(?:number\s+)?(\d{1,3})(?:\s*(?:,|and|&)\s*(\d{1,3}))*",
     re.IGNORECASE,
 )
 _YEAR_PATTERN = re.compile(r"\b(?:19|20)\d{2}(?=\D|$)")
 _DOCUMENT_ROLE_PATTERNS = (
+    ("rector_report", r"\brector['\u2019]s?\s+reports?\b"),
     ("teaching", r"\bteaching\b"),
     ("paper", r"\bpapers?\b"),
     ("record", r"\brecords?\b"),
@@ -189,6 +190,7 @@ def derive_retrieval_contract(
     asks_for_testimony = any(term in intent_text for term in ("oral history", "oral histories", "interview", "testimony", "retrospective"))
     asks_for_contemporary = any(term in normalized for term in ("contemporary", "at the time", "period document", "surviving report"))
     asks_for_prospectus = "prospectus" in normalized or "prospectuses" in normalized
+    asks_for_rectors_reports = bool(re.search(dict(_DOCUMENT_ROLE_PATTERNS)["rector_report"], normalized))
     project_anchors = project_anchors_from_question(question)
     document_roles = _document_roles_from_question(question)
     temporal_start_year, temporal_end_year = _question_year_bounds(normalized)
@@ -209,6 +211,8 @@ def derive_retrieval_contract(
         required_surfaces.append("oral_history")
     if asks_for_prospectus:
         required_surfaces.append("prospectus")
+    if asks_for_rectors_reports:
+        required_surfaces.append("rector_report")
     if project_anchors:
         required_surfaces.append("project_report")
     temporal_requirement = "multiple_buckets" if across_time or (asks_for_testimony and asks_for_contemporary) else "none"
@@ -238,11 +242,26 @@ def candidate_surface(candidate: Mapping[str, Any]) -> str:
     )).lower()
     if "oral history" in searchable or "interview" in searchable:
         return "oral_history"
+    if re.search(dict(_DOCUMENT_ROLE_PATTERNS)["rector_report"], searchable):
+        return "rector_report"
     if "prospectus" in searchable:
         return "prospectus"
+    if re.search(r"\b(?:calendar|yearbook)\b", searchable):
+        return "institutional_publication"
     if re.search(r"\bjob\s+\d{1,3}\b", searchable):
         return "project_report"
     return "documentary"
+
+
+def candidate_matches_requested_family(candidate: Mapping[str, Any], contract: RetrievalContract) -> bool:
+    """Explicit publication families are selection boundaries, not topic synonyms."""
+    surfaces = set(contract.required_evidence_types)
+    if "rector_report" in surfaces or ("oral_history" in surfaces and "prospectus" in surfaces):
+        permitted = surfaces - {"documentary"}
+        if "prospectus" in permitted:
+            permitted.update({"rector_report", "institutional_publication"})
+        return candidate_surface(candidate) in permitted
+    return True
 
 
 def candidate_matches_surface(candidate: Mapping[str, Any], surface: str) -> bool:
@@ -294,7 +313,7 @@ def candidate_matches_facet(candidate: Mapping[str, Any], facet: FacetRequiremen
     if facet.facet_type == "activity":
         pattern = dict(_ACTIVITY_FACET_PATTERNS).get(facet.value)
         return bool(pattern and re.search(pattern, searchable))
-    return facet.value.lower() in searchable
+    return re.sub(r"[-\u2010-\u2014]", " ", facet.value.lower()) in re.sub(r"[-\u2010-\u2014]", " ", searchable)
 
 
 def diversify_candidates(
@@ -302,7 +321,10 @@ def diversify_candidates(
     contract: RetrievalContract,
     limit: int,
 ) -> tuple[list[dict[str, Any]], RetrievalCoverage]:
-    remaining = [dict(candidate) for candidate in candidates]
+    remaining = [
+        dict(candidate) for candidate in candidates
+        if candidate_matches_requested_family(candidate, contract)
+    ]
     if contract.temporal_start_year is not None and contract.temporal_end_year is not None:
         remaining = [
             candidate for candidate in remaining
@@ -344,6 +366,13 @@ def diversify_candidates(
                 source_counts[identity] = source_counts.get(identity, 0) + 1
                 return True
         return False
+
+    if contract.temporal_requirement == "multiple_buckets" and contract.temporal_start_year is not None:
+        dated_years = sorted({year for item in remaining if (year := candidate_year(item)) is not None})
+        if dated_years:
+            for year in dict.fromkeys((dated_years[0], dated_years[-1])):
+                if len(selected) < limit:
+                    take_first(lambda item, required=year: candidate_year(item) == required)
 
     for surface in contract.required_evidence_types:
         while len(selected) < limit and sum(candidate_matches_surface(item, surface) for item in selected) < contract.minimum_sources_per_required_surface:
@@ -399,7 +428,8 @@ def diversify_candidates(
     found_buckets = tuple(sorted({bucket for item in selected if (bucket := candidate_temporal_bucket(item))}))
     distinct_sources = len({source_id(item) for item in selected})
     entity_found = None if not contract.entity_anchors else any(
-        any(anchor.lower() in str(item).lower() for anchor in contract.entity_anchors) for item in selected
+        any(candidate_matches_facet(item, FacetRequirement("person", anchor)) for anchor in contract.entity_anchors)
+        for item in selected
     )
     project_found = None if not contract.project_anchors else any(
         item.get("project_anchor_matches")

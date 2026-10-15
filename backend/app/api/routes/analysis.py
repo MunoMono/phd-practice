@@ -23,7 +23,7 @@ from app.services.retrieval_validation_service import RetrievalValidationRequest
 from app.services.exploratory_retrieval_service import ExploratoryRetrievalService
 from app.services.turin_archive_first_retrieval_service import ARCHIVE_ASSET_SNAPSHOT_VERSION, TurinArchiveFirstRetrievalService
 from app.services.archive_question_preset_service import matching_archive_question_preset
-from app.services.retrieval_contract_service import derive_retrieval_contract
+from app.services.retrieval_contract_service import derive_retrieval_contract, project_anchors_from_question
 from app.services.turin_evidence_pipeline_service import EvidencePacketBuilder, StagedEvidencePipeline, compile_evidence_ledger, readable_claim_text, researcher_prose_issues
 from app.services.turin_evidence_pipeline_service import EvidencePacketBuilder, EvidencePipelineStageError, StagedEvidencePipeline
 from app.services.turin_question_policy import matching_turin_question_policy
@@ -329,7 +329,7 @@ def _catalogue_authorities(query: str, limit: int = 5) -> list[dict[str, Any]]:
         authority_types.append("ref_students")
     if any(term in question for term in ("constituted", "constitution")) and "ref_ddr_period" not in authority_types:
         authority_types.append("ref_ddr_period")
-    if any(term in question for term in ("project", "job ", "job number", "funder")) and "ddr_projects" not in authority_types:
+    if (project_anchors_from_question(query) or any(term in question for term in ("project", "job ", "job number", "funder"))) and "ddr_projects" not in authority_types:
         authority_types.append("ddr_projects")
     authority_types = list(dict.fromkeys(authority_types))
     if not authority_types:
@@ -1392,12 +1392,33 @@ def _synthesis_unavailable_response(
 ) -> dict[str, Any]:
     sources = retrieval["results"]
     authority_evidence = authority_evidence or []
+    if sources:
+        limitation = (
+            "Relevant documentary passages were retrieved, but a validated synthesis could "
+            "not be produced for this run. The retained passages remain available for review; "
+            "this generation failure does not establish historical absence."
+        )
+    else:
+        limitation = (
+            f"No admissible documentary passage was retrieved in {settings.TURIN_ARCHIVE_FIRST_CORPUS_VERSION}. "
+            "This is a retrieval or corpus-representation limit, not evidence that the "
+            "historical records or activity were absent."
+        )
+        available_records = retrieval.get("document_availability") or []
+        if available_records:
+            labels = [
+                f"{item.get('label') or item.get('asset_pid') or 'Matched archive asset'} "
+                f"(Asset PID {item.get('asset_pid') or 'unavailable'}; {item.get('classification') or 'availability unresolved'})"
+                for item in available_records[:4]
+            ]
+            limitation += " Matched archive traces: " + "; ".join(labels) + "."
+    authority_answer = _deterministic_authority_response(authority_evidence)["answer"] if authority_evidence else ""
     return {
         "query_id": f"exploratory-{uuid.uuid4().hex[:12]}",
         "mode": request.mode,
         "response_schema": "turin-evidence-pipeline-v2-exploratory-projection",
         "status": "completed",
-        "answer": "Relevant evidence was retrieved, but a validated synthesis could not be produced for this run. Inspect the retained sources and diagnostic trail.",
+        "answer": "\n\n".join(part for part in (authority_answer, limitation) if part),
         "answer_paragraphs": [],
         "answer_origin": "pipeline_synthesis_unavailable",
         "answer_state": AnswerState.SYNTHESIS_UNAVAILABLE.value,
@@ -1415,7 +1436,11 @@ def _synthesis_unavailable_response(
         "contextual_evidence": [],
         "inferences": [],
         "contradictions": [],
-        "missingness": [],
+        "missingness": [{"category": failure_code, "scope": "configured_corpus_and_retrieved_passages", "explanation": limitation}],
+        "archival_discovery": retrieval.get("archival_discovery", []),
+        "document_availability": retrieval.get("document_availability", []),
+        "corpus_representation_gaps": retrieval.get("corpus_representation_gaps", []),
+        "archival_context_only": retrieval.get("archival_context_only", []),
         "source_usage": {
             "retrieved_source_numbers": list(range(1, len(sources) + 1)),
             "retained_evidence_source_ids": [],
@@ -2096,12 +2121,7 @@ async def interrogate_exploratory_corpus(request: ExploratoryInterrogationReques
                 projection["answer_paragraphs"] = []
                 projection["answer_origin"] = "deterministic_evidence_limit"
                 projection["answer_state"] = AnswerState.EVIDENTIAL_LIMIT.value
-            documentary_answer = (
-                projection["answer"]
-                if projection["answer_paragraphs"]
-                or projection["answer_origin"] == "deterministic_evidence_limit"
-                else ""
-            )
+            documentary_answer = projection["answer"]
             projection["final_claim_plan"]["claims"] = [
                 *authority_claims,
                 *projection["final_claim_plan"].get("claims", []),
@@ -2351,12 +2371,20 @@ async def research_answer_corpus(request: ExploratoryInterrogationRequest):
     _hydrate_source_display_dates(retrieval["results"])
     retrieval_ms = round((time.perf_counter() - retrieval_started) * 1000, 1)
     if not retrieval["results"]:
-        raise HTTPException(status_code=404, detail="No relevant archival evidence was retrieved.")
+        return _synthesis_unavailable_response(
+            request, retrieval, stage="archive_first_retrieval",
+            failure_code="no_admissible_documentary_passages",
+            failure_message="No documentary passages were retrieved in the configured corpus.",
+        )
     packet_started = time.perf_counter()
     try:
         packets = _build_research_answer_packets(retrieval["results"], request.query)
         if not packets:
-            raise HTTPException(status_code=404, detail="No eligible documentary passages were available.")
+            return _synthesis_unavailable_response(
+                request, retrieval, stage="evidence_packet_assembly",
+                failure_code="no_eligible_documentary_packets",
+                failure_message="Retrieved passages did not yield eligible documentary packets.",
+            )
         packet_ms = round((time.perf_counter() - packet_started) * 1000, 1)
         inference_service = get_inference_service()
         result = await generate_documentary_synthesis(
