@@ -16,6 +16,8 @@ import { deriveRuntimeStatus } from '../../utils/runtimeStatus'
 const formatMetricValue = (value, fallback = 'Not yet recorded') => (value === null || value === undefined ? fallback : value)
 const formatCount = (value, fallback = 0) => Number(value ?? fallback).toLocaleString()
 const formatTokens = (value) => (value === null || value === undefined ? 'N/A' : `${Number(value).toLocaleString()} tokens`)
+const formatLiveCount = (value) => value === null || value === undefined ? 'Unavailable' : formatCount(value)
+const formatBytes = (value) => value === null || value === undefined ? 'Unavailable' : `${(value / (1024 * 1024)).toLocaleString('en-GB', { maximumFractionDigits: 2 })} MiB`
 
 const Dashboard = () => {
   const navigate = useNavigate()
@@ -35,17 +37,22 @@ const Dashboard = () => {
 
     const loadDashboard = async () => {
       try {
+        const failures = []
+        const recordFailure = (label) => () => {
+          failures.push(label)
+          return null
+        }
         const [runtimePayload, runtimeHealthPayload, retrievalHealthPayload, statsPayload, authorityPayload, inventoryPayload, analyticalResult, claimsPayload] = await Promise.all([
-          getRuntimeModelInfo().catch(() => null),
-          getRuntimeHealth().catch(() => null),
-          getRetrievalHealth().catch(() => null),
-          fetchDashboardStats().catch(() => null),
-          getAuthoritySummary().catch(() => null),
-          getDocumentInventorySummary().catch(() => null),
+          getRuntimeModelInfo().catch(recordFailure('model identity')),
+          getRuntimeHealth().catch(recordFailure('runtime health')),
+          getRetrievalHealth().catch(recordFailure('retrieval health')),
+          fetchDashboardStats().catch(recordFailure('processing statistics')),
+          getAuthoritySummary().catch(recordFailure('authority inventory')),
+          getDocumentInventorySummary().catch(recordFailure('archive inventory')),
           fetchDashboardAnalyticalSurface()
             .then((data) => ({ data, status: 'ready' }))
             .catch(() => ({ data: null, status: 'unavailable' })),
-          getClaims().catch(() => null),
+          getClaims().catch(recordFailure('claim records')),
         ])
 
         if (isCancelled) {
@@ -61,6 +68,7 @@ const Dashboard = () => {
         setAnalyticalSurface(analyticalResult.data)
         setAnalyticalSurfaceStatus(analyticalResult.status)
         setClaims(claimsPayload?.claims ?? null)
+        setLoadError(failures.length ? `Could not load: ${failures.join(', ')}. Unavailable metrics are not zero counts.` : '')
       } catch (error) {
         if (!isCancelled) {
           setLoadError(error.message || 'Failed to load dashboard metrics.')
@@ -76,16 +84,31 @@ const Dashboard = () => {
   }, [])
 
   const frozenCorpusStatus = useMemo(() => {
-    const overview = stats?.overview || {}
+    const composition = analyticalSurface?.composition
     return [
-      { label: 'Frozen corpus version', value: analyticalSurface?.corpus_version || 'Loading' },
+      { label: 'Frozen corpus version', value: analyticalSurface?.corpus_version || 'Unavailable' },
+      {
+        label: 'Searchable source documents',
+        value: formatLiveCount(composition?.controlled_ingestible_sources),
+        detail: 'Distinct documents with chunks in the active frozen corpus.'
+      },
       {
         label: 'Searchable FTS chunks',
-        value: formatCount(analyticalSurface?.composition?.current_chunks ?? overview.totalPages),
-        detail: `${formatCount(analyticalSurface?.composition?.controlled_ingestible_sources)} successfully ingested frozen-corpus sources`
+        value: formatLiveCount(composition?.current_chunks),
+        detail: composition ? `${formatCount(composition.controlled_ingestible_sources)} successfully ingested frozen-corpus sources` : 'Active corpus counts unavailable.'
+      },
+      {
+        label: 'Indexed text size',
+        value: formatBytes(composition?.indexed_text_bytes),
+        detail: 'UTF-8 chunk text only; excludes source files, indexes and model weights.'
+      },
+      {
+        label: 'Recorded source-file size',
+        value: formatBytes(composition?.recorded_source_bytes),
+        detail: composition ? `Size metadata recorded for ${formatCount(composition.source_size_recorded_documents)} of ${formatCount(composition.current_assets)} current corpus records; not an archive-wide storage total.` : 'Source size metadata unavailable.'
       }
     ]
-  }, [analyticalSurface, stats])
+  }, [analyticalSurface])
 
   const runtimeStatus = deriveRuntimeStatus(runtimeHealth, retrievalHealth)
 
@@ -93,26 +116,26 @@ const Dashboard = () => {
     const overview = stats?.overview || {}
     const mlProcessing = stats?.mlProcessing || {}
     const corpusCounts = overview.corpusStatus || {}
-    const persistedDocumentCount = formatMetricValue(corpusCounts.persistedDocumentCount, 0)
+    const persistedDocumentCount = formatMetricValue(corpusCounts.persistedDocumentCount, 'unavailable')
     return [
       {
         label: `Archive-resolved current document records (of ${persistedDocumentCount} local records)`,
-        value: formatMetricValue(corpusCounts.archiveResolvedDocumentCount, 0)
+        value: formatMetricValue(corpusCounts.archiveResolvedDocumentCount, 'Unavailable')
       },
       {
         label: `Legacy document records without current archive resolution (of ${persistedDocumentCount} local records)`,
-        value: formatMetricValue(corpusCounts.unresolvedLegacyDocumentCount, 0)
+        value: formatMetricValue(corpusCounts.unresolvedLegacyDocumentCount, 'Unavailable')
       },
       {
         label: 'Documents with stored embeddings',
-        value: `${formatMetricValue(mlProcessing.documentsWithEmbeddings, 0)} of ${persistedDocumentCount} local records`,
-        detail: 'Inactive for retrieval; PostgreSQL FTS remains active.'
+        value: `${formatMetricValue(mlProcessing.documentsWithEmbeddings, 'Unavailable')} of ${persistedDocumentCount} local records`,
+        detail: `Inactive for retrieval; PostgreSQL FTS remains active. Cached processing snapshot: ${stats?.lastUpdated ? new Date(stats.lastUpdated).toLocaleString() : 'unavailable'}.`
       },
       {
         label: 'ML-authorised archive PDF media',
         // totalPdfs includes retained legacy APR material and is not a frozen-corpus metric.
-        value: formatMetricValue(overview.totalPdfAssets, 0),
-        detail: 'PID-linked archive metadata'
+        value: formatMetricValue(overview.totalPdfAssets, 'Unavailable'),
+        detail: 'PID-linked archive metadata from the cached processing snapshot, not searchable-document coverage.'
       }
     ]
   }, [stats])
@@ -177,7 +200,7 @@ const Dashboard = () => {
               </Tag>
             </div>
             <h2 className="dashboard__runtime-hero-title">Research apparatus status</h2>
-            <p className="dashboard__runtime-hero-description">Live retrieval is available alongside frozen corpus controls, immutable research runs, provenance tracing, and human-authored assessment.</p>
+            <p className="dashboard__runtime-hero-description">Live runtime and retrieval status alongside frozen corpus controls, immutable research runs, provenance tracing, and human-authored assessment.</p>
             <div className="dashboard__model-cards" aria-label="Research apparatus models">
               <div className="dashboard__model-card dashboard__model-card--granite">
                 <div className="dashboard__model-card-heading">
@@ -185,17 +208,17 @@ const Dashboard = () => {
                   <span>IBM Granite</span>
                 </div>
                 <h3>Source interpretation</h3>
-                <p>{runtimeInfo?.display_name || 'IBM Granite 4.1 30B · Q4_K_M'} · evidence-grounded synthesis</p>
+                <p>{runtimeInfo?.display_name || 'Model identity unavailable'} · evidence-grounded synthesis</p>
                 <span>Interprets retrieved documentary passages into bounded, cited research responses.</span>
               </div>
               <div className="dashboard__model-card dashboard__model-card--baai">
                 <div className="dashboard__model-card-heading">
-                  <span className="dashboard__model-mark" aria-hidden="true"><img src="/baai.png" alt="" /></span>
-                  <span>BAAI</span>
+                  <Search size={20} aria-hidden="true" />
+                  <span>PostgreSQL</span>
                 </div>
-                <h3>Semantic retrieval</h3>
-                <p>bge-m3 · 1,024-dimensional embeddings</p>
-                <span>Retrieves semantically related corpus passages and underpins the Semantic Atlas projection.</span>
+                <h3>Archive-first retrieval</h3>
+                <p>Versioned corpus · full-text search</p>
+                <span>Retrieves admissible documentary passages with original provenance. Stored embeddings are not active research retrieval.</span>
               </div>
             </div>
             {runtimeInfo && (
@@ -230,6 +253,7 @@ const Dashboard = () => {
         <Column>
           <SectionHeading title="Frozen retrieval corpus" />
           <p className="app-copy-tight">Versioned PostgreSQL full-text retrieval evidence, separate from archive inventory and local processing state.</p>
+          {analyticalSurface?.measured_at && <p className="app-copy-tight">Live corpus snapshot: {new Date(analyticalSurface.measured_at).toLocaleString()}. Counts describe the corpus, not the inference model.</p>}
         </Column>
 
         {frozenCorpusStatus.map((item) => (

@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from sqlalchemy import func, text
 from typing import Any, List, Dict, Literal, Mapping, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 import json
 import logging
 import re
@@ -2942,7 +2942,7 @@ async def get_dashboard_analytical_surface():
     try:
         composition = db.execute(text("""
             WITH current_documents AS (
-                SELECT document_id, use_for_ml
+                SELECT document_id, use_for_ml, file_size_bytes
                 FROM documents
                 WHERE corpus_version = :corpus_version
             ), chunked_documents AS (
@@ -2955,7 +2955,11 @@ async def get_dashboard_analytical_surface():
                 (SELECT COUNT(*) FROM current_documents WHERE use_for_ml = 1) AS ml_eligible_assets,
                 (SELECT COUNT(*) FROM current_documents WHERE use_for_ml = 0) AS ml_excluded_assets,
                 (SELECT COUNT(*) FROM chunked_documents) AS controlled_ingestible_sources,
-                (SELECT COUNT(*) FROM document_chunks WHERE corpus_version = :corpus_version) AS current_chunks
+                (SELECT COUNT(*) FROM document_chunks WHERE corpus_version = :corpus_version) AS current_chunks,
+                (SELECT COALESCE(SUM(octet_length(chunk_text)), 0) FROM document_chunks
+                 WHERE corpus_version = :corpus_version) AS indexed_text_bytes,
+                (SELECT COUNT(*) FROM current_documents WHERE file_size_bytes > 0) AS source_size_recorded_documents,
+                (SELECT SUM(file_size_bytes) FROM current_documents WHERE file_size_bytes > 0) AS recorded_source_bytes
         """), {"corpus_version": corpus_version}).mappings().one()
 
         density = db.execute(text("""
@@ -2995,12 +2999,19 @@ async def get_dashboard_analytical_surface():
 
         return {
             "corpus_version": corpus_version,
+            "measured_at": datetime.now(timezone.utc).isoformat(),
             "composition": {
                 "current_assets": int(composition["current_assets"] or 0),
                 "controlled_ingestible_sources": int(composition["controlled_ingestible_sources"] or 0),
                 "source_format_anomalies": max(0, int(composition["ml_eligible_assets"] or 0) - int(composition["controlled_ingestible_sources"] or 0)),
                 "ml_excluded_assets": int(composition["ml_excluded_assets"] or 0),
                 "current_chunks": int(composition["current_chunks"] or 0),
+                "indexed_text_bytes": int(composition["indexed_text_bytes"] or 0),
+                "source_size_recorded_documents": int(composition["source_size_recorded_documents"] or 0),
+                "recorded_source_bytes": (
+                    int(composition["recorded_source_bytes"])
+                    if composition["recorded_source_bytes"] is not None else None
+                ),
             },
             "density": [{"document_id": row["document_id"], "title": row["title"] or "Untitled document", "chunk_count": int(row["chunk_count"])} for row in density],
             "temporal": {

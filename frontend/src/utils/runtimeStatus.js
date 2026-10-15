@@ -1,10 +1,11 @@
 export const deriveRuntimeStatus = (runtimeHealth, retrievalHealth) => {
-  const qwenReady = runtimeHealth?.status === 'healthy'
+  const modelReady = runtimeHealth?.status === 'healthy'
     && runtimeHealth?.model_status === 'ready'
     && runtimeHealth?.model_loaded === true
 
-  if (qwenReady) {
-    return { label: 'Qwen ready', type: 'green', ready: true }
+  if (modelReady) {
+    const modelLabel = runtimeHealth.model?.startsWith('granite') ? 'Granite' : 'Inference'
+    return { label: `${modelLabel} ready`, type: 'green', ready: true }
   }
 
   if (retrievalHealth?.status === 'healthy' && retrievalHealth?.database === 'connected') {
