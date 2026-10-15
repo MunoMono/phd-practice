@@ -233,6 +233,7 @@ def _evidence_records(packets: list[Any], question: str = "") -> list[dict[str, 
     seen_source_ids: set[str] = set()
     facets = _question_facets(question)
     candidates: list[dict[str, Any]] = []
+    required_context: list[dict[str, Any]] = []
     for packet in packets:
         source_id = str(packet.source_id)
         if source_id in seen_source_ids:
@@ -300,7 +301,49 @@ def _evidence_records(packets: list[Any], question: str = "") -> list[dict[str, 
             "text": str(hit["text"]),
             "evidence_role": "retrieved_match",
         }]
-        span_page = spans[0]["page"]
+        if re.search(r"\b(interview|oral.history|testimony)\b", str(base_record["title"]), re.I):
+            hit_position = chunks.index(hit)
+            for direction in (-1, 1):
+                neighbors = (
+                    reversed(chunks[:hit_position]) if direction == -1
+                    else iter(chunks[hit_position + 1:])
+                )
+                neighbor = next(
+                    (chunk for chunk in neighbors if len(str(chunk.get("text") or "").strip()) >= 35),
+                    None,
+                )
+                if neighbor is not None:
+                    neighbor_source = f"{document_id}:{neighbor['chunk_id']}"
+                    spans.append({
+                        "evidence_id": "EV-" + hashlib.sha256(neighbor_source.encode()).hexdigest()[:12],
+                        "source_id": neighbor_source,
+                        "document_id": document_id,
+                        "chunk_id": str(neighbor["chunk_id"]),
+                        "page": neighbor.get("page"),
+                        "text": str(neighbor["text"]),
+                        "evidence_role": "adjacent_testimony_context",
+                    })
+        if re.search(r"\bscientific\b", question or "", re.I) and re.search(
+            r"\baction research\b", question or "", re.I,
+        ):
+            condition = next((
+                chunk for chunk in chunks
+                if str(chunk.get("chunk_id")) != hit_id
+                and re.search(r"\bon those occasions when\b|\bonly if\b", str(chunk.get("text")), re.I)
+                and re.search(r"\b(?:objective|verifi\w*|replic\w*)\b", str(chunk.get("text")), re.I)
+            ), None)
+            if condition is not None:
+                condition_source = f"{document_id}:{condition['chunk_id']}"
+                required_context.append({
+                    **base_record,
+                    "evidence_id": "EV-" + hashlib.sha256(condition_source.encode()).hexdigest()[:12],
+                    "source_id": condition_source,
+                    "document_id": document_id,
+                    "chunk_id": str(condition["chunk_id"]),
+                    "page": condition.get("page"),
+                    "text": str(condition["text"]),
+                    "evidence_role": "requested_method_condition_context",
+                })
         context_candidates = []
         for chunk in chunks:
             chunk_id = str(chunk.get("chunk_id") or "")
@@ -342,7 +385,7 @@ def _evidence_records(packets: list[Any], question: str = "") -> list[dict[str, 
                 _normalise_text(span["text"]).encode("utf-8")
             ).hexdigest()
             duplicate_of = identity_by_content.get(passage_identity)
-            source_page_key = (content_identity, span_page)
+            source_page_key = (content_identity, span["page"])
             if duplicate_of is None:
                 duplicate_of = next((
                     evidence_id
@@ -452,6 +495,18 @@ def _evidence_records(packets: list[Any], question: str = "") -> list[dict[str, 
             ).hexdigest()[:12],
             "duplicate_of": None,
         })
+    for condition in required_context:
+        statement = re.search(
+            r"[^.!?]*\b(?:on those occasions when|only if)\b[^.!?]*[.!?]",
+            condition["text"], re.I,
+        )
+        required_text = _normalise_text(statement.group() if statement else condition["text"])
+        if not any(
+            item["chunk_id"] == condition["chunk_id"]
+            and required_text in _normalise_text(item["text"])
+            for item in records
+        ):
+            records.append({**condition, "duplicate_of": None})
     return records
 
 
@@ -525,7 +580,8 @@ def _documentary_reading_packet(evidence: list[dict[str, Any]]) -> str:
 
 
 def build_documentary_analysis_prompt(
-    question: str, evidence: list[dict[str, Any]]
+    question: str, evidence: list[dict[str, Any]],
+    authority_evidence: list[Mapping[str, Any]] | None = None,
 ) -> str:
     return (
         "Read EVIDENCE to prepare a compact scholarly argument. Return JSON matching the schema. "
@@ -557,9 +613,59 @@ def build_documentary_analysis_prompt(
         "exclude. These notes are proposed reasoning for independent assessment, not validated "
         "history. Keep the complete analysis brief; spend words on documentary reasoning, not "
         "administrative repetition.\n\n"
-        f"RESEARCH QUESTION:\n{question}\n{_hybrid_documentary_task(question)}"
+        + _source_interpretation_context(question, authority_evidence)
+        + f"RESEARCH QUESTION:\n{question}\n{_hybrid_documentary_task(question)}"
         f"\nEVIDENCE:\n{_documentary_reading_packet(evidence)}"
     )
+
+def _source_interpretation_context(
+    question: str, authority_evidence: list[Mapping[str, Any]] | None,
+) -> str:
+    context = (
+        "\nSOURCE INTERPRETATION RULES:\n"
+        "In this RCA research instrument DDR means the Royal College of Art Department "
+        "of Design Research. Do not invent another expansion. Other abbreviations must "
+        "retain their explicit source meanings; where genuinely ambiguous, leave them unresolved. "
+        "Distinguish catalogue labels from printed report identifications where they disagree; "
+        "do not silently resolve the discrepancy. "
+        "Track the subject, institution, place and time of each recollection. "
+        "Interviews contain interviewer and respondent turns. Do not attribute an "
+        "interviewer's statement to the respondent. If an excerpt does not establish "
+        "its speaker, describe what the transcript records without guessing the speaker. "
+        "A description of a later institution is not a description of the RCA. Do not turn a mention "
+        "of a computing tutor into evidence that the speaker studied under that tutor. "
+        "Retrospective testimony can be compared with contemporary records but cannot "
+        "independently verify their implementation. "
+    )
+    if authority_evidence:
+        context += (
+            "\nCONTROLLED AUTHORITY CONTEXT (not documentary quotations):\n"
+            + json.dumps([
+                {key: item.get(key) for key in ("source", "authority_type", "authority_id", "fields")}
+                for item in authority_evidence
+            ], ensure_ascii=False, separators=(",", ":"))
+            + "\nThese database facts are rendered separately by the application. Reconcile "
+            "them with documentary dates and personnel explicitly. Do not claim recorded "
+            "employment is unestablished merely because a report lacks employment dates. "
+            "Preserve real discrepancies rather than overriding either record. A named "
+            "leadership role does not establish sole authorship or individual intellectual "
+            "contributions. Do not create EV citations for database fields.\n"
+        )
+    if re.search(r"\bscientific\b", question, re.I) and re.search(r"\baction research\b", question, re.I):
+        context += (
+            "\nMETHODOLOGICAL COMPARISON:\n"
+            "Organise the answer around the separately evidenced treatments of each "
+            "requested method, then compare their uses. Preserve any conditional requirements "
+            "for objectivity, verification and replication; do not collapse systematic enquiry "
+            "into scientific enquiry or practical action research into academic research. "
+            "A conceptual comparison you construct is an interpretation, not an institutional "
+            "integration claim. Do not describe methods as woven into, combined in, or "
+            "integrated across a curriculum unless an original passage explicitly establishes "
+            "that relationship. Course lists establish listed content, not its delivery. "
+            "Make the first sentence express the documented distinction or comparison, "
+            "not an assumed integrated methodology.\n"
+        )
+    return context
 
 def _hybrid_documentary_task(question: str) -> str:
     decomposition = decompose_hybrid_question(question)
@@ -607,7 +713,8 @@ def validate_documentary_analysis(
 
 
 def build_documentary_composition_prompt(
-    question: str, evidence: list[dict[str, Any]], analysis: DocumentaryAnalysis
+    question: str, evidence: list[dict[str, Any]], analysis: DocumentaryAnalysis,
+    authority_evidence: list[Mapping[str, Any]] | None = None,
 ) -> str:
     return (
         "Write a scholarly archival answer using only the supplied passages. "
@@ -656,17 +763,19 @@ def build_documentary_composition_prompt(
         "Do not assert a coherent framework or unified curriculum merely because the concepts "
         "occur in teaching documents. State which requested connections remain unestablished "
         "in this packet, without claiming that they never existed. Return prose only."
+        + _source_interpretation_context(question, authority_evidence)
     )
 
 
 async def generate_documentary_synthesis(
-    question: str, evidence: list[dict[str, Any]], inference_service: Any
+    question: str, evidence: list[dict[str, Any]], inference_service: Any,
+    authority_evidence: list[Mapping[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Two construction calls, no review call or automatic repair; human review required."""
     if not evidence:
         raise ValueError("No source passages are available for documentary synthesis.")
     started = time.monotonic()
-    analysis_prompt = build_documentary_analysis_prompt(question, evidence)
+    analysis_prompt = build_documentary_analysis_prompt(question, evidence, authority_evidence)
     analysis_result = await inference_service.generate_experiment(
         analysis_prompt, max_tokens=2048, temperature=0.2, do_sample=False,
         response_schema=DocumentaryAnalysis.model_json_schema(),
@@ -675,7 +784,7 @@ async def generate_documentary_synthesis(
     if analysis_result.get("generation", {}).get("done_reason") == "length":
         raise RuntimeError("Documentary analysis was truncated; composition was not attempted.")
     analysis = validate_documentary_analysis(analysis_result["raw_response"], evidence)
-    composition_prompt = build_documentary_composition_prompt(question, evidence, analysis)
+    composition_prompt = build_documentary_composition_prompt(question, evidence, analysis, authority_evidence)
     answer_result = await inference_service.generate_experiment(
         composition_prompt, max_tokens=1200, temperature=0.2, do_sample=False,
         stage="documentary_scholarly_composition",

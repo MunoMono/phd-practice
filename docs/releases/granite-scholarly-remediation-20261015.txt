@@ -1,0 +1,43 @@
+Granite targeted scholarly remediation, 15 October 2026
+
+Authorised scope: DOC-02, DOC-12, HYB-07 and HYB-08.
+Baseline and rollback: 3a16f7a55fd7751f3d7abe5065ae0cacdf0d2d18.
+Model remains granite4.1:30b-q4_K_M.
+
+Corrections:
+- Expose the existing controlled authority facts to both existing scholarly
+  calls, preserving their separate deterministic rendering and citation role.
+- Preserve RCA Department of Design Research identity, oral-history speaker,
+  institution and chronology distinctions, and catalogue/PDF disagreements.
+- Within already-nominated documents prefer substantive computing-practice
+  testimony and problem/method-bearing research-needs passages. Preserve
+  existing admissibility checks and record actual lexical query matches.
+- Retain adjacent original testimony and conditional methodological context
+  with original document/chunk identifiers, pages and EV citation bindings.
+- Preserve the existing packet budget and anchor while prioritising required
+  scientific/action-research conditions. Keep existing complete-sentence
+  evidence selections when they already represent the condition.
+- Require separately evidenced methodological comparison, not an unsupported
+  integrated curriculum or implementation claim.
+
+No new inference architecture, model call, verification layer, corpus change,
+authority write, frozen UAT edit or human acceptance decision.
+
+Validation:
+- 273 focused tests and 78 subtests passed.
+- The previously documented staged telemetry baseline failure is excluded
+  from the clean selector; it is not repaired by this release.
+- DOC-09, DOC-15, DOC-16 and DOC-17 retain exactly the same retrieved
+  document/chunk identifiers and complete reading evidence.
+- Candidate retrieval inspection made no inference calls or database writes.
+- All four implementation baselines match deployed image and isolated Git.
+- Expanded documentary-analysis prompts remain within the unchanged context
+  budget using a conservative character-based estimate.
+
+Release is backend-only. Preserve the dashboard/frontend, environment,
+mounts, ports, networks, existing corpus and prior image rollback.
+
+After deployment execute the four exact frozen questions once, sequentially,
+and save complete unedited production answers to the researcher's desktop.
+HYB-09 remains on hold. Its separate source-identity proposal requires explicit
+approval before catalogue/database corrections or project relationship writes.

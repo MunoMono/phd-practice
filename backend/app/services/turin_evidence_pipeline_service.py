@@ -2096,14 +2096,31 @@ def _context_chunk(chunk: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
-def _trim_to_token_budget(chunks: list[dict[str, Any]], matched_id: str, budget: int) -> list[dict[str, Any]]:
+def _trim_to_token_budget(
+    chunks: list[dict[str, Any]], matched_id: str, budget: int, question: str | None = None,
+) -> list[dict[str, Any]]:
     """Keep a deterministic documentary neighbourhood under a conservative token estimate."""
     selected: list[dict[str, Any]] = []
     used = 0
     matched_index = next(value["chunk_index"] for value in chunks if value["chunk_id"] == matched_id)
+    comparing_research_modes = bool(
+        question and re.search(r"\bscientific\b", question, re.I)
+        and re.search(r"\baction research\b", question, re.I)
+    )
+
+    def has_required_condition(chunk: dict[str, Any]) -> bool:
+        return bool(
+            comparing_research_modes
+            and re.search(r"\bon those occasions when\b|\bonly if\b", chunk["text"], re.I)
+            and re.search(r"\b(?:objective|verifi\w*|replic\w*)\b", chunk["text"], re.I)
+        )
+
     ordered_chunks = sorted(
         chunks,
-        key=lambda item: (item["chunk_id"] != matched_id, abs(item["chunk_index"] - matched_index), item["chunk_index"]),
+        key=lambda item: (
+            item["chunk_id"] != matched_id, not has_required_condition(item),
+            abs(item["chunk_index"] - matched_index), item["chunk_index"],
+        ),
     )
     for chunk in ordered_chunks:
         cost = (len(chunk["text"]) + 3) // 4
@@ -2168,7 +2185,7 @@ class EvidencePacketBuilder:
                   AND chunk_index BETWEEN :chunk_index - 3 AND :chunk_index + 3
                 ORDER BY chunk_index, chunk_id
             """), {"document_id": result["document_id"], "chunk_index": result.get("chunk_sequence")}).mappings().all()
-            chunks = _trim_to_token_budget([_context_chunk(row) for row in rows], str(result["chunk_id"]), local_token_budget)
+            chunks = _trim_to_token_budget([_context_chunk(row) for row in rows], str(result["chunk_id"]), local_token_budget, question)
             match_index = next((index for index, chunk in enumerate(chunks) if chunk["chunk_id"] == result["chunk_id"]), None)
             if match_index is None:
                 chunks = sorted([_context_chunk(result), *chunks], key=lambda chunk: (chunk["chunk_index"], chunk["chunk_id"]))

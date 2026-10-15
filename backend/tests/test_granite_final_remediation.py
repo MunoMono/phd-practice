@@ -122,6 +122,7 @@ def test_hybrid_reuses_two_call_draft_and_preserves_authority_on_failure(failure
         assert result["human_acceptance_status"] == "UNASSESSED"
         packets.assert_called_once_with(retrieval["results"], decompose_hybrid_question(QUESTION).documentary_query)
         generate.assert_awaited_once()
+        assert generate.await_args.kwargs["authority_evidence"] == AUTHORITY
     else:
         assert result["answer_state"] == "synthesis_unavailable"
         assert "absent" in result["answer"] or "does not establish historical absence" in result["answer"]

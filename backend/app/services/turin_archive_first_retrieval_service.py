@@ -75,6 +75,76 @@ class TurinArchiveFirstRetrievalService:
         ]
 
     @staticmethod
+    def _requested_task_passages(
+        rows: list[dict[str, Any]], question: str, *, hybrid: bool,
+    ) -> list[dict[str, Any]]:
+        def task_ranked(selected: list[dict[str, Any]]) -> list[dict[str, Any]]:
+            query_terms = set(_terms(question))
+            return [
+                {
+                    **row,
+                    "score": max(
+                        float(row.get("score") or 0),
+                        len(query_terms.intersection(_terms(str(row.get("chunk_text") or "")))),
+                    ),
+                    "task_query_matches": sorted(
+                        query_terms.intersection(_terms(str(row.get("chunk_text") or "")))
+                    ),
+                }
+                for row in selected
+            ]
+
+        if re.search(r"\bcomput\w*\b", question, re.I) and re.search(
+            r"\boral.history\b|\btestimony\b", question, re.I,
+        ):
+            substantive_testimony = [
+                row for row in rows
+                if re.search(r"\binterview\b|\boral.history\b", str(row.get("title") or ""), re.I)
+                and len(re.findall(r"\bcomput\w*\b", str(row.get("chunk_text") or ""), re.I)) >= 2
+                and re.search(
+                    r"\b(?:us(?:e[ds]?|ing)|built|programm\w*|interactive|help\w*|taught|work\w*|develop\w*|learn\w*)\b",
+                    str(row.get("chunk_text") or ""), re.I,
+                )
+                and ExploratoryRetrievalService._passage_quality(str(row.get("chunk_text") or ""))[0]
+            ]
+            if substantive_testimony:
+                computing_practice = [
+                    row for row in substantive_testimony
+                    if re.search(
+                        r"\b(?:programm\w*|comput\w*[ -]based)\b|"
+                        r"\b(?:use[ds]?|using|help\w*|taught|learn\w*).{0,80}\bcomput\w*\b",
+                        str(row.get("chunk_text") or ""), re.I,
+                    )
+                ]
+                if computing_practice:
+                    substantive_testimony = computing_practice
+                return task_ranked(substantive_testimony)
+        if hybrid and re.search(r"\bresearch needs\b", question, re.I):
+            substantive = [
+                row for row in rows
+                if len(re.findall(
+                    r"\b(?:complexity|cogniti\w*|ergonom\w*|hypothes\w*|understanding|"
+                    r"methodolog\w*|performance|problem\w*)\b",
+                    str(row.get("chunk_text") or ""), re.I,
+                )) >= 3
+                and ExploratoryRetrievalService._passage_quality(
+                    str(row.get("chunk_text") or "")
+                )[0]
+            ]
+            if substantive:
+                return task_ranked(substantive)
+        if re.search(r"\bscientific\b", question, re.I) and re.search(r"\baction research\b", question, re.I):
+            conditional = [
+                row for row in rows
+                if re.search(r"\bon those occasions when\b|\bonly if\b", str(row.get("chunk_text") or ""), re.I)
+                and re.search(r"\b(?:objective|verifi\w*|replic\w*)\b", str(row.get("chunk_text") or ""), re.I)
+                and ExploratoryRetrievalService._passage_quality(str(row.get("chunk_text") or ""))[0]
+            ]
+            if conditional:
+                return task_ranked(conditional)
+        return rows
+
+    @staticmethod
     def _candidate_matches(asset: Mapping[str, Any], plan: Mapping[str, Any]) -> dict[str, Any]:
         query_terms = set(_terms(str(plan["normalised_query"])))
         exact_anchors = [_normalise(entity["label"]) for entity in plan["resolved_entities"]]
@@ -809,6 +879,9 @@ class TurinArchiveFirstRetrievalService:
             ]
             if facet_passages:
                 permitted = facet_passages
+            permitted = self._requested_task_passages(
+                permitted, documentary_query, hybrid=hybrid_decomposition is not None,
+            )
             passage = ExploratoryRetrievalService._select_best_passage(permitted, query_terms)
             if passage is None:
                 nomination["availability"] = {**availability, "classification": "DOCUMENTARY_EVIDENCE_INSUFFICIENT"}

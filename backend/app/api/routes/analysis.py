@@ -2415,6 +2415,7 @@ async def research_answer_corpus(request: ExploratoryInterrogationRequest):
         inference_service = get_inference_service()
         result = await generate_documentary_synthesis(
             request.query, _evidence_records(packets, documentary_question), inference_service,
+            authority_evidence=authority_evidence,
         )
     except (InferenceTimeoutError, RuntimeError, ValueError) as exc:
         if hybrid:
