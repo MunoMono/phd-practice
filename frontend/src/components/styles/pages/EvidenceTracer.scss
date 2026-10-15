@@ -2,6 +2,7 @@
 @use '@carbon/react/scss/theme' as *;
 @use '@carbon/react/scss/breakpoint' as *;
 @use '@carbon/react/scss/type' as *;
+@use '@carbon/type' as carbon-type;
 
 .evidence-tracer {
   .tracer__visualization {
@@ -63,16 +64,16 @@
   }
 
   .tracer__panel--answer .panel-header {
-    max-width: 48rem;
-    margin: 0 auto $spacing-06;
+    max-width: none;
+    margin: 0 0 $spacing-06;
   }
 
   .tracer__answer-state {
     display: grid;
     gap: $spacing-03;
     margin-bottom: $spacing-05;
-    max-width: 48rem;
-    margin-inline: auto;
+    max-width: none;
+    margin-inline: 0;
 
     .cds--inline-notification { max-width: none; }
 
@@ -83,12 +84,17 @@
 
   .tracer__answer-body {
     @include type-style('body-02');
-    max-width: 48rem;
-    margin: 0 auto $spacing-06;
+    font-size: calc(var(--cds-body-02-font-size, #{carbon-type.type-scale(3)}) * 3);
+    max-width: none;
+    width: 100%;
+    margin: 0 0 $spacing-06;
+    text-align: left;
+    overflow-wrap: anywhere;
     color: $text-primary;
 
     p, blockquote, ul, ol {
       @include type-style('body-02');
+      font-size: inherit;
       margin: 0 0 $spacing-05;
     }
 
@@ -99,6 +105,7 @@
 
     .tracer__source-citation {
       @include type-style('label-01');
+      font-size: 0.75em;
       margin-left: 0;
       font-weight: 600;
       line-height: 1;
@@ -301,8 +308,8 @@
   }
 
   .tracer__answer-controls {
-    max-width: 48rem;
-    margin: $spacing-05 auto 0;
+    max-width: none;
+    margin: $spacing-05 0 0;
     display: flex;
     flex-wrap: wrap;
     gap: $spacing-05;

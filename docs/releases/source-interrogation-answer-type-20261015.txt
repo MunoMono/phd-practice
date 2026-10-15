@@ -1,0 +1,27 @@
+RESEARCH ANSWER TYPOGRAPHY
+Base: a6b0b43769f77eea93372177f915812338c552d6
+Date: 2026-10-15
+
+Rename the answer section Research answer. Left-align its heading, review
+notice, generated prose and controls across the entire panel content width.
+Panel padding remains for readability and mobile access.
+
+Generated prose uses three times Carbon type-scale(3), the existing 16px
+body-02 baseline: 48px at the standard root size. Paragraphs, quotations and
+lists inherit the answer size. Citations use 0.75em, preserving the original
+12px-to-16px proportion at the new size (36px-to-48px). Superscripts remain
+immediately against the preceding word and before sentence punctuation.
+Neither the generated wording nor underlying citations are changed.
+
+Focused browser checks measure exact 3x size, relative citation size,
+left alignment, full panel-content width, before-stop placement and no page
+overflow at desktop and mobile widths. Retain existing graph, source,
+provenance, session, export and theme checks. Check protected screen
+content/navigation/pixels and unchanged source hashes before and after release.
+Use the existing static 2D atlas control identically in both comparison
+browsers to exclude orbit timing from the protected-screen pixel check.
+
+Deploy only the frontend overlay on the current a6b0b43 image. Preserve that
+image for automatic rollback. No backend, inference, model, retrieval,
+corpus, authority, archival identity or frozen UAT changes. No research
+questions or human acceptance decisions are executed.

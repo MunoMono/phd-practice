@@ -1162,7 +1162,7 @@ const EvidenceTracer = () => {
       <Column>
         <Tile className="tracer__panel tracer__panel--answer">
           <PanelHeader
-            title="Scholarly answer"
+            title="Research answer"
             description={null}
             actions={traceData && (
               !['retrieval_only', 'deterministic_catalogue_result', 'deterministic_archive_collection_result', 'targeted_document_evidence_limit', 'deterministic_direct_source_fallback', 'deterministic_cited_evidence_synthesis'].includes(traceData.answerOrigin) && <AnswerAiLabel

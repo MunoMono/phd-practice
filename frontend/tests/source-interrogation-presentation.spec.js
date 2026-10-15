@@ -150,18 +150,58 @@ test('eight passages use a compact graph and consistently aligned reading surfac
     const summary = document.querySelector('.evidence-source-card__why summary')
     return {
       answerWidth: answer.width,
-      answerCentered: Math.abs((answer.left + answer.right) / 2 - (panel.left + panel.right) / 2),
+      availableWidth: panel.width - parseFloat(getComputedStyle(document.querySelector('.tracer__panel--answer')).paddingLeft) - parseFloat(getComputedStyle(document.querySelector('.tracer__panel--answer')).paddingRight) - 2,
+      answerLeft: answer.left,
+      contentLeft: panel.left + parseFloat(getComputedStyle(document.querySelector('.tracer__panel--answer')).paddingLeft) + 1,
       sourceWidth: source.width,
       quoteWidth: quote.width,
       summaryPadding: parseFloat(getComputedStyle(summary).paddingTop),
     }
   })
   expect(layout.answerWidth).toBeGreaterThan(650)
-  expect(layout.answerWidth).toBeLessThanOrEqual(768)
-  expect(layout.answerCentered).toBeLessThan(2)
+  expect(Math.abs(layout.answerWidth - layout.availableWidth)).toBeLessThan(2)
+  expect(Math.abs(layout.answerLeft - layout.contentLeft)).toBeLessThan(2)
   expect(layout.sourceWidth).toBeLessThanOrEqual(1024)
   expect(layout.quoteWidth).toBeGreaterThan(layout.sourceWidth * 0.85)
   expect(layout.summaryPadding).toBeGreaterThanOrEqual(12)
+})
+
+test('Research answer fills the box with exactly triple Carbon body text and proportional citations', async ({ page }) => {
+  await submit(page)
+  await expect(page.getByRole('heading', { name: 'Research answer', exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Scholarly answer', exact: true })).toHaveCount(0)
+  for (const width of [1440, 390]) {
+    await page.setViewportSize({ width, height: 1000 })
+    const layout = await page.locator('.tracer__answer-body').evaluate((answer) => {
+      const style = getComputedStyle(answer)
+      const paragraph = answer.querySelector('p')
+      const citation = answer.querySelector('sup')
+      const panel = answer.closest('.tracer__panel--answer')
+      const panelStyle = getComputedStyle(panel)
+      const panelBox = panel.getBoundingClientRect()
+      const answerBox = answer.getBoundingClientRect()
+      return {
+        rootFont: parseFloat(getComputedStyle(document.documentElement).fontSize),
+        answerFont: parseFloat(style.fontSize),
+        paragraphFont: parseFloat(getComputedStyle(paragraph).fontSize),
+        citationFont: parseFloat(getComputedStyle(citation).fontSize),
+        alignment: style.textAlign,
+        width: answerBox.width,
+        availableWidth: panelBox.width - parseFloat(panelStyle.paddingLeft) - parseFloat(panelStyle.paddingRight) - 2,
+        left: answerBox.left,
+        contentLeft: panelBox.left + parseFloat(panelStyle.paddingLeft) + 1,
+        beforeStop: citation.nextSibling.textContent.startsWith('.'),
+      }
+    })
+    expect(layout.answerFont).toBe(layout.rootFont * 3)
+    expect(layout.paragraphFont).toBe(layout.answerFont)
+    expect(layout.citationFont).toBe(layout.answerFont * 0.75)
+    expect(layout.alignment).toBe('left')
+    expect(Math.abs(layout.width - layout.availableWidth)).toBeLessThan(2)
+    expect(Math.abs(layout.left - layout.contentLeft)).toBeLessThan(2)
+    expect(layout.beforeStop).toBe(true)
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+  }
 })
 
 test('citations following full stops inside emphasized words move before the stop', async ({ page }) => {
