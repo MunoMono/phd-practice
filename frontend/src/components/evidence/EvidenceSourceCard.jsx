@@ -116,8 +116,8 @@ const EvidenceSourceCard = ({
         <Button size="sm" kind="ghost" onClick={onCopyCitation}>Copy citation</Button>
         <Button size="sm" kind="ghost" onClick={onOpenCorpus}>Open in sources</Button>
         <Button size="sm" kind="ghost" onClick={onShowAnalytics}>Locate in semantic atlas</Button>
-        <Button size="sm" kind="secondary" onClick={() => setExpanded(!expanded)} aria-expanded={expanded}>View provenance</Button>
-        {source.publicUrl && <a href={source.publicUrl} target="_blank" rel="noreferrer">Open original source</a>}
+        <Button size="sm" kind="ghost" onClick={() => setExpanded(!expanded)} aria-expanded={expanded}>View provenance</Button>
+        {source.publicUrl && <Button as="a" size="sm" kind="ghost" href={source.publicUrl} target="_blank" rel="noreferrer">Open original source</Button>}
       </div>
 
       {expanded && (

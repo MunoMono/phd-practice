@@ -183,8 +183,10 @@ export const citationTextNodes = (text, presentation) => {
     }
     let before = text.slice(offset, match.index).replace(/[ \t]+$/, '')
     const following = text.slice(end)
-    const punctuation = following.match(/^[ \t]*([.,;:!?]+)/)
-    if (punctuation) before += punctuation[1]
+    const trailing = before.match(/([.,;:!?]+)([*_]{0,3})$/)
+    const trailingPunctuation = trailing?.[1] || ''
+    if (trailing) before = before.slice(0, -trailing[0].length).replace(/[ \t]+$/, '') + trailing[2]
+    const punctuation = trailingPunctuation ? null : following.match(/^[ \t]*([.,;:!?]+)/)
     nodes.push({ type: 'text', value: before })
     const children = []
     ids.forEach((id, index) => {
@@ -197,6 +199,7 @@ export const citationTextNodes = (text, presentation) => {
           data: { hProperties: { 'aria-label': 'Inspect unresolved citation' } } })
     })
     nodes.push({ type: 'citation', data: { hName: 'sup', hProperties: { className: 'tracer__source-citation' } }, children })
+    if (trailingPunctuation || punctuation) nodes.push({ type: 'text', value: trailingPunctuation || punctuation[1] })
     offset = end + (punctuation ? punctuation[0].length : 0)
   }
   nodes.push({ type: 'text', value: text.slice(offset) })
@@ -208,13 +211,26 @@ export const scholarlyRemarkPlugin = (presentation) => () => (tree) => {
     if (node?.type === 'text') node.value = node.value.replace(/[ \t]+$/, '')
     else if (node?.children?.length) trimEnd(node.children.at(-1))
   }
+  const takePunctuation = (node) => {
+    if (node?.type === 'text') {
+      const punctuation = node.value.match(/[.,;:!?]+$/)?.[0] || ''
+      if (punctuation) node.value = node.value.slice(0, -punctuation.length)
+      return punctuation
+    }
+    if (['emphasis', 'strong', 'delete'].includes(node?.type)) return takePunctuation(node.children.at(-1))
+    return ''
+  }
   const visit = (node) => {
     if (!node.children || ['link', 'linkReference', 'code', 'inlineCode'].includes(node.type)) return
     const children = []
     for (const child of node.children) {
       if (child.type === 'text') {
         const rendered = citationTextNodes(child.value, presentation)
-        if (rendered[1]?.type === 'citation' && /^[.,;:!?]*$/.test(rendered[0].value)) trimEnd(children.at(-1))
+        if (rendered[1]?.type === 'citation' && rendered[0].value === '') {
+          trimEnd(children.at(-1))
+          const punctuation = takePunctuation(children.at(-1))
+          if (punctuation) rendered.splice(2, 0, { type: 'text', value: punctuation })
+        }
         children.push(...rendered)
       } else {
         visit(child)

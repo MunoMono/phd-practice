@@ -32,12 +32,18 @@ test('every Unicode hyphen variant resolves without rewriting identifiers', () =
   }
 })
 
-test('no space precedes citation; sentence punctuation precedes the superscript', () => {
+test('no space precedes citation; superscript precedes sentence punctuation', () => {
   const p = buildScholarlyPresentation(trace())
   const nodes = citationTextNodes('A claim [EV-123456789abc]. More.', p)
-  assert.equal(nodes[0].value, 'A claim.')
+  assert.equal(nodes[0].value, 'A claim')
   assert.equal(nodes[1].data.hName, 'sup')
-  assert.equal(nodes[2].value, ' More.')
+  assert.equal(nodes[2].value, '.')
+  assert.equal(nodes[3].value, ' More.')
+  const afterStop = citationTextNodes('A claim. [EV-123456789abc] More.', p)
+  assert.equal(afterStop[0].value, 'A claim')
+  assert.equal(afterStop[1].type, 'citation')
+  assert.equal(afterStop[2].value, '.')
+  assert.equal(afterStop[3].value, ' More.')
   assert.equal(citationTextNodes("Archer's formulation [EV-123456789abc] remains.", p)[0].value, "Archer's formulation")
 })
 
@@ -95,7 +101,7 @@ test('Markdown export shares citations, punctuation and unresolved warnings with
   const t = trace()
   t.answer = 'Interpretation — bounded [EV-123456789abc]. Unknown [EV-000000000000].'
   const exported = exportScholarlyAnswer(t)
-  assert.ok(exported.includes('Interpretation–bounded.<sup>[1](#source-card-1)</sup>'))
+  assert.ok(exported.includes('Interpretation–bounded<sup>[1](#source-card-1)</sup>.'))
   assert.ok(exported.includes('<a id="source-card-1"></a>Report one'))
   assert.ok(exported.includes('p. 0'))
   assert.ok(exported.includes('Unresolved citation: EV-000000000000'))
@@ -126,7 +132,7 @@ test('existing citation links preserve their actual targets instead of inferring
 test('adjacent citation groups share a punctuated superscript without ambiguous joined numbers', () => {
   const p = buildScholarlyPresentation(trace())
   const nodes = citationTextNodes('Bounded [EV-123456789abc] [EV-abcdef123456].', p)
-  assert.equal(nodes[0].value, 'Bounded.')
+  assert.equal(nodes[0].value, 'Bounded')
   assert.equal(nodes.filter((node) => node.type === 'citation').length, 1)
   assert.deepEqual(nodes[1].children.map((node) => node.value || node.children[0].value), ['1', ',', '2'])
 })

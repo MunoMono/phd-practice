@@ -7,7 +7,7 @@ import { chartColors, carbonColors, chartStyles } from '../../utils/carbonD3Them
 const sourceLabel = (source, index) => {
   const title = source.title || source.pid || source.documentId || 'Untitled source'
   const locator = source.page != null ? `p. ${source.page}` : 'page unavailable'
-  return `${index + 1}: ${title.length > 36 ? `${title.slice(0, 35)}…` : title} | ${locator}`
+  return `${index + 1}: ${title.length > 58 ? `${title.slice(0, 57)}…` : title} | ${locator}`
 }
 
 const sourceDetail = (source) => [
@@ -115,16 +115,16 @@ const EvidenceGraph = ({ data }) => {
 
   useEffect(() => {
     setSelectedSource(null)
-    const width = 1120
-    const rowSpacing = 100
-    const topOffset = 220
-    const rowCount = Math.max(data?.sources?.length || 0, 1)
-    const height = Math.max(360, topOffset + ((rowCount - 1) * rowSpacing) + 90)
+    const width = 1024
+    const rowSpacing = 112
+    const topOffset = 190
+    const rowCount = Math.ceil((data?.sources?.length || 0) / 4)
+    const height = data ? Math.max(150, topOffset + (rowCount * rowSpacing) - 12) : 160
 
     d3.select(svgRef.current).selectAll('*').remove()
 
     const svg = d3.select(svgRef.current)
-      .attr('viewBox', `0 0 1120 ${height}`)
+      .attr('viewBox', `0 0 ${width} ${height}`)
       .attr('preserveAspectRatio', 'xMidYMid meet')
 
     if (!data) {
@@ -159,18 +159,14 @@ const EvidenceGraph = ({ data }) => {
 
     sources.forEach((source, index) => {
       const sourceId = source.anchor || `passage-${index}`
-      const selectionScore = Number.isFinite(source.sourceNominationScore) ? source.sourceNominationScore : source.score || 0.5
-      const passageScore = Number.isFinite(source.passageScore) ? source.passageScore : source.score || 0.5
 
-      nodes.push({ id: sourceId, label: sourceLabel(source, index), detail: sourceDetail(source), source, column: 2, row: index, group: 'chunk' })
-      links.push({ source: 'selection', target: sourceId, value: selectionScore })
-      links.push({ source: sourceId, target: 'evidence-set', value: passageScore })
+      nodes.push({ id: sourceId, label: sourceLabel(source, index), detail: sourceDetail(source), source, column: index % 4, row: Math.floor(index / 4), group: 'chunk' })
     })
 
-    const columns = [80, 240, 400, 560, 720, 880, 1040]
+    const columns = [72, 218, 364, 510, 656, 802, 948]
 
     nodes.forEach((node) => {
-      node.x = columns[node.column]
+      node.x = node.source ? 128 + (node.column * 256) : columns[node.column]
       node.y = node.source ? topOffset + (node.row * rowSpacing) : 44
     })
 
@@ -189,6 +185,27 @@ const EvidenceGraph = ({ data }) => {
     }
     const linkGroup = svg.append('g').attr('class', 'evidence-graph__links')
     const nodeGroup = svg.append('g').attr('class', 'evidence-graph__nodes')
+
+    if (sources.length) {
+      linkGroup.append('path')
+        .attr('class', 'evidence-graph__source-rail')
+        .attr('d', `M${columns[2]},60V125H30V${topOffset + ((rowCount - 1) * rowSpacing) - 35}`)
+        .attr('fill', 'none')
+      for (let row = 0; row < rowCount; row += 1) {
+        const count = Math.min(sources.length - row * 4, 4)
+        linkGroup.append('path')
+          .attr('class', 'evidence-graph__source-rail')
+          .attr('d', `M30,${topOffset + row * rowSpacing - 35}H${128 + (count - 1) * 256}`)
+          .attr('fill', 'none')
+      }
+      linkGroup.selectAll('.evidence-graph__source-branch')
+        .data(nodes.filter((node) => node.source))
+        .enter().append('line')
+        .attr('class', 'evidence-graph__source-branch')
+        .attr('x1', (node) => node.x).attr('x2', (node) => node.x)
+        .attr('y1', (node) => node.y - 35)
+        .attr('y2', (node) => node.y - 12)
+    }
 
     linkGroup.selectAll('line')
       .data(hydratedLinks)
@@ -223,7 +240,7 @@ const EvidenceGraph = ({ data }) => {
 
     node.append('title').text((d) => `${d.label}\n${d.detail || ''}`)
     node.append('circle')
-      .attr('r', 16)
+      .attr('r', (node) => node.source ? 10 : 8)
       .attr('fill', (d) => colorMap[d.group] || carbonColors.gray[60])
       .attr('stroke', chartColors.selectionStroke)
       .attr('stroke-width', 1.5)
@@ -232,20 +249,20 @@ const EvidenceGraph = ({ data }) => {
       .attr('class', 'evidence-graph__label')
       .attr('fill', chartStyles.timeline.text.fill)
       .attr('text-anchor', 'middle')
-      .attr('y', 36)
+      .attr('y', (node) => node.source ? 26 : 30)
       .each(function appendLabelLines(nodeData) {
-        labelLines(nodeData.label).forEach((line, index) => {
+        labelLines(nodeData.label, nodeData.source ? 30 : 22).forEach((line, index) => {
           d3.select(this)
             .append('tspan')
             .attr('x', 0)
-            .attr('dy', index === 0 ? 0 : 13)
+            .attr('dy', index === 0 ? 0 : 18)
             .text(line)
         })
       })
     node.filter((d) => !d.source).append('text')
         .attr('class', 'evidence-graph__stage-status')
         .attr('text-anchor', 'middle')
-        .attr('y', 84)
+        .attr('y', 58)
         .text((d) => d.status)
 
   }, [data])
@@ -259,7 +276,7 @@ const EvidenceGraph = ({ data }) => {
         </div>
       )}
       {exportError && <InlineNotification lowContrast kind="error" title="Retrieval trail export failed" subtitle={exportError} />}
-      <p className="evidence-graph__framework-note">Epistemological framework, not seven model calls. Stage labels do not establish human acceptance; inspect the recorded assessments below.</p>
+      <p className="evidence-graph__framework-note">Research framework, not seven model calls or human acceptance. Select a passage to inspect its provenance.</p>
       <div className="evidence-graph__viewport" tabIndex={0} role="region" aria-label="Scrollable retrieval trail">
         <svg ref={svgRef} aria-label="Evidence retrieval trail" role="img"></svg>
       </div>

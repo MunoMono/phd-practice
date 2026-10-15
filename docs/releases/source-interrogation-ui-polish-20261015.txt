@@ -1,0 +1,44 @@
+SOURCE INTERROGATION UI POLISH
+Base: 99f73fa95f37bccdc3a014a6d92c09fa619dfdb1
+Date: 2026-10-15
+
+Researcher-requested citation convention supersedes the preceding release:
+superscript numbers sit immediately after the preceding word and before the
+sentence punctuation. Apply consistently to rendered answers and Markdown
+memos, including existing citations after full stops, adjacent groups,
+emphasized words and structured answers. Stored generated text remains intact.
+
+Align query controls beside the question and remove repeated framework copy.
+Center a consistent reading column for answer headings, review notices,
+prose and actions. Constrain source cards to a readable width, use their full
+content width for passages, and align source actions consistently. Correct
+the misplaced SCSS nesting that prevented provenance disclosure rows from
+receiving their intended spacing, separators and focusable summary styling.
+
+Replace the excessively tall single-column passage graph with four columns
+of selectable passages beneath the unchanged seven-stage framework.
+Eight passages fit within a 402-unit SVG rather than the previous 1010-unit
+canvas. A shared evidence rail denotes set membership, not passage-to-passage
+historical causation. Preserve keyboard inspection, original source links,
+all seven labels, honest assessment statuses, mobile scrolling and exports.
+
+Frontend-only overlay onto the current 99f73fa image. No backend, model,
+retrieval, prompt, archive, authority, frozen UAT or human decision changes.
+Preserve the exact current image for rollback; automatically roll back if
+health, asset, configuration, live fixture or protected-screen checks fail.
+
+Validation covers before-stop/no-space citation placement in DOM and memos,
+eight-passage graph height, reading-column centering, source-card width and
+disclosure padding, plus existing provenance/session/export/theme checks.
+Check unchanged source hashes and compare Sources, Workbench, Visual analytics
+and Absences with the exact confirmed production payload using identical
+read-only API responses. Pause the existing atlas orbit identically for
+screenshot comparisons. No research inference or UAT grading is performed.
+
+Before activation: 12 unit tests and 14 focused browser tests pass. Changed
+components and tests pass lint; existing page lint findings remain unchanged.
+139 protected source files remain byte-identical to the confirmed production
+snapshot. Sources, Workbench, Visual analytics and Absences content,
+navigation and screenshot pixels match. Retained DOC-12 and HYB-07 responses
+are replayed visually without new inference. Nine intercepted-fixture
+presentation tests and protected-screen checks are required after activation.

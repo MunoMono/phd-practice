@@ -16,7 +16,7 @@
   &__viewport {
     overflow-x: auto;
     &:focus-visible { outline: 2px solid $focus; }
-    svg { min-width: 70rem; }
+    svg { min-width: 64rem; }
   }
 
   &__label, &__stage-status, &__empty {
@@ -26,6 +26,10 @@
 
   &__stage-status { fill: $text-secondary; }
   &__links line { stroke: $border-strong-01; }
+  &__source-rail, &__source-branch {
+    stroke: $border-subtle-01;
+    stroke-width: 1;
+  }
   &__stage circle { fill: $layer-accent-01; stroke: $border-interactive; }
   &__source circle { fill: $support-info; stroke: $border-interactive; }
 

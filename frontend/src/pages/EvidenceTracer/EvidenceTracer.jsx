@@ -1033,7 +1033,7 @@ const EvidenceTracer = () => {
         <Tile className="tracer__panel tracer__panel--query">
           <PanelHeader
             title="Research query"
-            description="Use the active local inference path first. This view preserves provenance as mandatory, not optional."
+            description="Ask a question, then review the answer against its cited archival evidence."
           />
 
           <div className="tracer__query-grid">
@@ -1210,8 +1210,8 @@ const EvidenceTracer = () => {
         <Tile className="tracer__panel">
           <PanelHeader
             title="Retrieved source stack and evidence chain"
-            description="Question → Retrieval → Evidence → Validated claims → Scholarly argument → Citations → Bounded Qualification"
-              actions={traceData && <RetrievalAiLabel />}
+            description="Inspect the selected passages and their provenance."
+            actions={traceData && <RetrievalAiLabel />}
           />
           <EvidenceGraph data={traceData ? { ...traceData, sources: presentation.sources, citationCount: presentation.notes.length, unresolvedCitationCount: presentation.warnings.length } : null} />
           <EvidenceChain

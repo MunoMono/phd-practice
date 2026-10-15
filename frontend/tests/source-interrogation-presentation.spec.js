@@ -45,6 +45,11 @@ test('canonical citations preserve evidence, punctuation, warning visibility and
     /\s$/.test(node.previousSibling?.textContent || '')
   )))
   expect(whitespace).toBe(false)
+  const citationPosition = await answer.locator('sup').evaluateAll((nodes) => nodes.every((node) => (
+    !/[.,;:!?]\s*$/.test(node.previousSibling?.textContent || '')
+    && node.nextSibling?.textContent?.startsWith('.')
+  )))
+  expect(citationPosition).toBe(true)
   await expect(page.locator('.evidence-source-card')).toHaveCount(2)
   await expect(page.getByText('Exact first—passage.', { exact: true })).toHaveCount(1)
   await expect(page.getByText('Exact second—passage.', { exact: true })).toHaveCount(1)
@@ -110,11 +115,67 @@ test('Markdown memo exports citation links and every original source passage wit
   expect(await result.failure()).toBeNull()
   const markdown = await readFile(await result.path(), 'utf8')
   expect(markdown).toContain('<sup>[1](#source-card-1)</sup>')
+  expect(markdown).toContain('<sup>[2](#source-card-2)</sup>.')
   expect(markdown).toContain('Connections–not implementation–are inferred.')
   expect(markdown).toContain('"Original—words"')
   expect(markdown).toContain('Exact first—passage.')
   expect(markdown).toContain('Exact second—passage.')
   expect(markdown).toContain('Unresolved citation: EV-000000000000')
+})
+
+test('eight passages use a compact graph and consistently aligned reading surfaces', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 })
+  await submit(page, {
+    ...response,
+    evidence_sources: Array.from({ length: 8 }, (_, index) => ({
+      ...response.evidence_sources[0],
+      evidence_id: index === 0 ? 'EV-123456789abc' : index === 1 ? 'EV-abcdef123456' : `EV-${String(index).padStart(12, '0')}`,
+      chunk_id: `c${index + 1}`,
+      title: 'Job 171 | A review of research needs aimed at elucidating principles of interface design for man-computer design systems',
+      text: `Original documentary passage ${index + 1}.`,
+      page: index + 4,
+    })),
+    retrieved_evidence: [],
+  })
+  const graph = page.locator('.evidence-graph')
+  await expect(graph.locator('.evidence-graph__source')).toHaveCount(8)
+  expect(await graph.getByRole('img', { name: 'Evidence retrieval trail' }).evaluate((node) => node.viewBox.baseVal.height)).toBeLessThanOrEqual(410)
+  const positions = await graph.locator('.evidence-graph__source').evaluateAll((nodes) => nodes.map((node) => node.getAttribute('transform')))
+  expect(new Set(positions).size).toBe(8)
+  const layout = await page.evaluate(() => {
+    const answer = document.querySelector('.tracer__answer-body').getBoundingClientRect()
+    const panel = document.querySelector('.tracer__panel--answer').getBoundingClientRect()
+    const source = document.querySelector('.evidence-source-card').getBoundingClientRect()
+    const quote = document.querySelector('.evidence-source-card__excerpt').getBoundingClientRect()
+    const summary = document.querySelector('.evidence-source-card__why summary')
+    return {
+      answerWidth: answer.width,
+      answerCentered: Math.abs((answer.left + answer.right) / 2 - (panel.left + panel.right) / 2),
+      sourceWidth: source.width,
+      quoteWidth: quote.width,
+      summaryPadding: parseFloat(getComputedStyle(summary).paddingTop),
+    }
+  })
+  expect(layout.answerWidth).toBeGreaterThan(650)
+  expect(layout.answerWidth).toBeLessThanOrEqual(768)
+  expect(layout.answerCentered).toBeLessThan(2)
+  expect(layout.sourceWidth).toBeLessThanOrEqual(1024)
+  expect(layout.quoteWidth).toBeGreaterThan(layout.sourceWidth * 0.85)
+  expect(layout.summaryPadding).toBeGreaterThanOrEqual(12)
+})
+
+test('citations following full stops inside emphasized words move before the stop', async ({ page }) => {
+  await submit(page, {
+    ...response,
+    original_draft: 'A **bounded formulation.** [EV-123456789abc] More evidence. [EV-abcdef123456]',
+  })
+  const answer = page.locator('.tracer__answer-body')
+  await expect(answer.locator('strong')).toHaveText('bounded formulation')
+  await expect(answer).toHaveText('A bounded formulation1. More evidence2.')
+  const download = page.waitForEvent('download')
+  await page.getByRole('button', { name: 'Download retrieval memo' }).click()
+  const markdown = await readFile(await (await download).path(), 'utf8')
+  expect(markdown).toContain('**bounded formulation**<sup>[1](#source-card-1)</sup>.')
 })
 
 test('scoped-missingness answers share documentary citation rendering without implying acceptance', async ({ page }) => {
