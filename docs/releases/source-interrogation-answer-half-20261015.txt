@@ -1,0 +1,15 @@
+RESEARCH ANSWER FONT REDUCTION
+Base: 834c4fdbd6cd37baf4ebde79d49dacc12fc1b2bd
+Date: 2026-10-15
+
+Reduce generated answer font size by 50 percent: 48px to 24px at the standard
+root size. Carbon body-02 multiplier changes from 3 to 1.5; proportional
+0.75em citations consequently change from 36px to 18px. Preserve the
+Research answer label, full-width left alignment, before-stop citations,
+all source evidence and the existing layout.
+
+Verify measured answer and citation sizes at desktop and mobile widths,
+with existing presentation, session, export and provenance regressions.
+Deploy frontend only on the current 834c4fd image, preserving that exact
+image for rollback. Check live assets, health and protected screen parity.
+No backend, inference, corpus, authority, frozen UAT or human decision changes.

@@ -84,7 +84,7 @@
 
   .tracer__answer-body {
     @include type-style('body-02');
-    font-size: calc(var(--cds-body-02-font-size, #{carbon-type.type-scale(3)}) * 3);
+    font-size: calc(var(--cds-body-02-font-size, #{carbon-type.type-scale(3)}) * 1.5);
     max-width: none;
     width: 100%;
     margin: 0 0 $spacing-06;

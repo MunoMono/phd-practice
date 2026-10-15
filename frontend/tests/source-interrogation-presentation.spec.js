@@ -166,7 +166,7 @@ test('eight passages use a compact graph and consistently aligned reading surfac
   expect(layout.summaryPadding).toBeGreaterThanOrEqual(12)
 })
 
-test('Research answer fills the box with exactly triple Carbon body text and proportional citations', async ({ page }) => {
+test('Research answer fills the box at half its previous size with proportional citations', async ({ page }) => {
   await submit(page)
   await expect(page.getByRole('heading', { name: 'Research answer', exact: true })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Scholarly answer', exact: true })).toHaveCount(0)
@@ -193,7 +193,7 @@ test('Research answer fills the box with exactly triple Carbon body text and pro
         beforeStop: citation.nextSibling.textContent.startsWith('.'),
       }
     })
-    expect(layout.answerFont).toBe(layout.rootFont * 3)
+    expect(layout.answerFont).toBe(layout.rootFont * 1.5)
     expect(layout.paragraphFont).toBe(layout.answerFont)
     expect(layout.citationFont).toBe(layout.answerFont * 0.75)
     expect(layout.alignment).toBe('left')
