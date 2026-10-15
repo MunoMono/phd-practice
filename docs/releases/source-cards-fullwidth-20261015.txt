@@ -1,0 +1,7 @@
+Source interrogation: full-width source cards
+
+Remove the centred 64rem constraint from the evidence chain so source cards
+fill the panel content width, matching the research answer.
+Preserve card padding, source content, provenance, citations, graph and typography.
+Browser regression measures panel alignment and every source-card width on
+desktop and mobile, alongside the existing answer and graph checks.

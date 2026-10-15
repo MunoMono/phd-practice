@@ -334,8 +334,9 @@
   .evidence-chain {
     display: grid;
     gap: $spacing-05;
-    max-width: 64rem;
-    margin-inline: auto;
+    width: 100%;
+    max-width: none;
+    margin-inline: 0;
   }
 
   .evidence-source-card {

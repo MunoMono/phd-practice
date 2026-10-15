@@ -159,6 +159,8 @@ test('eight archive-labelled passages fan between selection and evidence with Fi
     const answer = document.querySelector('.tracer__answer-body').getBoundingClientRect()
     const panel = document.querySelector('.tracer__panel--answer').getBoundingClientRect()
     const source = document.querySelector('.evidence-source-card').getBoundingClientRect()
+    const sourcePanel = document.querySelector('.evidence-source-card').closest('.tracer__panel')
+    const sourcePanelStyle = getComputedStyle(sourcePanel)
     const quote = document.querySelector('.evidence-source-card__excerpt').getBoundingClientRect()
     const summary = document.querySelector('.evidence-source-card__why summary')
     return {
@@ -167,6 +169,7 @@ test('eight archive-labelled passages fan between selection and evidence with Fi
       answerLeft: answer.left,
       contentLeft: panel.left + parseFloat(getComputedStyle(document.querySelector('.tracer__panel--answer')).paddingLeft) + 1,
       sourceWidth: source.width,
+      sourceAvailableWidth: sourcePanel.getBoundingClientRect().width - parseFloat(sourcePanelStyle.paddingLeft) - parseFloat(sourcePanelStyle.paddingRight) - 2,
       quoteWidth: quote.width,
       summaryPadding: parseFloat(getComputedStyle(summary).paddingTop),
     }
@@ -175,7 +178,7 @@ test('eight archive-labelled passages fan between selection and evidence with Fi
   expect(layout.answerWidth).toBeGreaterThan(650)
   expect(Math.abs(layout.answerWidth - layout.availableWidth)).toBeLessThan(2)
   expect(Math.abs(layout.answerLeft - layout.contentLeft)).toBeLessThan(2)
-  expect(layout.sourceWidth).toBeLessThanOrEqual(1024)
+  expect(Math.abs(layout.sourceWidth - layout.sourceAvailableWidth)).toBeLessThan(2)
   expect(layout.quoteWidth).toBeGreaterThan(layout.sourceWidth * 0.85)
   expect(layout.summaryPadding).toBeGreaterThanOrEqual(12)
 })
@@ -228,6 +231,22 @@ test('Research answer fills the box at half its previous size with proportional 
     expect(Math.abs(layout.width - layout.availableWidth)).toBeLessThan(2)
     expect(Math.abs(layout.left - layout.contentLeft)).toBeLessThan(2)
     expect(layout.beforeStop).toBe(true)
+    const sources = await page.locator('.evidence-chain').evaluate((chain) => {
+      const panel = chain.closest('.tracer__panel')
+      const style = getComputedStyle(panel)
+      const box = panel.getBoundingClientRect()
+      return {
+        width: chain.getBoundingClientRect().width,
+        availableWidth: box.width - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight) - 2,
+        left: chain.getBoundingClientRect().left,
+        contentLeft: box.left + parseFloat(style.paddingLeft) + 1,
+        cardWidths: Array.from(chain.querySelectorAll('.evidence-source-card'), (card) => card.getBoundingClientRect().width),
+      }
+    })
+    expect(Math.abs(sources.width - sources.availableWidth)).toBeLessThan(2)
+    expect(Math.abs(sources.left - sources.contentLeft)).toBeLessThan(2)
+    expect(sources.cardWidths.length).toBeGreaterThan(0)
+    for (const cardWidth of sources.cardWidths) expect(Math.abs(cardWidth - sources.width)).toBeLessThan(2)
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
   }
 })
