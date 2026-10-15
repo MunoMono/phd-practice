@@ -1,6 +1,24 @@
 import { Button, Tile } from '@carbon/react'
 import { useState } from 'react'
-import { DiagnosticValue } from './EvidenceDetails'
+
+const provenanceFields = (value, path = []) => {
+  if (value === null || value === undefined || value === '') return []
+  if (typeof value === 'object') return Object.entries(value).flatMap(([key, item]) => (
+    provenanceFields(item, [...path, Array.isArray(value) ? `Item ${Number(key) + 1}` : key.replace(/_/g, ' ').replace(/([a-z])([A-Z])/g, '$1 $2')])
+  ))
+  return [{ path: path.join(' / '), value: typeof value === 'boolean' ? value ? 'Yes' : 'No' : String(value) }]
+}
+
+const ProvenanceFields = ({ value }) => (
+  <dl className="evidence-source-card__provenance-grid">
+    {provenanceFields(value).map((field) => (
+      <div className="evidence-source-card__provenance-field" key={field.path}>
+        <dt>{field.path}</dt>
+        <dd tabIndex={field.value.length > 120 ? 0 : undefined}>{field.value}</dd>
+      </div>
+    ))}
+  </dl>
+)
 
 const renderCitation = (citation, source) => {
   if (!citation) {
@@ -77,13 +95,13 @@ const EvidenceSourceCard = ({
         {source.documentId && <span>Document ID: {source.documentId}</span>}
       </div>
       <div className="evidence-source-card__retained-metadata">
-        <DiagnosticValue value={Object.fromEntries(Object.entries(source).filter(([key]) => ![
+        <ProvenanceFields value={Object.fromEntries(Object.entries(source).filter(([key]) => ![
           'title', 'excerpt', 'provenance', 'aliases', 'anchorAliases', 'anchor', 'detail',
           'chunkId', 'documentId', 'pid', 'date', 'page', 'evidenceState', 'evidenceType', 'provenanceStatus',
           'retrievalChannels', 'sourceNominationChannels', 'sourceNominationScore', 'metadataMatches',
           'archiveNominationReasons', 'passageEvidenceChannel', 'passageScore', 'textScore', 'metadataScore',
         ].includes(key)))} />
-        {source.provenance && <DiagnosticValue value={Object.fromEntries(Object.entries(source.provenance).filter(([key]) => !['text', 'excerpt'].includes(key)))} />}
+        {source.provenance && <ProvenanceFields value={Object.fromEntries(Object.entries(source.provenance).filter(([key]) => !['text', 'excerpt'].includes(key)))} />}
       </div>
 
       </details>

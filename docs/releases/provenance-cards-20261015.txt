@@ -1,0 +1,8 @@
+Source interrogation: compact provenance cards
+
+Display retained source and documentary provenance as bordered metadata cards,
+eight across on wide screens, four on tablets and two on mobile.
+Nested field paths retain their context; arrays retain their item positions.
+Original values, identifiers, rights and URLs remain available without truncation.
+Long values scroll within keyboard-focusable fields rather than stretching rows.
+No changes to research answers, retrieval, source identities or archival records.

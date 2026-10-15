@@ -68,6 +68,34 @@ test('canonical citations preserve evidence, punctuation, warning visibility and
   expect(errors).toEqual([])
 })
 
+test('source provenance uses eight compact cards across without losing nested metadata', async ({ page }) => {
+  const longUri = `https://archive.example/${'original-asset/'.repeat(40)}report.pdf`
+  await submit(page, {
+    ...response,
+    evidence_sources: response.evidence_sources.map((source) => ({
+      ...source,
+      provenance: {
+        archive_record_pid: 'record-123', attached_media_pid: 'media-456', asset_pid: source.asset_pid,
+        repository: 'RCA Special Collections', source_uri: longUri,
+        rights: { holder: 'Original rights holder', restricted: false },
+        pages: [0, 4], checksum: 'immutable-checksum',
+      },
+    })),
+  })
+  const card = page.locator('#source-card-1')
+  await card.getByRole('button', { name: 'View provenance' }).click()
+  const grid = card.locator('.evidence-source-card__retained-metadata .evidence-source-card__provenance-grid').last()
+  await expect(grid).toContainText('Original rights holder')
+  await expect(grid).toContainText('No')
+  await expect(grid.locator('dd', { hasText: longUri })).toHaveText(longUri)
+  await expect(grid.locator('dt', { hasText: 'pages / Item 1' }).locator('..').locator('dd')).toHaveText('0')
+  for (const [width, columns] of [[1600, 8], [900, 4], [390, 2]]) {
+    await page.setViewportSize({ width, height: 1000 })
+    expect(await grid.evaluate((node) => getComputedStyle(node).gridTemplateColumns.split(' ').length)).toBe(columns)
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+  }
+})
+
 test('Figure 1 retrieval trail is legible, keyboard-operable, themed and exportable at mobile width', async ({ page }) => {
   await submit(page)
   const graph = page.locator('.evidence-graph')
