@@ -19,6 +19,9 @@ import { createMissingnessEventFromQueryRun, createQueryRun } from '../../api/qu
 import { listDocuments } from '../../api/documents'
 import { getRuntimeModelInfo } from '../../api/runtime'
 import EvidenceChain from '../../components/evidence/EvidenceChain'
+import ScholarlyAnswer from '../../components/evidence/ScholarlyAnswer'
+import EvidenceDetails from '../../components/evidence/EvidenceDetails'
+import { buildScholarlyPresentation } from '../../utils/scholarlyPresentation'
 import PanelHeader from '../../components/layout/PanelHeader'
 import PageHeader from '../../components/layout/PageHeader'
 import { PageGrid, PageColumn as Column } from '../../components/layout/PageGrid'
@@ -27,36 +30,10 @@ import { buildEvidenceTraceMemo, downloadMarkdown } from '../../utils/memoExport
 import { downloadJson } from '../../utils/workbenchExport'
 import { clearSourceInterrogationSession, loadSourceInterrogationSession, saveSourceInterrogationSession } from '../../utils/sourceInterrogationSession'
 
-const systemDerivedMissingnessCategories = new Set([
-  'zero_retrieval',
-  'insufficient_temporally_valid_evidence',
-  'no_matching_authority_record',
-  'no_matching_job_numbers',
-  'no_matching_job_number',
-  'insufficient_project_temporal_authority',
-  'no_projects_with_explicit_dates_for_year',
-  'no_documentary_retrieval_for_resolved_project',
-  'no_documentary_retrieval_for_authority',
-  'no_temporally_valid_documentary_support'
-])
-
 const validationFailureCategories = new Set([
   'parse_failure',
   'provenance_validation_failure'
 ])
-
-const missingnessOriginLabel = (item) => {
-  if (item.origin === 'system_pipeline') return 'Pipeline-derived'
-  if (item.origin === 'documentary') return 'Documentary'
-  if (item.origin === 'authority') return 'Authority-derived'
-  if (item.origin === 'model') return 'Model-generated'
-  return systemDerivedMissingnessCategories.has(item.category) ? 'System-derived' : 'Model-generated'
-}
-
-const formatInference = (item) => {
-  const inference = item?.claim_text || item?.inference || (typeof item === 'string' ? item : '')
-  return item?.confidence ? `${inference} (${item.confidence})` : inference
-}
 
 const formatScore = (score) => Number.isFinite(score) ? score.toFixed(3) : null
 
@@ -121,21 +98,10 @@ const answerStatePresentation = {
 const AnswerStateNotice = ({ trace }) => {
   const presentation = answerStatePresentation[trace?.answerState]
   if (!presentation) return null
-  const records = trace.stageExecution?.records || {}
-  const failedStage = Object.entries(records).find(([, record]) => ['failed', 'partial'].includes(record.status))
-  const citedCount = trace.sourceUsage?.cited_source_numbers?.length || 0
 
   return (
     <div className="tracer__answer-state">
       <InlineNotification lowContrast hideCloseButton kind={presentation.kind} title={presentation.title} subtitle={presentation.subtitle} />
-      {['synthesis_partial', 'synthesis_unavailable'].includes(trace.answerState) && (
-        <details>
-          <summary>Run diagnostics</summary>
-          <p>Retrieved sources: {trace.sources.length}. Cited sources: {citedCount}. Answer origin: {trace.answerOrigin || 'unavailable'}.</p>
-          {trace.synthesisFailure && <p>Failure: {trace.synthesisFailure.code}. {trace.synthesisFailure.message}</p>}
-          {failedStage && <p>Stage: {failedStage[0]}. Reason: {failedStage[1].failure_message || failedStage[1].failure_code || 'unavailable'}.</p>}
-        </details>
-      )}
     </div>
   )
 }
@@ -186,7 +152,11 @@ const mapRetrievedSources = (retrievedEvidence = []) => retrievedEvidence.map((s
   section: source.snapshot?.source_section || null,
   excerpt: source.excerpt || source.text,
   score: source.score,
-  citation: `${source.snapshot?.title || source.document_id} | Asset PID: ${canonicalAssetPid || 'unavailable'} | Page: ${source.page_start || 'unavailable'}`,
+  citation: [
+    source.snapshot?.title || source.title || source.document_id,
+    canonicalAssetPid ? `Asset PID: ${canonicalAssetPid}` : null,
+    source.page_start != null ? `Page: ${source.page_start}` : null,
+  ].filter(Boolean).join(' | '),
   citationStatus: ['resolved_current', 'archive_resolved_current'].includes(source.archive_resolution_status) ? 'loaded' : 'unavailable',
   provenance,
   provenanceStatus: ['resolved_current', 'archive_resolved_current'].includes(source.archive_resolution_status) ? 'loaded' : 'unavailable',
@@ -280,10 +250,13 @@ const mapPersistedRunToTrace = (run) => {
     corpusVersion: run.corpus_version || null,
     retrievalMethod: run.retrieval_method || null,
     retrieval: run.retrieval || null,
-    answer: response.answer || '',
+    answer: run.answer_state === 'unverified_research_draft' || response.answer_state === 'unverified_research_draft'
+      ? response.original_draft || run.original_draft || '' : response.answer || '',
     response: response.answer || '',
     answerOrigin: run.answer_origin || 'qwen_generated_synthesis',
-    answerState: run.answer_state || null,
+    answerState: run.answer_state || response.answer_state || null,
+    documentarySpans: response.evidence_sources || run.evidence_sources || [],
+    stageExecution: response.stage_execution || run.stage_execution || null,
     synthesisFailure: response.synthesis_failure || null,
     model: run.model?.name || 'Granite experiment',
     retrievedChunkIds: sources.map((source) => source.chunkId).filter(Boolean),
@@ -436,97 +409,6 @@ const mapCaptureToTrace = (capture) => {
   }
 }
 
-const displayCaptureAnswer = (trace) => {
-  if (!trace?.capture) return trace?.answer || ''
-  return (trace.answer || '').replace(/\n\*{0,2}EXACT REGISTERED QUESTION\*{0,2}[\s\S]*$/, '')
-}
-
-const documentaryCitationNotes = (text = '') => Array.from(
-  text.matchAll(/\[(EV-[0-9a-f]{12}(?:\s*,\s*EV-[0-9a-f]{12})*)\]/g)
-).flatMap((match) => match[1].split(/\s*,\s*/))
-
-const displayAnswerTypography = (text = '') => text
-  .split(/("[^"]*(?:"|$)|\u201c[^\u201d]*(?:\u201d|$)|\u2018[^\u2019]*(?:\u2019|$)|^>[^\n]*)/m)
-  .map((part, index) => index % 2 ? part : part
-    .replace(/\b(Proposition|proposition)\s+P\d+\b/g, '$1')
-    .replace(/\[P\d+(?:\s*,\s*P\d+)*\]/g, '')
-    .replace(/\bP\d+\b/g, 'the proposition')
-    .replace(/[ \t]*\u2014[ \t]*/g, ' \u2013 '))
-  .join('')
-
-const renderAnswerTextWithSourceLinks = (text, evidence = [], noteOffset = 0) => {
-  let noteNumber = noteOffset
-  return text.split(/(\[(?:\d+(?:,\s*\d+)*|EV-[0-9a-f]{12}(?:\s*,\s*EV-[0-9a-f]{12})*)\])/).map((part, partIndex) => {
-  const evidenceCitation = part.match(/^\[(EV-[0-9a-f]{12}(?:\s*,\s*EV-[0-9a-f]{12})*)\]$/)
-  if (evidenceCitation) {
-    return <sup className="tracer__source-citation" key={`evidence-citation-${partIndex}`}>
-      {evidenceCitation[1].split(/\s*,\s*/).map((id, index) => {
-        const number = ++noteNumber
-        return (
-          <span key={id}>{index > 0 ? ', ' : ''}{evidence.some((source) => source.evidence_id === id)
-            ? <a href={`#documentary-note-${number}`} aria-label={`Jump to citation ${number}`}>{number}</a>
-            : <span title={`Unresolved evidence ${id}`}>{number} (unresolved)</span>}</span>
-        )
-      })}
-    </sup>
-  }
-  const citation = part.match(/^\[(\d+(?:,\s*\d+)*)\]$/)
-  if (!citation) return part
-  return (
-    <sup className="tracer__source-citation" key={`answer-citation-${partIndex}`}>
-      {citation[1].split(/,\s*/).map((sourceNumber, citationIndex) => (
-        <span key={sourceNumber}>{citationIndex > 0 ? ', ' : ''}<a href={`#grouped-source-${sourceNumber}`} aria-label={`Jump to source ${sourceNumber}`}>{sourceNumber}</a></span>
-      ))}
-    </sup>
-  )
-})
-}
-
-const AnswerWithSourceLinks = ({ trace }) => {
-  const answer = displayAnswerTypography(displayCaptureAnswer(trace))
-  if (answer) {
-    let noteOffset = 0
-    return answer.split(/\n{2,}/).map((paragraph, paragraphIndex) => {
-      const rendered = renderAnswerTextWithSourceLinks(paragraph, trace.documentarySpans, noteOffset)
-      noteOffset += documentaryCitationNotes(paragraph).length
-      return (
-        <div className="tracer__answer-paragraph" key={`rendered-answer-paragraph-${paragraphIndex}`}>
-          <p>{rendered}</p>
-        </div>
-      )
-    })
-  }
-  if (trace?.answerParagraphs?.length > 0) {
-    return trace.answerParagraphs.map((paragraph, paragraphIndex) => (
-      <div className="tracer__answer-paragraph" key={`answer-paragraph-${paragraphIndex}`}>
-        {paragraph.title && <h4>{displayAnswerTypography(paragraph.title)}</h4>}
-        <p>
-          {paragraph.claims.map((claim, claimIndex) => {
-          const sourceNumbers = claim.sourceNumbers || claim.source_numbers || []
-          const authorityNumbers = claim.authorityNumbers || claim.authority_numbers || []
-          return (
-            <span key={`answer-claim-${paragraphIndex}-${claimIndex}`}>
-            {displayAnswerTypography(claim.text)}
-            {sourceNumbers.length > 0 && <sup className="tracer__source-citation">
-              {sourceNumbers.map((sourceNumber, citationIndex) => (
-                <span key={sourceNumber}>{citationIndex > 0 ? ', ' : ''}<a href={`#grouped-source-${sourceNumber}`} aria-label={`Jump to source ${sourceNumber}`}>{sourceNumber}</a></span>
-              ))}
-            </sup>}
-            {authorityNumbers.length > 0 && <sup className="tracer__source-citation">
-              {authorityNumbers.map((authorityNumber, citationIndex) => (
-                <span key={authorityNumber}>{citationIndex > 0 ? ', ' : ''}<a href={`#authority-${authorityNumber}`} aria-label={`Jump to authority record ${authorityNumber}`}>A{authorityNumber}</a></span>
-              ))}
-            </sup>}{' '}
-            </span>
-          )
-          })}
-        </p>
-      </div>
-    ))
-  }
-  return ''
-}
-
 const getRetrievalDiagnosticItems = (diagnostics) => {
   if (!diagnostics) {
     return []
@@ -648,6 +530,7 @@ const EvidenceTracer = () => {
     const [recordingAbsence, setRecordingAbsence] = useState(false)
     const [absenceRecordError, setAbsenceRecordError] = useState('')
   const [runtimeInfo, setRuntimeInfo] = useState(null)
+  const presentation = useMemo(() => buildScholarlyPresentation(traceData || {}), [traceData])
   const currentRunIdRef = useRef(null)
   const rehydrationRequestRef = useRef(null)
 
@@ -1045,7 +928,8 @@ const EvidenceTracer = () => {
       ? source.citation
       : source.citation
         ? [source.citation.title, source.citation.pid ? `PID: ${source.citation.pid}` : null, source.citation.page ? `Page: ${source.citation.page}` : null, source.citation.publicUrl || null].filter(Boolean).join(' | ')
-        : 'Not available from current endpoint.'
+        : [source.title, source.date, source.page != null ? `p. ${source.page}` : null,
+          source.pid ? `Asset PID: ${source.pid}` : null, source.publicUrl].filter(Boolean).join(', ')
 
     setCitationCopyFeedback(null)
     try {
@@ -1194,15 +1078,6 @@ const EvidenceTracer = () => {
         </Tile>
       </Column>
 
-      <Column>
-        <InlineNotification
-          lowContrast
-          kind="info"
-          title="Analytical output"
-          subtitle="Exploratory / non-formal interrogation. Generated answers are provisional until checked against retrieved source chunks and their provenance fields."
-        />
-      </Column>
-
       {!traceData && !loading && !error && (
         <Column>
           <InlineNotification
@@ -1285,14 +1160,10 @@ const EvidenceTracer = () => {
       )}
 
       <Column>
-        <Tile className="tracer__panel">
+        <Tile className="tracer__panel tracer__panel--answer">
           <PanelHeader
-            title="Answer"
-            description={traceData?.answerOrigin === 'curated_cited_evidence_synthesis'
-              ? 'Curated, passage-mapped synthesis from the retrieved archival evidence. No model synthesis was used.'
-              : ['deterministic_catalogue_result', 'deterministic_archive_collection_result', 'targeted_document_evidence_limit', 'deterministic_direct_source_fallback', 'deterministic_cited_evidence_synthesis'].includes(traceData?.answerOrigin)
-              ? 'Direct archive or database-authority result. No model synthesis was used.'
-              : 'Model-assisted response with explicit source-backing, caveats, and export controls. Generated answers remain provisional until checked against retrieved source chunks.'}
+            title="Scholarly answer"
+            description={null}
             actions={traceData && (
               !['retrieval_only', 'deterministic_catalogue_result', 'deterministic_archive_collection_result', 'targeted_document_evidence_limit', 'deterministic_direct_source_fallback', 'deterministic_cited_evidence_synthesis'].includes(traceData.answerOrigin) && <AnswerAiLabel
                 answerOrigin={traceData.answerOrigin}
@@ -1304,223 +1175,23 @@ const EvidenceTracer = () => {
             )}
           />
 
-          {traceData && <AnswerStateNotice trace={traceData} />}
+          {traceData && (traceData.answerState
+            ? <AnswerStateNotice trace={traceData} />
+            : <p className="tracer__answer-state">Research response. Claims require researcher review against the supplied evidence.</p>)}
 
-          <div className="tracer__answer-body">
-            {traceData ? <AnswerWithSourceLinks trace={traceData} /> : 'No answer returned yet. Submit a query to begin evidence tracing.'}
+          <div className="tracer__answer-body" onClick={(event) => {
+            const link = event.target.closest('a[href^="#"]')
+            if (!link) return
+            const target = document.getElementById(link.getAttribute('href').slice(1))
+            if (!target) return
+            for (let parent = target.parentElement; parent; parent = parent.parentElement) {
+              if (parent.tagName === 'DETAILS') parent.open = true
+            }
+            target.focus({ preventScroll: true })
+            target.scrollIntoView({ block: 'start' })
+          }}>
+            {traceData ? <ScholarlyAnswer presentation={presentation} /> : 'No answer returned yet. Submit a query to begin evidence tracing.'}
           </div>
-
-          {traceData && (
-            <div className="tracer__structured-response">
-              {documentaryCitationNotes(displayCaptureAnswer(traceData)).length > 0 && (
-                <section aria-label="Documentary citation notes">
-                  <h4>Notes</h4>
-                  <ol>
-                    {documentaryCitationNotes(displayCaptureAnswer(traceData)).map((id, index) => {
-                      const source = traceData.documentarySpans?.find((item) => item.evidence_id === id)
-                      return (
-                        <li key={`${id}-${index}`} id={`documentary-note-${index + 1}`}>
-                          {source
-                            ? <><a href={`#evidence-${id}`} aria-label={`Jump to evidence ${id}, note ${index + 1}`}>{source.title || 'Untitled documentary source'}</a>, {source.page != null ? `p. ${source.page}` : 'page unavailable'}.</>
-                            : <>Unresolved evidence reference: {id}.</>}
-                        </li>
-                      )
-                    })}
-                  </ol>
-                </section>
-              )}
-              {traceData.documentarySpans?.length > 0 && (
-                <section aria-label="Citable documentary passages">
-                  <h4>Citable documentary passages</h4>
-                  {traceData.documentarySpans.map((source) => (
-                    <div key={source.evidence_id} id={`evidence-${source.evidence_id}`}>
-                      <p><strong>{source.evidence_id}: {source.title}</strong> | Page {source.page ?? 'unavailable'} | {source.evidence_status} | {source.evidence_role}</p>
-                      <p>{source.text}</p>
-                      <p>Document: {source.document_id} | Asset: {source.asset_id} | Chunk: {source.chunk_id}</p>
-                      <p>Archive PID: {source.archive_record_pid || 'unavailable'} | Media PID: {source.attached_media_pid || 'unavailable'} | Asset PID: {source.asset_pid || 'unavailable'}</p>
-                      {source.source_uri && <a href={source.source_uri} target="_blank" rel="noreferrer">Open source {source.evidence_id}</a>}
-                    </div>
-                  ))}
-                </section>
-              )}
-              {traceData.comparison && (
-                <section aria-label="Document comparison evidence">
-                  <h4>Document comparison evidence</h4>
-                  {[['Document A', traceData.comparison.document_a], ['Document B', traceData.comparison.document_b]].map(([label, document]) => (
-                    <div key={document.document_id}>
-                      <p><strong>{label}:</strong> {document.title || document.document_id} | PID: {document.pid || 'unavailable'}.</p>
-                      {document.evidence?.length > 0
-                        ? document.evidence.map((source) => <p key={source.chunk_id}>{`Page ${source.page_start || 'unavailable'} | ${source.excerpt || source.text || 'Passage text unavailable.'}`}</p>)
-                        : <p>{document.evidence_limit}</p>}
-                      {document.claims?.length > 0
-                        ? document.claims.map((claim) => <p key={claim.claim_id}>{claim.claim_text}</p>)
-                        : <p>No documentary claim is asserted for this document beyond its retained passages.</p>}
-                    </div>
-                  ))}
-                  <p><strong>Convergences:</strong> {traceData.comparison.convergences?.length > 0 ? traceData.comparison.convergences.join(' ') : 'None established from the retained passages.'}</p>
-                  <p><strong>Differences or tensions:</strong> {traceData.comparison.differences_or_tensions?.length > 0 ? traceData.comparison.differences_or_tensions.join(' ') : 'None established from the retained passages.'}</p>
-                  {traceData.comparison.evidence_limits?.map((limit, index) => <p key={`comparison-limit-${index}`}><strong>Limit:</strong> {limit}</p>)}
-                </section>
-              )}
-              {traceData.authorityEvidence?.length > 0 && <section aria-label="Database authority context">
-                <h4>Database authority context</h4>
-                {traceData.authorityEvidence.map((item, authorityIndex) => (
-                    <p key={item.authority_id} id={`authority-${authorityIndex + 1}`}>
-                      {item.authority_type === 'ddr_projects'
-                        ? `Job ${item.job_number} | ${item.title} | Funder: ${item.funder_name || 'unavailable'} | Duration: ${item.duration_text || 'unavailable'} | Project lead: ${item.project_lead_name || 'unavailable'}`
-                        : item.authority_type !== 'agent_employment'
-                          ? `${item.label} | ${item.authority_type} | ${item.authority_classification || 'database authority record'}${item.description ? ` | ${item.description}` : ''}`
-                          : `${item.assertion} | Staff code: ${item.authority_id || 'unavailable'} | ${item.role || 'Role unavailable'} | ${item.tenure?.start_date || 'start unavailable'} to ${item.tenure?.end_date || 'end unavailable'}`}
-                    </p>
-                  ))}
-                {traceData.authorityProvenance?.length > 0 && <p>Authority provenance: {traceData.authorityProvenance.map((item) => `${item.authority_type} | ${item.authority_id}`).join('; ')}.</p>}
-                {traceData.authorityBoundaries?.map((boundary) => <p key={boundary}><strong>Boundary:</strong> {boundary}</p>)}
-                {traceData.roleReconciliation?.map((item) => <p key={item.status}><strong>Reconciliation:</strong> {item.boundary}</p>)}
-                {traceData.authorityRoles && <>
-                  <p>Planner entity resolution: {traceData.authorityRoles.planner_entity_resolution?.length > 0 ? traceData.authorityRoles.planner_entity_resolution.map((item) => `${item.label} (${item.authority_type})`).join('; ') : 'None'}.</p>
-                  <p>Controlled lexical expansion: {traceData.authorityRoles.controlled_lexical_expansion?.used ? 'Yes' : 'No'}.</p>
-                  <p>Authority retrieval nomination influence: {traceData.authorityRoles.retrieval_nomination?.used ? 'Yes' : 'No'}.</p>
-                  <p>Authority context supplied to the model: {traceData.authorityRoles.qwen_authority_context?.supplied ? 'Yes' : 'No'}.</p>
-                  <p>Persisted authority audit: {traceData.authorityRoles.persisted_authority_audit?.persisted ? 'Yes' : 'No'}.</p>
-                </>}
-              </section>}
-              {traceData.documentaryEvidence?.length > 0 && <section aria-label="Documentary evidence">
-                <h4>Documentary evidence</h4>
-                {traceData.documentaryEvidence.map((item, index) => <p key={item.claim_id || item.chunk_id || index}>{item.text || item.claim_text || item.claim}</p>)}
-              </section>}
-              {traceData.testimonyEvidence?.length > 0 && <section aria-label="Retrospective testimony">
-                <h4>Retrospective testimony</h4>
-                {traceData.testimonyEvidence.map((item, index) => <p key={item.claim_id || item.chunk_id || index}>{item.text || item.claim_text || item.claim}</p>)}
-              </section>}
-              {traceData.evidenceLedger?.length > 0 && <section aria-label="Typed evidence ledger">
-                <h4>Typed evidence ledger</h4>
-                {traceData.evidenceLedger.map((item) => (
-                  <p key={item.evidence_id}>
-                    {item.evidence_type} | {item.source_title || item.source_pid_or_authority_key || item.evidence_id}
-                    {item.relation_type_if_any ? ` | Relation: ${item.relation_type_if_any}` : ''}
-                    {item.relation_derivation_if_any ? ` | Derived from: ${item.relation_derivation_if_any}` : ''}
-                    {item.contemporary_or_retrospective ? ` | Temporal class: ${item.contemporary_or_retrospective}` : ''}
-                  </p>
-                ))}
-              </section>}
-              {traceData.sourceGroups?.length > 0 && <section aria-label="Source assets">
-                <h4>Source assets</h4>
-                {traceData.sourceGroups.map((group) => (
-                  <details key={group.asset_key} open>
-                    <summary>
-                      {group.title || 'Untitled source'}
-                      {group.date ? ` | ${group.date}` : ''}
-                      {group.pid ? ` | PID ${group.pid}` : ''}
-                      {` | ${group.chunks?.length || 0} retrieved passage${group.chunks?.length === 1 ? '' : 's'}`}
-                    </summary>
-                    <p>
-                      Evidence type: {group.evidence_types?.map((type) => (
-                        <Tag key={type} type="blue" size="sm">{type}</Tag>
-                      ))}
-                    </p>
-                    {group.collection && <p>Collection: {group.collection}</p>}
-                    {group.presets?.length > 0 && <p>Collection preset: {group.presets.join(', ')}</p>}
-                    {group.chunks?.map((chunk) => (
-                      <details key={chunk.source_id} id={`grouped-source-${chunk.source_number}`} open>
-                        <summary>Page {chunk.page_start || 'unavailable'}{chunk.page_end && chunk.page_end !== chunk.page_start ? `-${chunk.page_end}` : ''} | Chunk {chunk.chunk_id || 'unavailable'}</summary>
-                        <p>{chunk.text || 'Passage text unavailable.'}</p>
-                      </details>
-                    ))}
-                  </details>
-                ))}
-              </section>}
-              <section aria-label="Archival metadata associations">
-                <h4>Archival metadata associations</h4>
-                {traceData.archivalAssociations?.length > 0
-                  ? traceData.archivalAssociations.map((item, index) => <p key={`${item.record_pid}-${index}`}>Record {item.record_pid} | Scope: {item.scope} | Controlled fields: {item.controlled_fields?.join(', ') || 'not retained'} | {item.description}</p>)
-                  : <p>No archival metadata association is asserted for this run.</p>}
-              </section>
-              <section aria-label="Retrieval diagnostics">
-                <h4>Retrieval diagnostics</h4>
-                {retrievalDiagnosticItems.length > 0
-                  ? retrievalDiagnosticItems.map((item, index) => <p key={`diagnostic-${index}`}>{item}</p>)
-                  : <p>Retrieval diagnostics were not calculated for this run.</p>}
-              </section>
-              {traceData.retrievalV3 && (
-                <section aria-label="Retrieval v3 explanation">
-                  <h4>Retrieval v3 explanation</h4>
-                  <p>Template: {traceData.retrievalV3.retrieval_template}; adequacy: {traceData.retrievalV3.retrieval_adequacy?.status}.</p>
-                  <p>{traceData.retrievalV3.retrieval_adequacy?.missingness_safety_message || 'Retrieval adequacy permits corpus-level missingness evaluation only after researcher review.'}</p>
-                  {traceData.sources.map((source) => (
-                    <div key={`v3-${source.chunkId}`}>
-                      <p>Source {source.rank}: lanes {source.laneNominations.map((item) => item.lane).join(', ') || 'none'}.</p>
-                      {source.authorityGraphSignals?.edges?.length > 0 && (
-                        <p>Authority graph: {source.authorityGraphSignals.edges.map((edge) => `${edge.authority_label} (${edge.authority_id}; ${edge.relation_type}; ${edge.trigger_field}: ${edge.trigger_value_raw})`).join('; ')}.</p>
-                      )}
-                      <p>Passage: page {source.page || 'unavailable'}; chunk {source.chunkId}; facets {source.facetCoverage.join(', ') || 'none'}; score {formatScore(source.passageScore) || 'unavailable'}; components {source.passageScoreComponents ? Object.entries(source.passageScoreComponents).map(([key, value]) => `${key}=${value}`).join(', ') : 'unavailable'}.</p>
-                    </div>
-                  ))}
-                </section>
-              )}
-              <section aria-label="Model interpretation">
-                <h4>Model interpretation</h4>
-                {['deterministic_catalogue_result', 'targeted_document_evidence_limit'].includes(traceData.answerOrigin)
-                  ? <p>Not used. This result was determined from the selected-document retrieval result without model synthesis.</p>
-                  : traceData.pipelineFailure
-                  ? <><p>Model interpretation unavailable</p><p>Formal run stopped at {traceData.pipelineFailure.stage === 'source_analysis' ? 'Stage A schema validation' : traceData.pipelineFailure.stage}.</p><p>{traceData.pipelineFailure.raw_output_preserved ? 'Raw Stage A model output is preserved with the immutable run.' : traceData.errorMessage || 'No final synthesis was produced.'}</p>{traceData.pipelineFailure.raw_output_preserved && traceData.rawModelResponse && <details className="tracer__raw-capture"><summary>Raw Stage A model output (immutable audit record)</summary><pre>{traceData.rawModelResponse}</pre></details>}</>
-                  : traceData.inferences?.length > 0
-                  ? traceData.inferences.map((item, index) => <p key={item?.claim_id || item?.inference || `inference-${index}`}>{formatInference(item)}</p>)
-                  : <p>{traceData.answerState === 'unverified_research_draft' ? 'The complete draft above is unverified model interpretation, not established historical findings.' : 'No generated inference is asserted.'}</p>}
-                {traceData.contradictions?.map((item, index) => <p key={`contradiction-${index}`}>Qualification: {item.description || item.claim || item}</p>)}
-                {traceData.stageExecution && <p>Stages run: {traceData.stageExecution.stages?.join(', ') || 'not recorded'} ({traceData.stageExecution.call_count ?? 0} model calls).</p>}
-              </section>
-              <section aria-label="Evidential limits">
-                <h4>Evidential limits</h4>
-                {traceData.evidentialLimits?.length > 0
-                  ? traceData.evidentialLimits.map((item, index) => (
-                    <p key={item.claim_id || `${item.category}-${index}`}>
-                      <strong>{missingnessOriginLabel(item)}:</strong> {item.claim_text || item.explanation}
-                    </p>
-                  ))
-                  : <p>No scoped evidential limits were recorded.</p>}
-                {traceData.captureDerivedLimits?.map((limit, index) => <p key={`capture-limit-${index}`}><strong>Capture-derived documentary boundary:</strong> {limit}</p>)}
-                {traceData.captureDerivedLimits?.length > 0 && <p>These are limits of the selected documentary passages in this immutable capture, not evidence of archival absence.</p>}
-                {traceData.captureAuditSummary && <p><strong>Capture audit:</strong> {traceData.captureAuditSummary}</p>}
-              </section>
-              <details className="tracer__raw-capture">
-                <summary>Diagnostic response fields</summary>
-                <p>Raw authority records: {traceData.diagnosticAuthorityEvidence?.length || 0}. Raw documentary claims: {traceData.diagnosticDocumentaryEvidence?.length || 0}. Raw pipeline limits: {traceData.missingness?.length || 0}.</p>
-              </details>
-              <section aria-label="Source provenance">
-                <h4>Source provenance</h4>
-                <p>{traceData.sourceProvenance?.valid ? 'PASS' : 'Requires researcher review.'} Documentary passage archival/document/page chain: {traceData.sourceProvenance?.source_count ?? traceData.sources.length} source{(traceData.sourceProvenance?.source_count ?? traceData.sources.length) === 1 ? '' : 's'}.</p>
-              </section>
-              <section aria-label="Model claim provenance">
-                <h4>Model-claim provenance</h4>
-                <p>{traceData.claimProvenanceResult?.valid ? 'PASS' : 'PARTIAL / requires researcher review.'} Generated substantive claims must cite valid supplied documentary sources.</p>
-                {traceData.claimValidation?.rendered_claims?.map((claim, index) => (
-                  <p key={`claim-validation-${index}`}>
-                    Claim {claim.claim_ids?.join(', ') || index + 1} | Status: <strong>{claim.status}</strong> | Evidence IDs: {claim.supporting_evidence_ids?.join(', ') || 'None'}
-                  </p>
-                ))}
-                {traceData.claimProvenance?.length > 0 && (
-                  <div className="tracer__claim-provenance">
-                    {traceData.claimProvenance.map((claim) => (
-                      <div className="tracer__claim" key={claim.claim_id || claim.claim_number}>
-                        <p><strong>{claim.section || `Claim ${claim.claim_number}`}</strong></p>
-                        <p>{claim.claim_text || claim.assertion}</p>
-                        <p>Source IDs: {(claim.source_ids || claim.evidence_ids)?.join(', ') || 'None'} | Status: <strong>{claim.provenance_status || claim.semantic_status}</strong></p>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                {traceData.formatViolations?.length > 0 && <InlineNotification lowContrast kind="warning" title="Model output contained unexpected structural/prompt-echo text." subtitle="The raw capture is preserved exactly; this text is recorded as FORMAT_VIOLATION, not as an evidential claim." />}
-                {traceData.capture && <details className="tracer__raw-capture"><summary>Raw one-shot output (immutable audit record)</summary><pre>{traceData.rawModelResponse}</pre></details>}
-              </section>
-              {traceData.missingnessDecision && (
-                <section aria-label="Scoped missingness decision">
-                  <h4>Scoped missingness decision</h4>
-                  <p>Status: {traceData.missingnessDecision.missingness_state}. Coverage: {traceData.missingnessDecision.coverage_status}.</p>
-                  <p>Tested proposition: {traceData.missingnessDecision.claim_predicate}</p>
-                </section>
-              )}
-            </div>
-          )}
 
           {traceData && (
             <div className="tracer__answer-controls">
@@ -1539,11 +1210,12 @@ const EvidenceTracer = () => {
         <Tile className="tracer__panel">
           <PanelHeader
             title="Retrieved source stack and evidence chain"
-            description="Question → archive-first source selection → retained, inspectable passages → evidence set → recorded answer construction → response."
+            description="Question → Retrieval → Evidence → Validated claims → Scholarly argument → Citations → Bounded Qualification"
               actions={traceData && <RetrievalAiLabel />}
           />
+          <EvidenceGraph data={traceData ? { ...traceData, sources: presentation.sources, citationCount: presentation.notes.length, unresolvedCitationCount: presentation.warnings.length } : null} />
           <EvidenceChain
-            sources={traceData?.sources || []}
+            sources={presentation.sources}
             model={runtimeInfo?.display_name}
             showEmptyState={showNoSourcesReturned}
             onCopyCitation={handleCopyCitation}
@@ -1551,16 +1223,23 @@ const EvidenceTracer = () => {
             onShowAnalytics={goToAnalytics}
             onToggleProvenance={handleToggleProvenance}
           />
-        </Tile>
-      </Column>
-
-      <Column>
-        <Tile className="tracer__visualization">
-          <PanelHeader
-            title="Retrieval trail"
-            description="Trace-derived map of the archival passages used for this response. Each passage node names its archive identifier and page; hover for title and evidential classification."
-          />
-          <EvidenceGraph data={traceData} />
+          {presentation.notes.length > 0 && (
+            <section className="tracer__citation-notes" aria-label="Documentary citation notes">
+              <h4>Notes</h4>
+              <ol>{presentation.notes.map((note) => (
+                <li key={note.number} id={`documentary-note-${note.number}`}>
+                  <a href={`#${note.target}`}>{note.source?.title || note.authority?.assertion || note.authority?.title || note.authority?.label || 'Database authority record'}</a>
+                  {note.source && <>, {note.source.date || 'date unavailable'}, p. {note.source.page ?? 'unavailable'}.</>}
+                </li>
+              ))}</ol>
+            </section>
+          )}
+          {presentation.warnings.length > 0 && (
+            <div id="citation-warnings" tabIndex={-1}>
+              <InlineNotification lowContrast hideCloseButton kind="warning" title="Unresolved citations" subtitle={presentation.warnings.join(' ')} />
+            </div>
+          )}
+          <EvidenceDetails trace={traceData} presentation={presentation} diagnosticItems={retrievalDiagnosticItems} />
         </Tile>
       </Column>
     </PageGrid>

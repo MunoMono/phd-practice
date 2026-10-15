@@ -1,13 +1,13 @@
-import { Button } from '@carbon/react'
+import { Button, InlineNotification } from '@carbon/react'
 import { Download } from '@carbon/icons-react'
 import { useEffect, useRef, useState } from 'react'
 import * as d3 from 'd3'
 import { chartColors, carbonColors, chartStyles } from '../../utils/carbonD3Theme'
 
 const sourceLabel = (source, index) => {
-  const archiveId = source.pid || source.archiveRecordPid || source.documentId || `Source ${index + 1}`
-  const locator = source.page ? `p. ${source.page}` : source.chunkId ? `chunk ${source.chunkId}` : 'locator unavailable'
-  return `${archiveId} | ${locator}`
+  const title = source.title || source.pid || source.documentId || 'Untitled source'
+  const locator = source.page != null ? `p. ${source.page}` : 'page unavailable'
+  return `${index + 1}: ${title.length > 36 ? `${title.slice(0, 35)}…` : title} | ${locator}`
 }
 
 const sourceDetail = (source) => [
@@ -40,6 +40,25 @@ const formatScore = (score) => {
 const EvidenceGraph = ({ data }) => {
   const svgRef = useRef()
   const [selectedSource, setSelectedSource] = useState(null)
+  const [exportError, setExportError] = useState('')
+  const exportCopy = () => {
+    const copy = svgRef.current.cloneNode(true)
+    copy.setAttribute('xmlns', 'http://www.w3.org/2000/svg')
+    const originals = [svgRef.current, ...svgRef.current.querySelectorAll('*')]
+    const copies = [copy, ...copy.querySelectorAll('*')]
+    originals.forEach((element, index) => {
+      const style = getComputedStyle(element)
+      for (const property of ['fill', 'stroke', 'font-family', 'font-size', 'font-weight']) {
+        copies[index].setAttribute(property, style.getPropertyValue(property))
+      }
+    })
+    const background = document.createElementNS('http://www.w3.org/2000/svg', 'rect')
+    background.setAttribute('width', svgRef.current.viewBox.baseVal.width)
+    background.setAttribute('height', svgRef.current.viewBox.baseVal.height)
+    background.setAttribute('fill', getComputedStyle(svgRef.current.parentElement.parentElement).backgroundColor)
+    copy.insertBefore(background, copy.firstChild)
+    return copy
+  }
 
   const downloadBlob = (blob, filename) => {
     const url = URL.createObjectURL(blob)
@@ -53,16 +72,16 @@ const EvidenceGraph = ({ data }) => {
   const exportSvg = () => {
     if (!svgRef.current) return
 
-    const copy = svgRef.current.cloneNode(true)
-    copy.setAttribute('xmlns', 'http://www.w3.org/2000/svg')
+    const copy = exportCopy()
+    setExportError('')
     downloadBlob(new Blob([new XMLSerializer().serializeToString(copy)], { type: 'image/svg+xml;charset=utf-8' }), 'turin-evidence-trail.svg')
   }
 
   const exportPng = () => {
     if (!svgRef.current) return
 
-    const copy = svgRef.current.cloneNode(true)
-    copy.setAttribute('xmlns', 'http://www.w3.org/2000/svg')
+    const copy = exportCopy()
+    setExportError('')
     const svgBlob = new Blob([new XMLSerializer().serializeToString(copy)], { type: 'image/svg+xml;charset=utf-8' })
     const url = URL.createObjectURL(svgBlob)
     const image = new Image()
@@ -73,28 +92,39 @@ const EvidenceGraph = ({ data }) => {
       canvas.width = viewBox.width * scale
       canvas.height = viewBox.height * scale
       const context = canvas.getContext('2d')
-      context.fillStyle = '#262626'
+      if (!context) {
+        setExportError('PNG export failed: a canvas drawing context is unavailable.')
+        URL.revokeObjectURL(url)
+        return
+      }
+      context.fillStyle = getComputedStyle(svgRef.current.parentElement).backgroundColor
       context.fillRect(0, 0, canvas.width, canvas.height)
       context.drawImage(image, 0, 0, canvas.width, canvas.height)
       canvas.toBlob((blob) => {
         if (blob) downloadBlob(blob, 'turin-evidence-trail.png')
+        else setExportError('PNG export failed: the browser could not encode the image.')
         URL.revokeObjectURL(url)
       }, 'image/png')
+    }
+    image.onerror = () => {
+      setExportError('PNG export failed: the browser could not render the SVG.')
+      URL.revokeObjectURL(url)
     }
     image.src = url
   }
 
   useEffect(() => {
-    const width = 960
-    const rowSpacing = 84
-    const topOffset = 80
+    setSelectedSource(null)
+    const width = 1120
+    const rowSpacing = 100
+    const topOffset = 220
     const rowCount = Math.max(data?.sources?.length || 0, 1)
-    const height = Math.max(420, topOffset + ((rowCount - 1) * rowSpacing) + 64)
+    const height = Math.max(360, topOffset + ((rowCount - 1) * rowSpacing) + 90)
 
     d3.select(svgRef.current).selectAll('*').remove()
 
     const svg = d3.select(svgRef.current)
-    .attr('viewBox', `0 0 1120 ${height}`)
+      .attr('viewBox', `0 0 1120 ${height}`)
       .attr('preserveAspectRatio', 'xMidYMid meet')
 
     if (!data) {
@@ -103,7 +133,7 @@ const EvidenceGraph = ({ data }) => {
         .attr('y', height / 2)
         .attr('text-anchor', 'middle')
         .attr('fill', chartColors.emptyState)
-        .style('font-size', '16px')
+        .attr('class', 'evidence-graph__empty')
         .text('Submit a question to inspect its evidence trail')
 
       return
@@ -111,22 +141,24 @@ const EvidenceGraph = ({ data }) => {
 
     const sources = data.sources || []
     const archiveIds = new Set(sources.map((source) => source.pid || source.archiveRecordPid).filter(Boolean))
-    const answerConstruction = data.answerOrigin === 'deterministic_evidence_bound_fallback'
-      ? 'Evidence-bound assembly'
-      : data.answerOrigin === 'retrieval_only'
-        ? 'No model synthesis'
-        : 'Model evidence synthesis'
+    const unverified = data.answerState === 'unverified_research_draft'
+    const unavailable = ['synthesis_unavailable', 'evidential_limit'].includes(data.answerState)
+      || ['retrieval_only', 'model_parse_failure', 'model_runtime_failure'].includes(data.answerOrigin)
+      || (!data.answer && !data.answerParagraphs?.length)
+    const claimStatus = unverified ? 'Unassessed' : data.claimValidation ? 'Checks recorded' : 'Not established'
     const nodes = [
-      { id: 'question', label: 'Research question', detail: data.prompt || data.query || 'Question text unavailable', column: 0, row: 0, group: 'query' },
-      { id: 'selection', label: 'Archive-first selection', detail: `${sources.length} retained passage${sources.length === 1 ? '' : 's'} nominated from the available evidence surface`, column: 1, row: 0, group: 'document' },
-      { id: 'evidence-set', label: 'Inspectable evidence set', detail: `${sources.length} passage${sources.length === 1 ? '' : 's'} from ${archiveIds.size || 'unresolved'} archival record${archiveIds.size === 1 ? '' : 's'}`, column: 3, row: 0, group: 'pid' },
-      { id: 'construction', label: answerConstruction, detail: data.model ? `Runtime model: ${data.model}` : 'Answer construction method recorded by this run', column: 4, row: 0, group: data.answerOrigin === 'deterministic_evidence_bound_fallback' ? 'document' : 'model' },
-      { id: 'answer', label: 'Evidence-backed response', detail: 'Read alongside the selected passages, provenance chain, and stated limits.', column: 5, row: 0, group: 'answer' }
+      { id: 'question', label: 'Question', status: 'Submitted', detail: data.prompt || data.query, column: 0, group: 'query' },
+      { id: 'selection', label: 'Retrieval', status: `${sources.length} passages`, detail: 'Source nomination and passage selection, not proof of historical action.', column: 1, group: 'document' },
+      { id: 'evidence-set', label: 'Evidence', status: sources.length ? 'Inspectable' : 'Not supplied', detail: `${sources.length} passages from ${archiveIds.size || 'unresolved'} archival records`, column: 2, group: 'pid' },
+      { id: 'claims', label: 'Validated claims', status: claimStatus, detail: 'Inspect the actual claim assessments below. This stage label does not establish human acceptance.', column: 3, group: 'document' },
+      { id: 'argument', label: 'Scholarly argument', status: unavailable ? 'Unavailable' : unverified ? 'Unverified draft' : 'Response recorded', detail: `Construction: ${data.answerOrigin || 'not recorded'}; model: ${data.model || 'not recorded'}`, column: 4, group: 'model' },
+      { id: 'citations', label: 'Citations', status: data.unresolvedCitationCount ? 'Unresolved references' : data.citationCount ? `${data.citationCount} linked notes` : 'None mapped', detail: 'Links resolve only to supplied evidence; they do not independently validate a claim.', column: 5, group: 'pid' },
+      { id: 'qualification', label: 'Bounded Qualification', status: data.evidentialLimits?.length || data.missingness?.length ? 'Limits recorded' : 'Not assessed', detail: 'Absence within a retrieved scope does not prove historical absence.', column: 6, group: 'document' },
     ]
-    const links = [{ source: 'question', target: 'selection', value: 1 }]
+    const links = nodes.slice(1).map((node, index) => ({ source: nodes[index].id, target: node.id, value: 1, framework: true }))
 
     sources.forEach((source, index) => {
-      const sourceId = source.chunkId || source.sourceId || `source-${index}`
+      const sourceId = source.anchor || `passage-${index}`
       const selectionScore = Number.isFinite(source.sourceNominationScore) ? source.sourceNominationScore : source.score || 0.5
       const passageScore = Number.isFinite(source.passageScore) ? source.passageScore : source.score || 0.5
 
@@ -135,14 +167,11 @@ const EvidenceGraph = ({ data }) => {
       links.push({ source: sourceId, target: 'evidence-set', value: passageScore })
     })
 
-    links.push({ source: 'evidence-set', target: 'construction', value: 1 })
-    links.push({ source: 'construction', target: 'answer', value: 1 })
-
-    const columns = [90, 280, 505, 730, 920, 1080]
+    const columns = [80, 240, 400, 560, 720, 880, 1040]
 
     nodes.forEach((node) => {
       node.x = columns[node.column]
-      node.y = node.column === 2 ? topOffset + (node.row * rowSpacing) : height / 2
+      node.y = node.source ? topOffset + (node.row * rowSpacing) : 44
     })
 
     const nodeLookup = new Map(nodes.map((node) => [node.id, node]))
@@ -167,6 +196,7 @@ const EvidenceGraph = ({ data }) => {
       .append('line')
       .attr('stroke', carbonColors.gray[50])
       .attr('stroke-opacity', 0.65)
+      .attr('stroke-dasharray', (d) => d.framework ? '4 4' : null)
       .attr('stroke-width', (d) => Math.max(1.5, Math.min(4, d.value * 3)))
       .attr('x1', (d) => d.source.x)
       .attr('y1', (d) => d.source.y)
@@ -177,6 +207,8 @@ const EvidenceGraph = ({ data }) => {
       .data(nodes)
       .enter()
       .append('g')
+      .attr('class', (d) => d.source ? 'evidence-graph__source' : 'evidence-graph__stage')
+      .attr('data-stage', (d) => d.source ? null : d.label)
       .attr('transform', (d) => `translate(${d.x}, ${d.y})`)
       .attr('tabindex', (d) => d.source ? 0 : null)
       .attr('role', (d) => d.source ? 'button' : null)
@@ -191,13 +223,13 @@ const EvidenceGraph = ({ data }) => {
 
     node.append('title').text((d) => `${d.label}\n${d.detail || ''}`)
     node.append('circle')
-      .attr('r', 22)
+      .attr('r', 16)
       .attr('fill', (d) => colorMap[d.group] || carbonColors.gray[60])
       .attr('stroke', chartColors.selectionStroke)
       .attr('stroke-width', 1.5)
 
     node.append('text')
-      .attr('font-size', 12)
+      .attr('class', 'evidence-graph__label')
       .attr('fill', chartStyles.timeline.text.fill)
       .attr('text-anchor', 'middle')
       .attr('y', 36)
@@ -210,6 +242,11 @@ const EvidenceGraph = ({ data }) => {
             .text(line)
         })
       })
+    node.filter((d) => !d.source).append('text')
+        .attr('class', 'evidence-graph__stage-status')
+        .attr('text-anchor', 'middle')
+        .attr('y', 84)
+        .text((d) => d.status)
 
   }, [data])
 
@@ -221,7 +258,11 @@ const EvidenceGraph = ({ data }) => {
           <Button kind="ghost" size="sm" renderIcon={Download} onClick={exportPng}>Download PNG</Button>
         </div>
       )}
-      <svg ref={svgRef} aria-label="Evidence retrieval trail" role="img"></svg>
+      {exportError && <InlineNotification lowContrast kind="error" title="Retrieval trail export failed" subtitle={exportError} />}
+      <p className="evidence-graph__framework-note">Epistemological framework, not seven model calls. Stage labels do not establish human acceptance; inspect the recorded assessments below.</p>
+      <div className="evidence-graph__viewport" tabIndex={0} role="region" aria-label="Scrollable retrieval trail">
+        <svg ref={svgRef} aria-label="Evidence retrieval trail" role="img"></svg>
+      </div>
       {selectedSource && (
         <aside className="evidence-graph__inspector" aria-live="polite">
           <h4>Selected passage</h4>
@@ -233,6 +274,7 @@ const EvidenceGraph = ({ data }) => {
             <div><dt>Retrieval strength</dt><dd>{formatScore(selectedSource.score)} overall | {formatScore(selectedSource.sourceNominationScore)} nomination | {formatScore(selectedSource.passageScore)} passage</dd></div>
             <div><dt>Provenance status</dt><dd>{selectedSource.provenanceStatus || 'Unavailable'}</dd></div>
           </dl>
+          <a href={`#${selectedSource.anchor || ''}`}>Read selected source passage</a>
         </aside>
       )}
     </div>

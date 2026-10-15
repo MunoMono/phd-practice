@@ -1,8 +1,10 @@
-import { AILabel, AILabelActions, AILabelContent, Button, Tile } from '@carbon/react'
+import { Button, Tile } from '@carbon/react'
+import { useState } from 'react'
+import { DiagnosticValue } from './EvidenceDetails'
 
-const renderCitation = (citation) => {
+const renderCitation = (citation, source) => {
   if (!citation) {
-    return 'Not yet exposed by endpoint.'
+    return [source.title, source.date, source.page != null ? `p. ${source.page}` : null, source.pid, source.publicUrl].filter(Boolean).join(', ')
   }
 
   if (typeof citation === 'string') {
@@ -18,36 +20,6 @@ const renderCitation = (citation) => {
   ].filter(Boolean).join(' | ')
 }
 
-const SourceAiLabel = ({ source, model, classificationLabel }) => (
-  <AILabel
-    className="evidence-source-card__ai-label"
-    size="xs"
-    textLabel={`Explain source selection for ${source.pid || source.sourceId || 'this source'}`}
-  >
-    <AILabelContent>
-      <div className="evidence-source-card__ai-explanation">
-        <p className="evidence-source-card__ai-eyebrow">AI explained</p>
-        <h4>Source selection</h4>
-        <p>This archival record was selected for review against the current research question.</p>
-        <hr />
-        <h5>What this means</h5>
-        <ol>
-          <li>The archive identifier is {source.pid || 'not exposed'}.</li>
-          <li>Its relation to this question is {classificationLabel || 'not classified'}.</li>
-          <li>Its archive status is {source.provenanceStatus || 'not exposed'}.</li>
-        </ol>
-        <p className="evidence-source-card__ai-note">The archival passage and its descriptive information are source material. The AI label explains selection for review, not the historical record.</p>
-      </div>
-      <AILabelActions>
-        <div className="evidence-source-card__ai-model">
-          <span>AI model</span>
-          <span>{model || 'Active research runtime'}</span>
-        </div>
-      </AILabelActions>
-    </AILabelContent>
-  </AILabel>
-)
-
 const DetailRow = ({ label, children }) => (
   <div className="evidence-source-card__detail-row">
     <dt>{label}</dt>
@@ -59,12 +31,11 @@ const EvidenceSourceCard = ({
   id,
   source,
   index,
-  model,
   onCopyCitation,
   onOpenCorpus,
-  onShowAnalytics,
-  onToggleProvenance
+  onShowAnalytics
 }) => {
+  const [expanded, setExpanded] = useState(Boolean(source.provenanceExpanded))
   const classificationLabel = {
     DIRECT_SUPPORT: 'Direct support',
     PARTIAL_SUPPORT: 'Partial support',
@@ -79,48 +50,43 @@ const EvidenceSourceCard = ({
   const title = source.title || 'Document title not yet exposed by endpoint.'
 
   return (
-    <Tile id={id} className="evidence-source-card">
+    <Tile id={id} className="evidence-source-card" tabIndex={-1}>
+      {(source.anchorAliases || source.aliases || []).filter((alias) => alias !== id).map((alias) => <span key={alias} id={alias} className="evidence-source-card__anchor" />)}
       <div className="evidence-source-card__header">
         <div>
-          <h4>Source {source.sourceId || index + 1}</h4>
-          <p>{title} | {source.date || 'Date not recorded'}</p>
-        </div>
-        <div className="evidence-source-card__header-actions">
-          <SourceAiLabel source={source} model={model} classificationLabel={classificationLabel} />
-          <dl className="evidence-source-card__status" aria-label="Source retrieval status">
-            <div><dt>Archive ID</dt><dd>{source.pid || 'Unavailable'}</dd></div>
-            <div><dt>Answer use</dt><dd>{source.evidenceState || 'Retrieved candidate'}</dd></div>
-            <div><dt>Relation</dt><dd>{classificationLabel || 'Not classified'}</dd></div>
-            <div><dt>Evidence type</dt><dd>{source.evidenceType || 'Not typed'}</dd></div>
-            <div><dt>Status</dt><dd>{source.provenanceStatus || 'Unavailable'}</dd></div>
-          </dl>
+          <h4>Source {index + 1} – {title}</h4>
+          <p>{source.date || 'Date not recorded'} | Page {source.page ?? 'unavailable'}{source.section ? ` / ${source.section}` : ''}</p>
         </div>
       </div>
-
-      <div className="evidence-source-card__meta">
-        <span>Chunk ID: {source.chunkId || 'Not yet exposed by endpoint'}</span>
-        <span>Document ID: {source.documentId || 'Not yet exposed by endpoint'}</span>
-        <span>Date: {source.date || 'Not retained in capture'}</span>
-        <span>Contributor: {source.contributorStatus || 'Contributor not retained in capture'}</span>
-        <span>Source type: {source.sourceType || 'Not retained in capture'}</span>
-        <span>Temporal class: {source.temporalClass || 'Not retained in capture'}</span>
-        {source.personNameStatus && <span>{source.personNameStatus}</span>}
-        {source.temporalAuditStatus && <span>Temporal audit: {source.temporalAuditStatus}</span>}
-        <span>Page/Section: {source.page || 'N/A'}{source.section ? ` / ${source.section}` : ''}</span>
-        <span>Archive identity: {source.identity?.recordPid || 'record unavailable'} → {source.identity?.mediaPid || 'media unavailable'} → {source.identity?.assetPid || 'asset unavailable'}</span>
-        <span>Retrieval score: {source.score ?? 'Not yet exposed by endpoint'}</span>
-      </div>
-
-      {source.classificationScope && <p className="evidence-source-card__classification-scope">{source.classificationScope}</p>}
-      {source.classificationProjection && <p className="evidence-source-card__classification-scope">Stored class: {source.classificationProjection.stored_classification}; read-only display projection: {source.classificationProjection.displayed_classification}.</p>}
-      {source.classificationAuditNote && <p className="evidence-source-card__classification-scope">{source.classificationAuditNote}</p>}
-      {source.unclassifiedStatus && <p className="evidence-source-card__classification-scope">{source.unclassifiedStatus}</p>}
-      {source.formulation && <p className="evidence-source-card__classification-scope">Documentary formulation: {source.formulation}</p>}
-      {source.sourceFamily && <p className="evidence-source-card__classification-scope">Source-family concentration: {source.sourceFamily}</p>}
-
       <div className="evidence-source-card__excerpt">
         {source.excerpt || 'No excerpt returned by the current endpoint.'}
       </div>
+      <details className="evidence-source-card__why" open={expanded} onToggle={(event) => setExpanded(event.currentTarget.open)}>
+        <summary>Provenance details</summary>
+        <div className="evidence-source-card__header-actions">
+          <dl className="evidence-source-card__status" aria-label="Source retrieval status">
+            {source.pid && <div><dt>Archive ID</dt><dd>{source.pid}</dd></div>}
+            {source.evidenceState && <div><dt>Answer use</dt><dd>{source.evidenceState}</dd></div>}
+            {classificationLabel && <div><dt>Relation</dt><dd>{classificationLabel}</dd></div>}
+            {source.evidenceType && <div><dt>Evidence type</dt><dd>{source.evidenceType}</dd></div>}
+            {source.provenanceStatus && <div><dt>Status</dt><dd>{source.provenanceStatus}</dd></div>}
+          </dl>
+        </div>
+      <div className="evidence-source-card__meta">
+        {source.chunkId && <span>Chunk ID: {source.chunkId}</span>}
+        {source.documentId && <span>Document ID: {source.documentId}</span>}
+      </div>
+      <div className="evidence-source-card__retained-metadata">
+        <DiagnosticValue value={Object.fromEntries(Object.entries(source).filter(([key]) => ![
+          'title', 'excerpt', 'provenance', 'aliases', 'anchorAliases', 'anchor', 'detail',
+          'chunkId', 'documentId', 'pid', 'date', 'page', 'evidenceState', 'evidenceType', 'provenanceStatus',
+          'retrievalChannels', 'sourceNominationChannels', 'sourceNominationScore', 'metadataMatches',
+          'archiveNominationReasons', 'passageEvidenceChannel', 'passageScore', 'textScore', 'metadataScore',
+        ].includes(key)))} />
+        {source.provenance && <DiagnosticValue value={Object.fromEntries(Object.entries(source.provenance).filter(([key]) => !['text', 'excerpt'].includes(key)))} />}
+      </div>
+
+      </details>
 
       {(source.sourceNominationChannels.length > 0 || source.retrievalChannels.length > 0 || source.metadataMatches.length > 0 || source.archiveNominationReasons.length > 0) && (
         <details className="evidence-source-card__why">
@@ -138,27 +104,25 @@ const EvidenceSourceCard = ({
       <details className="evidence-source-card__why">
         <summary>Why this passage?</summary>
         <dl className="evidence-source-card__detail-list">
-          <DetailRow label="Evidence channel">{source.passageEvidenceChannel || 'WINDOW_CONTEXT'}</DetailRow>
+          {source.passageEvidenceChannel && <DetailRow label="Evidence channel">{source.passageEvidenceChannel}</DetailRow>}
           {Number.isFinite(source.passageScore) && <DetailRow label="Passage score">{source.passageScore.toFixed(3)}</DetailRow>}
-          <DetailRow label="Text relevance">{Number.isFinite(source.textScore) ? source.textScore.toFixed(3) : 'Not scored'}</DetailRow>
-          <DetailRow label="Metadata score">{Number.isFinite(source.metadataScore) ? source.metadataScore.toFixed(3) : 'Source nomination only'}</DetailRow>
+          {Number.isFinite(source.textScore) && <DetailRow label="Text relevance">{source.textScore.toFixed(3)}</DetailRow>}
+          {Number.isFinite(source.metadataScore) && <DetailRow label="Metadata score">{source.metadataScore.toFixed(3)}</DetailRow>}
           <DetailRow label="Documentary window">Page {source.page || 'unavailable'}{source.section ? `, ${source.section}` : ''} | {source.chunkId || 'chunk unavailable'}</DetailRow>
         </dl>
       </details>
-
-      <div className="evidence-source-card__citation">
-        <strong>Citation:</strong> {renderCitation(source.citation)}
-      </div>
 
       <div className="evidence-source-card__actions">
         <Button size="sm" kind="ghost" onClick={onCopyCitation}>Copy citation</Button>
         <Button size="sm" kind="ghost" onClick={onOpenCorpus}>Open in sources</Button>
         <Button size="sm" kind="ghost" onClick={onShowAnalytics}>Locate in semantic atlas</Button>
-        <Button size="sm" kind="secondary" onClick={onToggleProvenance}>View provenance</Button>
+        <Button size="sm" kind="secondary" onClick={() => setExpanded(!expanded)} aria-expanded={expanded}>View provenance</Button>
+        {source.publicUrl && <a href={source.publicUrl} target="_blank" rel="noreferrer">Open original source</a>}
       </div>
 
-      {source.provenanceExpanded && (
+      {expanded && (
         <div className="evidence-source-card__provenance">
+          <p><strong>Citation:</strong> {renderCitation(source.citation, source)}</p>
           {(source.provenance || Object.keys(source.catalogueLocation || {}).length > 0 || Object.keys(source.rightsAccess || {}).length > 0) ? (
             <>
               {source.provenance && <>
@@ -166,8 +130,6 @@ const EvidenceSourceCard = ({
                 <dl className="evidence-source-card__detail-list">
                 <DetailRow label="Identity chain">{source.provenance.archive_record_pid || 'record unavailable'} → {source.provenance.attached_media_pid || 'media unavailable'} → {source.provenance.asset_pid || 'asset unavailable'} → page {source.provenance.page || source.page || 'unavailable'} → {source.provenance.chunk_id || source.chunkId || 'chunk unavailable'}</DetailRow>
                 {source.provenance.source_uri && <DetailRow label="Source file"><a href={source.provenance.source_uri} target="_blank" rel="noreferrer">Open archival source file</a></DetailRow>}
-                <DetailRow label="Influenced inferences">{source.provenance.inferencesInfluenced || 'Not exposed by this immutable run.'}</DetailRow>
-                <DetailRow label="Training runs">{(source.provenance.trainingRuns || []).length > 0 ? source.provenance.trainingRuns.map((run) => run.model).join(', ') : 'None returned'}</DetailRow>
                 </dl>
               </>}
               {Object.keys(source.catalogueLocation || {}).length > 0 && <>
@@ -186,7 +148,6 @@ const EvidenceSourceCard = ({
               {source.rightsAccess?.data_rights && <DetailRow label="Data rights">{source.rightsAccess.data_rights}</DetailRow>}
                 </dl>
               </>}
-              {source.provenanceStatus !== 'loaded' && <p>Catalogue metadata was refreshed from DDR GraphQL. The retained document asset has changed, so current passages require re-ingestion and revalidation.</p>}
             </>
           ) : (
             <p>Provenance details are not available from the current endpoint.</p>

@@ -64,34 +64,24 @@
   }
 
   .tracer__answer-body {
-    @include type-style('heading-03');
-    font-size: 4.21875rem;
-    line-height: 5.625rem;
-    max-width: 72rem;
+    @include type-style('body-02');
+    max-width: 66ch;
     margin-bottom: $spacing-07;
-    white-space: pre-wrap;
     color: $text-primary;
 
-    .tracer__answer-paragraph h4 {
-      margin: 0 0 2rem;
-      font-size: 1.875rem;
-      line-height: 2.25rem;
+    p, blockquote, ul, ol {
+      @include type-style('body-02');
+      margin: 0 0 $spacing-05;
     }
 
-    p {
-      margin: 0;
-      font-size: 1.5rem;
-      line-height: 2.25rem;
-    }
-
-    .tracer__answer-paragraph + .tracer__answer-paragraph {
-      margin-top: $spacing-05;
+    blockquote {
+      border-left: 1px solid $border-interactive;
+      padding-left: $spacing-05;
     }
 
     .tracer__source-citation {
-      display: inline-block;
-      margin-left: 0.1875rem;
-      font-size: 0.6875em;
+      @include type-style('label-01');
+      margin-left: 0;
       font-weight: 600;
       line-height: 1;
       vertical-align: super;
@@ -104,9 +94,43 @@
       a:hover,
       a:focus-visible {
         text-decoration: underline;
+        outline: 1px solid $focus;
       }
     }
   }
+
+  .tracer__citation-notes, .tracer__supporting-details {
+    @include type-style('body-01');
+    margin-top: $spacing-06;
+    overflow-wrap: anywhere;
+
+    h4 { @include type-style('heading-02'); }
+    dl { margin: 0; }
+    dt { @include type-style('label-01'); color: $text-secondary; }
+    dd { margin: $spacing-02 0 $spacing-04 $spacing-05; }
+    pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+    details > summary { cursor: pointer; margin-bottom: $spacing-04; }
+  }
+
+  .evidence-source-card {
+    scroll-margin-top: $spacing-10;
+    &:target, &:focus { outline: 2px solid $focus; }
+  }
+
+  .evidence-source-card__excerpt {
+    @include type-style('body-02');
+    white-space: pre-wrap;
+    max-width: 66ch;
+  }
+
+  .evidence-source-card__retained-metadata {
+    @include type-style('body-01');
+    overflow-wrap: anywhere;
+    dt { @include type-style('label-01'); color: $text-secondary; }
+    dd { margin: $spacing-02 0 $spacing-04 $spacing-05; }
+  }
+
+  .evidence-chain { margin-top: $spacing-06; }
 
   .tracer__structured-response {
     display: grid;
@@ -312,9 +336,9 @@
     }
 
     h4 {
-      @include type-style('label-02');
+      @include type-style('heading-02');
       margin: 0 0 $spacing-02;
-      color: $text-secondary;
+      color: $text-primary;
       overflow-wrap: anywhere;
     }
 

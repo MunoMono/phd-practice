@@ -31,29 +31,29 @@ test('active Source Interrogation result survives analysis navigation until inte
   const input = page.getByRole('textbox', { name: 'Research query' })
   await input.fill('Query A')
   await page.getByRole('button', { name: 'Run interrogation' }).click()
-  await expect(page.getByText('Answer for Query A.')).toBeVisible()
+  await expect(page.locator('.tracer__answer-body')).toContainText('Answer for Query A.')
   await expect(page.getByRole('link', { name: 'Jump to source 1' })).toBeVisible()
-  await expect(page.getByText('Source for Query A', { exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Source 1 – Source for Query A', exact: true })).toBeVisible()
 
   await page.reload()
-  await expect(page.getByText('Answer for Query A.')).toBeVisible()
-  await expect(page.getByText('Source for Query A', { exact: true })).toBeVisible()
+  await expect(page.locator('.tracer__answer-body')).toContainText('Answer for Query A.')
+  await expect(page.getByRole('heading', { name: 'Source 1 – Source for Query A', exact: true })).toBeVisible()
 
   await page.goto('/absences')
   await page.goto('/source-interrogation')
-  await expect(page.getByText('Answer for Query A.')).toBeVisible()
-  await expect(page.getByText('Source for Query A', { exact: true })).toBeVisible()
+  await expect(page.locator('.tracer__answer-body')).toContainText('Answer for Query A.')
+  await expect(page.getByRole('heading', { name: 'Source 1 – Source for Query A', exact: true })).toBeVisible()
 
   await page.goto('/semantic-atlas')
   await page.goto('/cross-readings')
   await page.goto('/source-interrogation')
-  await expect(page.getByText('Answer for Query A.')).toBeVisible()
+  await expect(page.locator('.tracer__answer-body')).toContainText('Answer for Query A.')
 
   await input.fill('Query B')
-  await expect(page.getByText('Answer for Query A.')).toBeVisible()
+  await expect(page.locator('.tracer__answer-body')).toContainText('Answer for Query A.')
   await page.getByRole('button', { name: 'Run interrogation' }).click()
-  await expect(page.getByText('Answer for Query B.')).toBeVisible()
-  await expect(page.getByText('Answer for Query A.')).toHaveCount(0)
+  await expect(page.locator('.tracer__answer-body')).toContainText('Answer for Query B.')
+  await expect(page.locator('.tracer__answer-body')).not.toContainText('Answer for Query A.')
 
   await page.getByRole('button', { name: 'Clear current research' }).click()
   await expect(input).toHaveValue('')
@@ -65,7 +65,7 @@ test('active Source Interrogation result survives analysis navigation until inte
 
 test('a malformed saved Source Interrogation trace is discarded before rendering', async ({ page }) => {
   await page.addInitScript(() => {
-    window.sessionStorage.setItem('innovation-design.source-interrogation.active.v1', JSON.stringify({
+    window.sessionStorage.setItem('innovation-design.source-interrogation.active.v2', JSON.stringify({
       query: 'Interrupted query',
       mode: 'runtime',
       traceData: { answer: 'Partial response without a source stack.' }
@@ -75,5 +75,5 @@ test('a malformed saved Source Interrogation trace is discarded before rendering
   await page.goto('/source-interrogation')
 
   await expect(page.getByText('No answer returned yet. Submit a query to begin evidence tracing.')).toBeVisible()
-  await expect.poll(() => page.evaluate(() => window.sessionStorage.getItem('innovation-design.source-interrogation.active.v1'))).toBeNull()
+  await expect.poll(() => page.evaluate(() => window.sessionStorage.getItem('innovation-design.source-interrogation.active.v2'))).toBeNull()
 })

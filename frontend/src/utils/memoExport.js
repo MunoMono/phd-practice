@@ -1,3 +1,5 @@
+import { consolidateSources, exportScholarlyAnswer } from './scholarlyPresentation'
+
 const formatCitation = (source) => {
   if (!source.citation) {
     return 'Not available from current endpoint.'
@@ -80,8 +82,9 @@ const retrievalDiagnosticLines = (diagnostics) => {
 export const buildEvidenceTraceMemo = ({ trace, generatedAt = new Date() }) => {
   const generatedAtValue = trace.timestamp || generatedAt.toISOString()
   const retrieval = trace.retrieval || {}
-  const sourceLines = trace.sources.length > 0
-    ? trace.sources.map((source, index) => {
+  const sources = consolidateSources(trace)
+  const sourceLines = sources.length > 0
+    ? sources.map((source, index) => {
         const lines = [
           `### Source ${index + 1}`,
         ]
@@ -128,7 +131,7 @@ export const buildEvidenceTraceMemo = ({ trace, generatedAt = new Date() }) => {
   appendSection(lines, 'Archive / database authority context', (trace.authorityEvidence || []).map((item) => `- ${formatAuthorityContext(item)}`))
 
   const generatedInterpretation = [
-    ...(trace.answer ? [`### Answer\n\n${trace.answer}`] : []),
+    ...(trace.answer || trace.answerParagraphs?.length ? [`### Answer\n\n${exportScholarlyAnswer(trace)}`] : []),
     ...(trace.documentaryEvidence?.length ? ['### Documentary evidence claims', ...trace.documentaryEvidence.map((item) => `- ${item.claim} [PID ${item.pid || 'unrecorded'}, page ${item.page ?? 'unrecorded'}]`)] : []),
     ...(trace.inferences?.length ? ['### Inferences', ...trace.inferences.map((item) => `- ${item.inference}${item.confidence ? ` (${item.confidence})` : ''}`)] : []),
     ...(trace.contradictions?.length ? ['### Contradictions', ...trace.contradictions.map((item) => `- ${item.contradiction || item}`)] : [])

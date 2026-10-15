@@ -5,6 +5,29 @@
 .evidence-graph {
   width: 100%;
   min-width: 0;
+  background: $layer-01;
+
+  &__framework-note {
+    @include type-style('body-compact-01');
+    color: $text-secondary;
+    margin-bottom: $spacing-05;
+  }
+
+  &__viewport {
+    overflow-x: auto;
+    &:focus-visible { outline: 2px solid $focus; }
+    svg { min-width: 70rem; }
+  }
+
+  &__label, &__stage-status, &__empty {
+    @include type-style('label-01');
+    fill: $text-primary;
+  }
+
+  &__stage-status { fill: $text-secondary; }
+  &__links line { stroke: $border-strong-01; }
+  &__stage circle { fill: $layer-accent-01; stroke: $border-interactive; }
+  &__source circle { fill: $support-info; stroke: $border-interactive; }
 
   &__toolbar {
     display: flex;

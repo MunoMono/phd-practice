@@ -1,0 +1,58 @@
+SOURCE INTERROGATION PRESENTATION - CONFIRMED PRODUCTION BASELINE
+Date: 2026-10-15
+Production source baseline: 9ae0e33c9b76bce7c0b2618f07ea40659afb0592
+Production frontend image: sha256:331c5e3dd1975e5f50e6f5e2a359a85ad253df910c44c99464dc221dfe12c62b
+Backend release remains: 53d9ddfb63be5a5e25580647957c315c17b94df4
+
+The earlier presentation candidate was rolled back because its Git baseline
+omitted existing frontend source changes already running in production.
+This release starts from the recovered production source, not that incomplete
+baseline. A clean rebuild reproduces all 236 original release files
+byte-for-byte, including the active index-Ct0g83cZ.js and index-BQ6MnBMK.css.
+
+Presentation scope:
+- Research query, Scholarly answer, and one consolidated retrieved source
+  stack and evidence chain, with graph first, passage cards next, and
+  provenance/retrieval/claim/runtime diagnostics collapsed but accessible.
+- Question, Retrieval, Evidence, Validated claims, Scholarly argument,
+  Citations, Bounded Qualification. Framework labels are not extra model
+  calls, scholarly acceptance, or a replacement for actual claim assessments.
+- Shared Chicago superscript citation rendering and memo export; stable
+  numbering, Unicode-hyphen identity lookup, grouped/repeated citations,
+  canonical passage navigation and visible unresolved-reference warnings.
+- Exact same-document/chunk/page/passage deduplication only. Original source
+  words, identifiers, provenance, actions, raw exports and stored research
+  responses remain available. Distinct archival passages are not collapsed.
+- Generated-prose dash presentation protects quoted archival wording,
+  source passages, identifiers, URLs and code. Raw model output is retained.
+- Carbon/Plex themes, readable scrolling graph, keyboard source inspection,
+  themed SVG/PNG downloads and v2 research-session persistence are retained.
+
+Validation and release gates:
+- 139 existing out-of-scope source files remain byte-identical to the
+  recovered production source. Application shell, Sources, Workbench,
+  Visual analytics and Absences retain their existing production source.
+- Sources, Workbench, Visual analytics and Absences are compared against
+  the actual files pulled from the live container, using identical
+  read-only production API responses. Content, navigation and full-page
+  screenshot pixels must match both before and after deployment. The existing
+  Pause orbit control stops the time-dependent atlas animation identically
+  in both browsers; no camera or application code is changed for this check.
+- 12 Node unit tests and 12 focused browser tests: documentary/hybrid/
+  scoped-missingness citations, provenance access, mobile graph, themes,
+  SVG/PNG and Markdown exports, sessions, reload, replacement and clearing.
+- Existing captured DOC-12 and HYB-07 responses are replayed locally,
+  without submitting any new research question.
+- Production build and changed-component/test lint. Page lint retains
+  its existing four unused-variable errors and two hook warnings.
+- Seven intercepted-fixture presentation tests must pass on live
+  production after activation. They do not run inference or assign grades.
+
+Frontend-only overlay and activation. Backend/container IDs, inference model,
+nginx/compose configuration, corpus, authority records, archival identities,
+frozen UAT records and human decisions must not change. Preserve the exact
+confirmed frontend image above as rollback. Automatically restore that image
+if deployment asset, health, configuration or browser preservation checks fail.
+
+Granite remains granite4.1:30b-q4_K_M. No model calls, research experiments,
+historical reconstructions or UAT decisions are authorised by this release.
